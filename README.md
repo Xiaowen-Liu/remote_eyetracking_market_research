@@ -2,7 +2,12 @@
 
 A Chrome extension that turns your webcam into an eye tracker for UX research — no hardware required. Record where participants look, generate gaze heatmaps, and analyse dwell time across any website.
 
-Built with [WebGazer.js](https://webgazer.cs.brown.edu/) and Chrome Extension Manifest V3.
+Built with [WebGazer.js](https://webgazer.cs.brown.edu/), Chrome Extension
+Manifest V3, FastAPI, and PostgreSQL.
+
+> **Independent clean-room project:** this repository contains independently
+> developed code and synthetic examples only. It is not affiliated with an
+> employer or commercial eye-tracking product.
 
 ---
 
@@ -13,6 +18,9 @@ Built with [WebGazer.js](https://webgazer.cs.brown.edu/) and Chrome Extension Ma
 - **Session recording** — gaze points sampled at ~10 fps, auto-screenshots on URL changes, scroll stops, and significant DOM mutations (e.g. modals opening)
 - **Results Dashboard** — view screenshots side-by-side with heatmap overlays; load the current session or import a participant's exported JSON
 - **Export** — one-click JSON export containing all gaze points, screenshots, dwell times, and AOI data
+- **Local-first collection** — webcam frames remain on-device, and the extension
+  does not send session data to the M1 API unless a later milestone adds an
+  explicit, consent-aware upload flow
 
 ---
 
@@ -43,6 +51,12 @@ popup.js ──► background.js (Service Worker)
                         startTracking()         ← heatmap + gaze dot active
 ```
 
+The repository is evolving into a full-stack platform. The M1 API foundation
+adds a normalized research domain model, versioned REST endpoints, reversible
+database migrations, stable error contracts, and generated TypeScript types.
+The existing extension remains usable while later milestones connect collection
+and analysis to the API.
+
 **Key design decisions:**
 
 - **Content script, not Offscreen Document** — `getUserMedia` only shows a permission prompt in a visible tab context. Moving WebGazer to the content script was the only reliable way to get the camera working in MV3.
@@ -59,6 +73,60 @@ popup.js ──► background.js (Service Worker)
 4. Pin the WebGaze extension icon
 
 No build step required — plain JS, no bundler.
+
+### Run the API foundation
+
+Requirements: Python 3.10+, Node.js 22+, and Docker.
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e 'apps/api[dev]'
+npm install
+docker compose up -d postgres
+npm run db:migrate
+npm run db:seed
+.venv/bin/uvicorn webgaze_api.main:app --app-dir apps/api --reload
+```
+
+The OpenAPI UI is available at `http://localhost:8000/api/docs`. Project
+endpoints use a documented temporary demo identity seam during M1; production
+authentication is intentionally deferred and must be implemented before public
+deployment.
+
+Generate the committed OpenAPI document and TypeScript types with:
+
+```bash
+npm run generate:contract
+```
+
+## Test
+
+The session-analysis core is separated from Chrome APIs so its validation,
+dwell-time accounting, and versioned export contract can be tested directly:
+
+```bash
+npm test
+```
+
+## Privacy and responsible use
+
+Webcam frames are processed locally and are not saved by the extension. Gaze
+coordinates and page screenshots remain in Chrome local storage until the user
+exports or deletes them. Screenshots may contain sensitive content; obtain
+participant consent and use synthetic data for public demonstrations.
+
+See [PRIVACY.md](PRIVACY.md) for the full data boundary and limitations. This
+tool is intended for exploratory UX research, not medical, employment,
+accessibility-certification, or other consequential decisions.
+
+## Clean-room development
+
+The next full-stack version is governed by an implementation-independent
+[functional specification](docs/clean-room/functional-spec.md),
+[data dictionary](docs/clean-room/data-dictionary.md), and
+[failure-mode checklist](docs/clean-room/failure-modes.md). The
+[source-boundary protocol](docs/clean-room/source-boundary.md) records which
+materials may and may not be used during implementation.
 
 ---
 
@@ -98,5 +166,8 @@ No build step required — plain JS, no bundler.
 | Platform | Chrome Extension MV3 |
 | Eye tracking | WebGazer.js (patched for MV3) |
 | ML model | TensorFlow.js FaceMesh |
-| Storage | `chrome.storage.local` (no backend) |
-| Languages | Vanilla JS, HTML, CSS |
+| API | FastAPI · Pydantic · OpenAPI |
+| Database | PostgreSQL · SQLAlchemy 2 · Alembic |
+| Collection storage | `chrome.storage.local` during the transition |
+| Languages | Python · TypeScript contract · Vanilla JS · HTML · CSS |
+| Tests | Pytest · Node.js built-in test runner |

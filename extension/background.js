@@ -1,3 +1,10 @@
+import {
+  addDwellSample,
+  buildSessionExport,
+  createDefaultState,
+  normalizeGazePoint,
+} from './core/session.js';
+
 /**
  * background.js — WebGaze service worker
  *
@@ -21,19 +28,7 @@
 // State
 // ---------------------------------------------------------------------------
 
-const DEFAULT_STATE = {
-  phase: 'idle',            // 'idle' | 'calibrating' | 'tracking'
-  sessionId: null,
-  participantId: null,
-  startedAt: null,
-  activeTabId: null,        // persisted so SW restart doesn't lose the tab
-  gazePoints: [],           // [{ x, y, ts, url }]  — sampled at ~10fps
-  screenshots: [],          // [{ id, capturedAt, url, reason, viewportW, viewportH, dataUrl }]
-  dwellTimes: {},           // { url: { aoi_label: ms } }
-  aois: [],                 // [{ label, x, y, w, h }]
-};
-
-let state = { ...DEFAULT_STATE };
+let state = createDefaultState();
 
 // ---------------------------------------------------------------------------
 // Storage helpers
@@ -108,47 +103,6 @@ async function captureScreenshot(reason = 'manual') {
 // Dwell time tracking
 // ---------------------------------------------------------------------------
 
-function updateDwellTimes(gazePoint) {
-  const { x, y, url } = gazePoint;
-  if (!state.dwellTimes[url]) state.dwellTimes[url] = {};
-  const urlDwells = state.dwellTimes[url];
-  for (const aoi of state.aois) {
-    if (x >= aoi.x && x <= aoi.x + aoi.w && y >= aoi.y && y <= aoi.y + aoi.h) {
-      const label = aoi.label || `aoi_${aoi.x}_${aoi.y}`;
-      // ~10fps → each stored point represents ~100ms
-      urlDwells[label] = (urlDwells[label] || 0) + 100;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Export builder
-// ---------------------------------------------------------------------------
-
-function buildExport() {
-  const duration = state.startedAt ? Date.now() - state.startedAt : 0;
-  const pageSummaries = {};
-  for (const [url, dwells] of Object.entries(state.dwellTimes)) {
-    const points = state.gazePoints.filter(p => p.url === url);
-    pageSummaries[url] = { gazePointCount: points.length, dwellTimes: dwells };
-  }
-  return {
-    // Schema version — makes future backend migration easier
-    schemaVersion: '1.0',
-    sessionId: state.sessionId,
-    participantId: state.participantId || 'anonymous',
-    startedAt: state.startedAt,
-    exportedAt: Date.now(),
-    durationMs: duration,
-    totalGazePoints: state.gazePoints.length,
-    screenshotCount: state.screenshots.length,
-    aois: state.aois,
-    pageSummaries,
-    gazePoints: state.gazePoints,
-    screenshots: state.screenshots,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Active tab helper
 // ---------------------------------------------------------------------------
@@ -183,7 +137,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         state = {
-          ...DEFAULT_STATE,
+          ...createDefaultState(),
           phase: 'calibrating',
           sessionId: `session_${Date.now()}`,
           participantId: (payload && payload.participantId) || 'anonymous',
@@ -205,7 +159,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           });
         } catch (err) {
           console.error('[background] Failed to inject webgazer.js:', err);
-          state = { ...DEFAULT_STATE };
+          state = createDefaultState();
           persistState();
           return;
         }
@@ -235,14 +189,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: false });
         break;
       }
-      const point = {
-        x: Math.round(payload.x),
-        y: Math.round(payload.y),
-        ts: payload.ts || Date.now(),
-        url: payload.url || '',
-      };
+      const point = normalizeGazePoint(payload);
+      if (!point) {
+        sendResponse({ ok: false, error: 'Invalid gaze point' });
+        break;
+      }
       state.gazePoints.push(point);
-      updateDwellTimes(point);
+      addDwellSample(state.dwellTimes, point, state.aois);
       schedulePersist();
       sendResponse({ ok: true });
       break;
@@ -295,7 +248,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case 'EXPORT': {
-      sendResponse({ ok: true, data: buildExport() });
+      sendResponse({ ok: true, data: buildSessionExport(state) });
       break;
     }
 
@@ -308,7 +261,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'RESET': {
       if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
-      state = { ...DEFAULT_STATE };
+      state = createDefaultState();
       chrome.storage.local.remove('webgazeState');
       sendResponse({ ok: true });
       break;

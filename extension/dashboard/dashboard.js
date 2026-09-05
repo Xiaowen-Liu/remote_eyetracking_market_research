@@ -1,4 +1,4 @@
-'use strict';
+import { buildSessionExport, validateSessionExport } from '../core/session.js';
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -282,21 +282,7 @@ btnLoadCurrent.addEventListener('click', () => {
     }
     const s = result.webgazeState;
     // Build an export-compatible object from raw state
-    const duration = s.startedAt ? Date.now() - s.startedAt : 0;
-    loadSession({
-      schemaVersion: '1.0',
-      sessionId:     s.sessionId  || 'unknown',
-      participantId: s.participantId || 'anonymous',
-      startedAt:     s.startedAt,
-      exportedAt:    Date.now(),
-      durationMs:    duration,
-      totalGazePoints: (s.gazePoints || []).length,
-      screenshotCount: (s.screenshots || []).length,
-      aois:          s.aois        || [],
-      pageSummaries: {},
-      gazePoints:    s.gazePoints  || [],
-      screenshots:   s.screenshots || [],
-    });
+    loadSession(buildSessionExport({ ...s, sessionId: s.sessionId || 'unknown' }));
   });
 });
 
@@ -311,6 +297,11 @@ fileInput.addEventListener('change', (e) => {
   reader.onload = (ev) => {
     try {
       const data = JSON.parse(ev.target.result);
+      const result = validateSessionExport(data);
+      if (!result.valid) {
+        alert(`Invalid session file:\n${result.errors.join('\n')}`);
+        return;
+      }
       loadSession(data);
     } catch {
       alert('Could not parse JSON file.');
