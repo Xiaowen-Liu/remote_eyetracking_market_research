@@ -9,6 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   createProject: vi.fn(),
   listStudies: vi.fn(),
   getDraft: vi.fn(),
+  getParticipantLink: vi.fn(),
   createStudy: vi.fn(),
   replaceDraft: vi.fn(),
   publish: vi.fn(),
@@ -37,6 +38,9 @@ describe("Study Builder", () => {
       total: 1,
     });
     apiMocks.listStudies.mockResolvedValue({ items: [], total: 0 });
+    apiMocks.getParticipantLink.mockResolvedValue({
+      participant_url: "/api/v1/participate/demo-link",
+    });
   });
 
   it("adds tasks while preserving contiguous task numbering", async () => {
@@ -51,5 +55,57 @@ describe("Study Builder", () => {
     expect(screen.getByText("2 / 4")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Task 2")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
+  });
+
+  it("keeps a published version read-only until a revision is created", async () => {
+    const user = userEvent.setup();
+    apiMocks.listStudies.mockResolvedValue({
+      items: [{ id: "00000000-0000-4000-8000-000000000020" }],
+      total: 1,
+    });
+    apiMocks.getDraft.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000020",
+      project_id: "00000000-0000-4000-8000-000000000010",
+      lifecycle: "published",
+      draft_revision: 1,
+      current_published_version: 1,
+      created_at: "2026-09-07T00:00:00Z",
+      updated_at: "2026-09-07T00:00:00Z",
+      title: "Published checkout study",
+      description: "Published research protocol",
+      consent_version: "demo-v1",
+      consent_text: "I consent to this synthetic study.",
+      target_origins: ["https://demo.example.com/"],
+      calibration_policy: {
+        minimum_quality: "variable",
+        allow_retry: true,
+        maximum_attempts: 3,
+      },
+      collection_policy: { screenshots_enabled: false, sample_interval_ms: 100 },
+      retention_days: 30,
+      tasks: [
+        {
+          position: 1,
+          title: "Find pricing",
+          prompt: "Find pricing.",
+          start_url: "https://demo.example.com/pricing",
+          success_url_pattern: null,
+          time_limit_ms: 120000,
+          areas_of_interest: [],
+        },
+      ],
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Published · v1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Study title")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Publish study" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Create revision" }));
+
+    expect(screen.getByLabelText("Study title")).toBeEnabled();
+    expect(screen.getByText("Editing · v2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish version 2" })).toBeDisabled();
   });
 });

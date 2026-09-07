@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   api,
@@ -38,15 +38,19 @@ const emptyDraft: StudyDraft = {
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 export function App() {
+  const bootstrapStarted = useRef(false);
   const [project, setProject] = useState<Project | null>(null);
   const [study, setStudy] = useState<StudyDraftResponse | null>(null);
   const [draft, setDraft] = useState<StudyDraft>(emptyDraft);
   const [busy, setBusy] = useState(true);
   const [dirty, setDirty] = useState(false);
+  const [editing, setEditing] = useState(true);
   const [notice, setNotice] = useState<Notice>(null);
   const [participantUrl, setParticipantUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (bootstrapStarted.current) return;
+    bootstrapStarted.current = true;
     void bootstrap();
   }, []);
 
@@ -62,6 +66,11 @@ export function App() {
         setStudy(existing);
         setDraft(toDraft(existing));
         setDirty(false);
+        setEditing(existing.current_published_version === null);
+        if (existing.current_published_version) {
+          const link = await api.getParticipantLink(existing.id);
+          setParticipantUrl(link.participant_url);
+        }
       }
     } catch (error) {
       showError(error);
@@ -128,7 +137,10 @@ export function App() {
         lifecycle: result.study.lifecycle,
         current_published_version: result.version.version_number,
       });
-      setParticipantUrl(result.participant_link?.participant_url ?? participantUrl);
+      const newParticipantUrl = result.participant_link?.participant_url ?? participantUrl;
+      setParticipantUrl(newParticipantUrl);
+      setDirty(false);
+      setEditing(false);
       setNotice({
         kind: "success",
         text: `Version ${result.version.version_number} published.`,
@@ -187,6 +199,16 @@ export function App() {
     }));
   }
 
+  async function copyParticipantLink() {
+    if (!participantUrl) return;
+    const absoluteUrl = new URL(participantUrl, window.location.origin).toString();
+    await navigator.clipboard.writeText(absoluteUrl);
+    setNotice({ kind: "success", text: "Participant link copied." });
+  }
+
+  const publishedVersion = study?.current_published_version ?? null;
+  const isLocked = publishedVersion !== null && !editing;
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -213,8 +235,16 @@ export function App() {
             </p>
           </div>
           <div className="status-stack">
-            <span className={`status ${study?.lifecycle ?? "draft"}`}>
-              {study?.lifecycle ?? "draft"}
+            <span className={`status ${dirty ? "draft" : study?.lifecycle ?? "draft"}`}>
+              {editing && publishedVersion
+                ? dirty
+                  ? "Unpublished changes"
+                  : `Editing · v${publishedVersion + 1}`
+                : dirty
+                ? "Unpublished changes"
+                : publishedVersion
+                  ? `Published · v${publishedVersion}`
+                  : "Draft"}
             </span>
             <small>
               {study ? `Draft revision ${study.draft_revision}` : "Not saved yet"}
@@ -233,7 +263,7 @@ export function App() {
         {busy && <div className="loading" role="status">Syncing study…</div>}
 
         <div className="workspace">
-          <div className="editor-column">
+          <fieldset className="editor-column" disabled={isLocked}>
             <section className="panel">
               <div className="section-number">01</div>
               <div className="panel-content">
@@ -378,52 +408,91 @@ export function App() {
                 )}
               </div>
             </section>
-          </div>
+          </fieldset>
 
           <aside className="publish-panel">
-            <p className="eyebrow">Study status</p>
-            <h2>Review &amp; publish</h2>
-            <p className="panel-description">
-              Required fields are checked before a version is created.
-            </p>
-            <ul>
-              <li className={draft.title ? "complete" : ""}>Study details</li>
-              <li className={draft.consent_text ? "complete" : ""}>
-                Participant consent
-              </li>
-              <li className={draft.tasks.length > 0 ? "complete" : ""}>
-                1–4 ordered tasks
-              </li>
-              <li className={draft.target_origins.length > 0 ? "complete" : ""}>
-                Allowed website
-              </li>
-            </ul>
-            <button
-              type="button"
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void publish()}
-            >
-              Publish study
-            </button>
-            <button
-              type="button"
-              className="secondary-button full"
-              disabled={busy}
-              onClick={() => void saveDraft()}
-            >
-              Save draft
-            </button>
-            <p className="fine-print">
-              Publishing creates version {study?.current_published_version
-                ? study.current_published_version + 1
-                : 1}. Published versions cannot be edited.
-            </p>
-            {participantUrl && (
-              <div className="participant-link">
-                <span>Participant link</span>
-                <code>{participantUrl}</code>
-              </div>
+            {isLocked ? (
+              <>
+                <p className="eyebrow">Published version {publishedVersion}</p>
+                <h2>Participant study</h2>
+                <p className="panel-description">
+                  This version is live and cannot be changed.
+                </p>
+                {participantUrl ? (
+                  <div className="participant-link published-link">
+                    <span>Participant link</span>
+                    <code>{participantUrl}</code>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => void copyParticipantLink()}
+                    >
+                      Copy participant link
+                    </button>
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className="secondary-button full"
+                  onClick={() => {
+                    setEditing(true);
+                    setNotice({
+                      kind: "success",
+                      text: `Editing a new draft. Version ${publishedVersion} remains live.`,
+                    });
+                  }}
+                >
+                  Create revision
+                </button>
+                <p className="fine-print">
+                  To stop new participants, close the study or revoke its link.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow">
+                  {publishedVersion ? "New revision" : "Study status"}
+                </p>
+                <h2>Review &amp; publish</h2>
+                <p className="panel-description">
+                  Required fields are checked before a version is created.
+                </p>
+                <ul>
+                  <li className={draft.title ? "complete" : ""}>Study details</li>
+                  <li className={draft.consent_text ? "complete" : ""}>
+                    Participant consent
+                  </li>
+                  <li className={draft.tasks.length > 0 ? "complete" : ""}>
+                    1–4 ordered tasks
+                  </li>
+                  <li className={draft.target_origins.length > 0 ? "complete" : ""}>
+                    Allowed website
+                  </li>
+                </ul>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={busy || (publishedVersion !== null && !dirty)}
+                  onClick={() => void publish()}
+                >
+                  {publishedVersion
+                    ? `Publish version ${publishedVersion + 1}`
+                    : "Publish study"}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button full"
+                  disabled={busy || Boolean(study && !dirty)}
+                  onClick={() => void saveDraft()}
+                >
+                  Save draft
+                </button>
+                <p className="fine-print">
+                  {publishedVersion
+                    ? `Version ${publishedVersion} remains live until this revision is published.`
+                    : "Published versions cannot be edited."}
+                </p>
+              </>
             )}
           </aside>
         </div>

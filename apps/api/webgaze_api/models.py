@@ -200,6 +200,7 @@ class ParticipantLink(Base):
         ForeignKey("study_versions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)
+    public_code: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     max_sessions: Mapped[int | None] = mapped_column(Integer)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

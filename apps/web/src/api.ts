@@ -5,6 +5,7 @@ export type StudyDraft = components["schemas"]["StudyDraft"];
 export type StudyDraftResponse = components["schemas"]["StudyDraftResponse"];
 export type StudySummary = components["schemas"]["StudySummary"];
 export type PublishResponse = components["schemas"]["PublishResponse"];
+export type ParticipantLink = components["schemas"]["ParticipantLinkResponse"];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -42,6 +43,8 @@ export const api = {
   listStudies: (projectId: string) =>
     request<{ items: StudySummary[]; total: number }>(`/projects/${projectId}/studies`),
   getDraft: (studyId: string) => request<StudyDraftResponse>(`/studies/${studyId}/draft`),
+  getParticipantLink: (studyId: string) =>
+    request<ParticipantLink>(`/studies/${studyId}/participant-link`),
   createStudy: (projectId: string, draft: StudyDraft) =>
     request<StudyDraftResponse>(`/projects/${projectId}/studies`, {
       method: "POST",

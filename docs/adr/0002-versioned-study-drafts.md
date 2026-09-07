@@ -24,7 +24,8 @@ resolution returns a minimal public protocol without owner or database IDs.
 
 - Existing sessions remain reproducible after a researcher edits the draft.
 - Task replacement is transactional and task positions remain contiguous.
-- Raw participant tokens are returned only when created; only their SHA-256
-  hashes are stored.
+- Participant links remain retrievable by their authorized researcher. The demo
+  stores a high-entropy public capability code as well as its SHA-256 hash;
+  production hardening should encrypt that code at rest with a managed key.
 - The version-zero convention must remain explicit in migrations and service
   code until a dedicated draft table becomes worthwhile.

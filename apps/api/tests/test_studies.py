@@ -109,6 +109,10 @@ def test_publish_creates_immutable_snapshot_and_is_idempotent(client: TestClient
     assert "study_id" not in protocol.json()
     assert "owner_id" not in protocol.json()
 
+    restored_link = client.get(f"/api/v1/studies/{study_id}/participant-link")
+    assert restored_link.status_code == 200
+    assert restored_link.json()["participant_url"] == body["participant_link"]["participant_url"]
+
     missing_link = client.get("/api/v1/participate/not-a-real-token")
     assert missing_link.status_code == 404
     assert missing_link.json()["error"]["code"] == "PARTICIPANT_LINK_NOT_FOUND"

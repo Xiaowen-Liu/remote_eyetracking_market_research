@@ -336,6 +336,7 @@ def publish_study(
     raw_token = secrets.token_urlsafe(32)
     link = ParticipantLink(
         token_hash=hashlib.sha256(raw_token.encode()).digest(),
+        public_code=raw_token,
         max_sessions=None,
     )
     published.participant_links = [link]
@@ -375,16 +376,48 @@ def publish_study(
 
 
 @router.get(
+    "/studies/{study_id}/participant-link",
+    response_model=ParticipantLinkResponse,
+    responses={404: {"model": ErrorResponse}},
+    operation_id="getActiveParticipantLink",
+)
+def get_active_participant_link(
+    study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
+) -> ParticipantLinkResponse:
+    study = owned_study(db, study_id, owner_id)
+    if not study.current_published_version:
+        raise ApiError(404, "PARTICIPANT_LINK_NOT_FOUND", "No participant link is active")
+    link = db.scalar(
+        select(ParticipantLink)
+        .join(StudyVersion)
+        .where(
+            StudyVersion.study_id == study.id,
+            StudyVersion.version_number == study.current_published_version,
+            ParticipantLink.revoked_at.is_(None),
+            ParticipantLink.public_code.is_not(None),
+        )
+        .order_by(ParticipantLink.created_at.desc())
+    )
+    if not link or not link.public_code:
+        raise ApiError(404, "PARTICIPANT_LINK_NOT_FOUND", "No participant link is active")
+    return ParticipantLinkResponse(
+        id=link.id,
+        study_version_id=link.study_version_id,
+        token=link.public_code,
+        participant_url=f"/api/v1/participate/{link.public_code}",
+    )
+
+
+@router.get(
     "/participate/{token}",
     response_model=PublicStudyProtocol,
     responses={404: {"model": ErrorResponse}, 410: {"model": ErrorResponse}},
     operation_id="resolveParticipantLink",
 )
 def resolve_participant_link(token: str, db: Session = DbSession) -> PublicStudyProtocol:
-    token_hash = hashlib.sha256(token.encode()).digest()
     link = db.scalar(
         select(ParticipantLink)
-        .where(ParticipantLink.token_hash == token_hash)
+        .where(ParticipantLink.public_code == token)
         .options(
             selectinload(ParticipantLink.study_version)
             .selectinload(StudyVersion.tasks)
