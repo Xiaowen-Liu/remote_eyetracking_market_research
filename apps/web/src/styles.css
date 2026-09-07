@@ -76,6 +76,7 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .published-link { margin-top: 20px; padding-top: 18px; }
 .published-link code { display: block; padding: 10px; background: #f4f6f2; border-radius: 6px; }
 .published-link .primary-button { margin-top: 5px; }
+.published-link .primary-button.copied { color: #314020; background: #dfeecb; border-color: #c6dca8; }
 .link-note { margin: 18px 0 0; padding: 12px; color: #68736c; background: #f4f6f2; border-radius: 7px; font-size: 12px; line-height: 1.45; }
 
 @media (max-width: 850px) {

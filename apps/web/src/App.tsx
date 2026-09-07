@@ -47,6 +47,7 @@ export function App() {
   const [editing, setEditing] = useState(true);
   const [notice, setNotice] = useState<Notice>(null);
   const [participantUrl, setParticipantUrl] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     if (bootstrapStarted.current) return;
@@ -202,8 +203,16 @@ export function App() {
   async function copyParticipantLink() {
     if (!participantUrl) return;
     const absoluteUrl = new URL(participantUrl, window.location.origin).toString();
-    await navigator.clipboard.writeText(absoluteUrl);
-    setNotice({ kind: "success", text: "Participant link copied." });
+    try {
+      await navigator.clipboard.writeText(absoluteUrl);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      setNotice({
+        kind: "error",
+        text: "The link could not be copied. Select and copy it manually.",
+      });
+    }
   }
 
   const publishedVersion = study?.current_published_version ?? null;
@@ -424,10 +433,11 @@ export function App() {
                     <code>{participantUrl}</code>
                     <button
                       type="button"
-                      className="primary-button"
+                      className={`primary-button ${linkCopied ? "copied" : ""}`}
                       onClick={() => void copyParticipantLink()}
+                      aria-live="polite"
                     >
-                      Copy participant link
+                      {linkCopied ? "✓ Link copied" : "Copy participant link"}
                     </button>
                   </div>
                 ) : null}

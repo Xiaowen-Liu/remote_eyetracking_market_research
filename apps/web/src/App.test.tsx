@@ -23,6 +23,10 @@ vi.mock("./api", () => ({
 describe("Study Builder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
     apiMocks.listProjects.mockResolvedValue({
       items: [
         {
@@ -101,6 +105,9 @@ describe("Study Builder", () => {
     expect(await screen.findByText("Published · v1")).toBeInTheDocument();
     expect(screen.getByLabelText("Study title")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Publish study" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Copy participant link" }));
+    expect(screen.getByRole("button", { name: "✓ Link copied" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Create revision" }));
 
