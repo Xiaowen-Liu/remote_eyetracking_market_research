@@ -104,6 +104,32 @@ full draft workflow: study configuration, one to four ordered tasks, server-side
 validation, immutable publishing, and participant-link resolution. Its API
 types are generated from the same OpenAPI document served by FastAPI.
 
+## Production deployment
+
+The web application and API are intentionally deployed as separate services:
+
+- **Vercel** builds the React application from the repository root using
+  `vercel.json`. Set `VITE_API_URL` to the public Railway API origin.
+- **Railway** builds `apps/api/Dockerfile` with the service root directory set
+  to `/apps/api`. Add a PostgreSQL service and set `WEBGAZE_DATABASE_URL` to its
+  private `DATABASE_URL` reference. The container runs Alembic migrations before
+  starting Uvicorn and Railway checks `/healthz` before routing traffic.
+
+Set the following API variables in Railway after Vercel assigns the production
+domain:
+
+```text
+WEBGAZE_ENVIRONMENT=production
+WEBGAZE_DATABASE_URL=${{Postgres.DATABASE_URL}}
+WEBGAZE_CORS_ORIGINS=["https://your-project.vercel.app"]
+WEBGAZE_SQL_ECHO=false
+```
+
+Deploy the API first, copy its Railway public origin into Vercel as
+`VITE_API_URL`, deploy the web app, then update `WEBGAZE_CORS_ORIGINS` with the
+final Vercel origin. Keep all demo data synthetic: authentication and abuse
+controls remain required before this API can host real research data.
+
 Generate the committed OpenAPI document and TypeScript types with:
 
 ```bash
