@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/participate/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve Participant Link */
+        get: operations["resolveParticipantLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -41,6 +58,93 @@ export interface paths {
         patch: operations["updateProject"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/studies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Studies */
+        get: operations["listStudies"];
+        put?: never;
+        /** Create Study */
+        post: operations["createStudy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studies/{study_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Study */
+        delete: operations["deleteStudy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studies/{study_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Study Draft */
+        get: operations["getStudyDraft"];
+        /** Replace Study Draft */
+        put: operations["replaceStudyDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studies/{study_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Study */
+        post: operations["publishStudy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studies/{study_id}/versions/{version_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Study Version */
+        get: operations["getStudyVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -62,6 +166,60 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AreaOfInterestDraft */
+        AreaOfInterestDraft: {
+            /** Height */
+            height?: number | null;
+            /** Label */
+            label: string;
+            /** Page Path */
+            page_path?: string | null;
+            /** Selector */
+            selector?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "manual" | "selector" | "imported";
+            /** Width */
+            width?: number | null;
+            /** X */
+            x?: number | null;
+            /** Y */
+            y?: number | null;
+        };
+        /** CalibrationPolicy */
+        CalibrationPolicy: {
+            /**
+             * Allow Retry
+             * @default true
+             */
+            allow_retry: boolean;
+            /**
+             * Maximum Attempts
+             * @default 3
+             */
+            maximum_attempts: number;
+            /**
+             * Minimum Quality
+             * @default variable
+             * @enum {string}
+             */
+            minimum_quality: "strong" | "variable" | "limited";
+        };
+        /** CollectionPolicy */
+        CollectionPolicy: {
+            /**
+             * Sample Interval Ms
+             * @default 100
+             */
+            sample_interval_ms: number;
+            /**
+             * Screenshots Enabled
+             * @default false
+             */
+            screenshots_enabled: boolean;
+        };
         /** ErrorDetail */
         ErrorDetail: {
             /** Code */
@@ -96,6 +254,23 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /** ParticipantLinkResponse */
+        ParticipantLinkResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Participant Url */
+            participant_url: string;
+            /**
+             * Study Version Id
+             * Format: uuid
+             */
+            study_version_id: string;
+            /** Token */
+            token: string;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -152,6 +327,249 @@ export interface components {
             research_question?: string | null;
             status?: components["schemas"]["ProjectStatus"] | null;
         };
+        /** PublicStudyProtocol */
+        PublicStudyProtocol: {
+            calibration_policy: components["schemas"]["CalibrationPolicy"];
+            collection_policy: components["schemas"]["CollectionPolicy"];
+            /** Consent Text */
+            consent_text: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Target Origins */
+            target_origins: string[];
+            /** Tasks */
+            tasks: components["schemas"]["PublicTask"][];
+            /** Title */
+            title: string;
+        };
+        /** PublicTask */
+        PublicTask: {
+            /** Position */
+            position: number;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Start Url
+             * Format: uri
+             */
+            start_url: string;
+            /** Success Url Pattern */
+            success_url_pattern: string | null;
+            /** Time Limit Ms */
+            time_limit_ms: number | null;
+            /** Title */
+            title: string;
+        };
+        /** PublishResponse */
+        PublishResponse: {
+            participant_link?: components["schemas"]["ParticipantLinkResponse"] | null;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+            study: components["schemas"]["StudySummary"];
+            version: components["schemas"]["StudyVersionResponse"];
+        };
+        /** StudyCreate */
+        StudyCreate: {
+            calibration_policy?: components["schemas"]["CalibrationPolicy"];
+            collection_policy?: components["schemas"]["CollectionPolicy"];
+            /** Consent Text */
+            consent_text: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Retention Days
+             * @default 30
+             */
+            retention_days: number;
+            /** Target Origins */
+            target_origins: string[];
+            /** Tasks */
+            tasks: components["schemas"]["TaskDraft"][];
+            /** Title */
+            title: string;
+        };
+        /** StudyDraft */
+        StudyDraft: {
+            calibration_policy?: components["schemas"]["CalibrationPolicy"];
+            collection_policy?: components["schemas"]["CollectionPolicy"];
+            /** Consent Text */
+            consent_text: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Retention Days
+             * @default 30
+             */
+            retention_days: number;
+            /** Target Origins */
+            target_origins: string[];
+            /** Tasks */
+            tasks: components["schemas"]["TaskDraft"][];
+            /** Title */
+            title: string;
+        };
+        /** StudyDraftResponse */
+        StudyDraftResponse: {
+            calibration_policy?: components["schemas"]["CalibrationPolicy"];
+            collection_policy?: components["schemas"]["CollectionPolicy"];
+            /** Consent Text */
+            consent_text: string;
+            /** Consent Version */
+            consent_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Published Version */
+            current_published_version: number | null;
+            /** Description */
+            description?: string | null;
+            /** Draft Revision */
+            draft_revision: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lifecycle: components["schemas"]["StudyLifecycle"];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Retention Days
+             * @default 30
+             */
+            retention_days: number;
+            /** Target Origins */
+            target_origins: string[];
+            /** Tasks */
+            tasks: components["schemas"]["TaskDraft"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * StudyLifecycle
+         * @enum {string}
+         */
+        StudyLifecycle: "draft" | "published" | "closed" | "archived";
+        /** StudyListResponse */
+        StudyListResponse: {
+            /** Items */
+            items: components["schemas"]["StudySummary"][];
+            /** Total */
+            total: number;
+        };
+        /** StudySummary */
+        StudySummary: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Published Version */
+            current_published_version: number | null;
+            /** Draft Revision */
+            draft_revision: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lifecycle: components["schemas"]["StudyLifecycle"];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** StudyVersionResponse */
+        StudyVersionResponse: {
+            calibration_policy?: components["schemas"]["CalibrationPolicy"];
+            collection_policy?: components["schemas"]["CollectionPolicy"];
+            /** Consent Text */
+            consent_text: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /**
+             * Published By
+             * Format: uuid
+             */
+            published_by: string;
+            /**
+             * Retention Days
+             * @default 30
+             */
+            retention_days: number;
+            /** Source Revision */
+            source_revision: number;
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /** Target Origins */
+            target_origins: string[];
+            /** Tasks */
+            tasks: components["schemas"]["TaskDraft"][];
+            /** Title */
+            title: string;
+            /** Version Number */
+            version_number: number;
+        };
+        /** TaskDraft */
+        TaskDraft: {
+            /** Areas Of Interest */
+            areas_of_interest?: components["schemas"]["AreaOfInterestDraft"][];
+            /** Position */
+            position: number;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Start Url
+             * Format: uri
+             */
+            start_url: string;
+            /** Success Url Pattern */
+            success_url_pattern?: string | null;
+            /** Time Limit Ms */
+            time_limit_ms?: number | null;
+            /** Title */
+            title: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -174,6 +592,55 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    resolveParticipantLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicStudyProtocol"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listProjects: {
         parameters: {
             query?: never;
@@ -346,6 +813,317 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listStudies: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    createStudy: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyDraftResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteStudy: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getStudyDraft: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyDraftResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replaceStudyDraft: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudyDraft"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyDraftResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publishStudy: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getStudyVersion: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+                version_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyVersionResponse"];
                 };
             };
             /** @description Not Found */

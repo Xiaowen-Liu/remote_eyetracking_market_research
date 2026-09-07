@@ -93,6 +93,17 @@ endpoints use a documented temporary demo identity seam during M1; production
 authentication is intentionally deferred and must be implemented before public
 deployment.
 
+Run the M2 Study Builder in a second terminal:
+
+```bash
+npm run dev:web
+```
+
+Open `http://localhost:5173`. The React/TypeScript application exercises the
+full draft workflow: study configuration, one to four ordered tasks, server-side
+validation, immutable publishing, and participant-link resolution. Its API
+types are generated from the same OpenAPI document served by FastAPI.
+
 Generate the committed OpenAPI document and TypeScript types with:
 
 ```bash
@@ -106,6 +117,7 @@ dwell-time accounting, and versioned export contract can be tested directly:
 
 ```bash
 npm test
+npm run build:web
 ```
 
 ## Privacy and responsible use

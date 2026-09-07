@@ -37,4 +37,16 @@ def test_study_contract_accepts_one_to_four_contiguous_tasks():
 def test_openapi_has_stable_operation_ids_and_error_schema(client):
     schema = client.get("/api/v1/openapi.json").json()
     assert schema["paths"]["/api/v1/projects"]["post"]["operationId"] == "createProject"
+    assert (
+        schema["paths"]["/api/v1/projects/{project_id}/studies"]["post"]["operationId"]
+        == "createStudy"
+    )
+    assert (
+        schema["paths"]["/api/v1/studies/{study_id}/publish"]["post"]["operationId"]
+        == "publishStudy"
+    )
+    assert (
+        schema["paths"]["/api/v1/participate/{token}"]["get"]["operationId"]
+        == "resolveParticipantLink"
+    )
     assert "ErrorResponse" in schema["components"]["schemas"]

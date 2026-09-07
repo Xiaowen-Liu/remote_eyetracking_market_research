@@ -129,6 +129,67 @@ class StudySummary(ApiModel):
     updated_at: datetime
 
 
+class StudyCreate(StudyDraft):
+    pass
+
+
+class StudyListResponse(ApiModel):
+    items: list[StudySummary]
+    total: int
+
+
+class StudyDraftResponse(StudyDraft):
+    id: UUID
+    project_id: UUID
+    lifecycle: StudyLifecycle
+    draft_revision: int
+    current_published_version: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class StudyVersionResponse(StudyDraft):
+    id: UUID
+    study_id: UUID
+    version_number: int
+    source_revision: int
+    published_by: UUID
+    published_at: datetime
+
+
+class ParticipantLinkResponse(ApiModel):
+    id: UUID
+    study_version_id: UUID
+    token: str
+    participant_url: str
+
+
+class PublishResponse(ApiModel):
+    study: StudySummary
+    version: StudyVersionResponse
+    participant_link: ParticipantLinkResponse | None = None
+    replayed: bool = False
+
+
+class PublicTask(ApiModel):
+    position: int
+    title: str
+    prompt: str
+    start_url: HttpUrl
+    success_url_pattern: str | None
+    time_limit_ms: int | None
+
+
+class PublicStudyProtocol(ApiModel):
+    title: str
+    consent_version: str
+    consent_text: str
+    target_origins: list[HttpUrl]
+    calibration_policy: CalibrationPolicy
+    collection_policy: CollectionPolicy
+    tasks: list[PublicTask]
+
+
 class OpenApiMetadata(ApiModel):
     schema_version: str = "v1"
     generated_at: datetime

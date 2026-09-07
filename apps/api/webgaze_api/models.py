@@ -128,6 +128,7 @@ class StudyVersion(Base):
         ForeignKey("studies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_revision: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     consent_version: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -136,14 +137,15 @@ class StudyVersion(Base):
     calibration_policy: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     collection_policy: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     retention_days: Mapped[int] = mapped_column(Integer, nullable=False)
-    published_by: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    published_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    published_by: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     study: Mapped[Study] = relationship(back_populates="versions")
     tasks: Mapped[list[Task]] = relationship(
         back_populates="study_version", cascade="all, delete-orphan", order_by="Task.position"
+    )
+    participant_links: Mapped[list[ParticipantLink]] = relationship(
+        back_populates="study_version", cascade="all, delete-orphan"
     )
 
 
@@ -204,6 +206,8 @@ class ParticipantLink(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    study_version: Mapped[StudyVersion] = relationship(back_populates="participant_links")
 
 
 class ParticipantSession(Base):
