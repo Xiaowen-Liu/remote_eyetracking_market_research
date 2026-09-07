@@ -15,3 +15,5 @@ coverage/
 *.sqlite3
 session-*.json
 participant-*.json
+.vercel/
+.env.local
