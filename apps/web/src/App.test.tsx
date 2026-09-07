@@ -109,10 +109,10 @@ describe("Study Builder", () => {
     await user.click(screen.getByRole("button", { name: "Copy participant link" }));
     expect(screen.getByRole("button", { name: "✓ Link copied" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Create revision" }));
+    await user.click(screen.getByRole("button", { name: "Edit study" }));
 
     expect(screen.getByLabelText("Study title")).toBeEnabled();
-    expect(screen.getByText("Editing · v2")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Publish version 2" })).toBeDisabled();
+    expect(screen.getByText("Editing study")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish changes" })).toBeDisabled();
   });
 });

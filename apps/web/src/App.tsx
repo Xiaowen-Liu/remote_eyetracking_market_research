@@ -248,7 +248,7 @@ export function App() {
               {editing && publishedVersion
                 ? dirty
                   ? "Unpublished changes"
-                  : `Editing · v${publishedVersion + 1}`
+                  : "Editing study"
                 : dirty
                 ? "Unpublished changes"
                 : publishedVersion
@@ -448,11 +448,11 @@ export function App() {
                     setEditing(true);
                     setNotice({
                       kind: "success",
-                      text: `Editing a new draft. Version ${publishedVersion} remains live.`,
+                      text: `You can now edit this study. Version ${publishedVersion} remains live until you publish changes.`,
                     });
                   }}
                 >
-                  Create revision
+                  Edit study
                 </button>
                 <p className="fine-print">
                   To stop new participants, close the study or revoke its link.
@@ -486,7 +486,7 @@ export function App() {
                   onClick={() => void publish()}
                 >
                   {publishedVersion
-                    ? `Publish version ${publishedVersion + 1}`
+                    ? "Publish changes"
                     : "Publish study"}
                 </button>
                 <button
