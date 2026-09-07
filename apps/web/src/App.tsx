@@ -381,8 +381,11 @@ export function App() {
           </div>
 
           <aside className="publish-panel">
-            <p className="eyebrow">Publish checklist</p>
-            <h2>Ready to test?</h2>
+            <p className="eyebrow">Study status</p>
+            <h2>Review &amp; publish</h2>
+            <p className="panel-description">
+              Required fields are checked before a version is created.
+            </p>
             <ul>
               <li className={draft.title ? "complete" : ""}>Study details</li>
               <li className={draft.consent_text ? "complete" : ""}>
@@ -412,8 +415,9 @@ export function App() {
               Save draft
             </button>
             <p className="fine-print">
-              Publishing creates an immutable snapshot. Future edits become a new
-              version.
+              Publishing creates version {study?.current_published_version
+                ? study.current_published_version + 1
+                : 1}. Published versions cannot be edited.
             </p>
             {participantUrl && (
               <div className="participant-link">
