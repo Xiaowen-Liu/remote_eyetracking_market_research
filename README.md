@@ -5,6 +5,10 @@ A Chrome extension that turns your webcam into an eye tracker for UX research �
 Built with [WebGazer.js](https://webgazer.cs.brown.edu/), Chrome Extension
 Manifest V3, FastAPI, and PostgreSQL.
 
+**Live system:** [Study Builder](https://webgaze-research.vercel.app) ·
+[REST API docs](https://remoteeyetrackingmarketresearch-production.up.railway.app/api/docs) ·
+[Health check](https://remoteeyetrackingmarketresearch-production.up.railway.app/healthz)
+
 > **Independent clean-room project:** this repository contains independently
 > developed code and synthetic examples only. It is not affiliated with an
 > employer or commercial eye-tracking product.
@@ -115,6 +119,19 @@ The web application and API are intentionally deployed as separate services:
   private `DATABASE_URL` reference. The container runs Alembic migrations before
   starting Uvicorn and Railway checks `/healthz` before routing traffic.
 
+```text
+Browser
+  └── Vercel CDN · React/Vite Study Builder
+        └── HTTPS REST calls
+              └── Railway · FastAPI container
+                    └── private network
+                          └── Railway PostgreSQL
+```
+
+The production API only permits browser requests from the Vercel production
+origin. Railway database credentials remain server-side and the browser build
+contains only the public API origin.
+
 Set the following API variables in Railway after Vercel assigns the production
 domain:
 
@@ -129,6 +146,10 @@ Deploy the API first, copy its Railway public origin into Vercel as
 `VITE_API_URL`, deploy the web app, then update `WEBGAZE_CORS_ORIGINS` with the
 final Vercel origin. Keep all demo data synthetic: authentication and abuse
 controls remain required before this API can host real research data.
+
+The initial production release was deployed from the CLI. GitHub-triggered
+deployments should be enabled after granting both hosting providers access to
+this repository and choosing `main` as the production branch.
 
 Generate the committed OpenAPI document and TypeScript types with:
 
