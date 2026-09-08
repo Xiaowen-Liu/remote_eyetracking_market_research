@@ -61,6 +61,40 @@ describe("Study Builder", () => {
     expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
   });
 
+  it("opens a project switcher from the Projects breadcrumb", async () => {
+    const user = userEvent.setup();
+    apiMocks.listProjects.mockResolvedValue({
+      items: [
+        {
+          id: "00000000-0000-4000-8000-000000000010",
+          owner_id: "00000000-0000-4000-8000-000000000001",
+          name: "Checkout UX research",
+          research_question: null,
+          status: "active",
+          created_at: "2026-09-07T00:00:00Z",
+          updated_at: "2026-09-07T00:00:00Z",
+        },
+        {
+          id: "00000000-0000-4000-8000-000000000011",
+          owner_id: "00000000-0000-4000-8000-000000000001",
+          name: "Navigation research",
+          research_question: null,
+          status: "active",
+          created_at: "2026-09-07T00:00:00Z",
+          updated_at: "2026-09-07T00:00:00Z",
+        },
+      ],
+      total: 2,
+    });
+    render(<App />);
+
+    await screen.findByText("Checkout UX research");
+    await user.click(screen.getByRole("button", { name: "Projects" }));
+
+    expect(screen.getByRole("heading", { name: "Switch research context" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Navigation research/ })).toBeInTheDocument();
+  });
+
   it("keeps a published version read-only until a revision is created", async () => {
     const user = userEvent.setup();
     apiMocks.listStudies.mockResolvedValue({
