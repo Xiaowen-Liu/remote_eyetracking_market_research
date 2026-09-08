@@ -32,6 +32,16 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .results-panel-header { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .export-actions { display: flex; gap: 8px; }
 .export-actions .secondary-button { margin: 0; padding: 8px 10px; font-size: 12px; }
+.comparison-note { margin: 0 0 16px; padding: 10px 12px; color: #536158; background: #f2f5ed; border-left: 3px solid #84a94c; border-radius: 0 7px 7px 0; font-size: 13px; line-height: 1.45; }
+.job-selector { display: grid; gap: 7px; margin-top: 18px; color: #526058; font-size: 12px; font-weight: 750; }
+.job-selector select { width: 100%; padding: 9px 10px; color: #26352d; background: #fbfcfa; border: 1px solid #cfd6cf; border-radius: 7px; }
+.aggregate-summary { margin-top: 22px; padding-top: 20px; border-top: 1px solid #e3e7e1; }
+.aggregate-summary h3 { margin: 5px 0 0; font: 500 21px/1.2 Georgia, serif; }
+.aggregate-summary > p { margin: 8px 0 14px; color: #68746c; font-size: 13px; line-height: 1.45; }
+.aggregate-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.aggregate-list article { display: grid; gap: 6px; padding: 13px; color: #2c3931; background: #f7f8f4; border-radius: 8px; font-size: 13px; }
+.aggregate-list span { color: #637068; font-size: 12px; line-height: 1.4; }
+.aggregate-unavailable { margin: 20px 0 0; color: #6e786f; font-size: 12px; line-height: 1.45; }
 .empty-results { display: grid; gap: 14px; max-width: 680px; padding: 32px; background: #fff; border: 1px solid #d9ded8; border-radius: 12px; }
 .empty-results h2 { margin: 0; font: 500 28px/1.2 Georgia, serif; }
 .empty-results p { margin: 0; color: #657069; line-height: 1.5; }
@@ -152,4 +162,6 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
   .environment { display: none; }
   .dashboard-heading { display: grid; align-items: start; }
   .dashboard-action { width: 100%; }
+  .export-actions { width: 100%; }
+  .export-actions .secondary-button { flex: 1; }
 }
