@@ -61,7 +61,7 @@ describe("Study Builder", () => {
     expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
   });
 
-  it("opens a project switcher from the Projects breadcrumb", async () => {
+  it("returns to a project dashboard from the Projects breadcrumb", async () => {
     const user = userEvent.setup();
     apiMocks.listProjects.mockResolvedValue({
       items: [
@@ -91,8 +91,9 @@ describe("Study Builder", () => {
     await screen.findByText("Checkout UX research");
     await user.click(screen.getByRole("button", { name: "Projects" }));
 
-    expect(screen.getByRole("heading", { name: "Switch research context" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Navigation research/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Projects" })).toBeInTheDocument();
+    expect(screen.getByText("Organize studies, participant protocols, and analysis work in one place.")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Open project" })).toHaveLength(2);
   });
 
   it("keeps a published version read-only until a revision is created", async () => {
