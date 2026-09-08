@@ -253,11 +253,16 @@ def list_study_participant_sessions(
             )
         ) or 0
         gaze_batch_count, gaze_sample_count = db.execute(
-            select(func.count(GazeSampleBatch.id), func.coalesce(func.sum(GazeSampleBatch.sample_count), 0))
+            select(
+                func.count(GazeSampleBatch.id),
+                func.coalesce(func.sum(GazeSampleBatch.sample_count), 0),
+            )
             .where(GazeSampleBatch.session_id == session.id)
         ).one()
         job = db.scalar(
-            select(AnalysisJob).where(AnalysisJob.session_id == session.id).order_by(AnalysisJob.queued_at.desc())
+            select(AnalysisJob)
+            .where(AnalysisJob.session_id == session.id)
+            .order_by(AnalysisJob.queued_at.desc())
         )
         events = list(
             db.scalars(
@@ -275,13 +280,24 @@ def list_study_participant_sessions(
             consented_at=session.consented_at,
             submitted_at=session.submitted_at,
             calibration_quality=calibration.quality_grade if calibration else None,
-            calibration_error_px=float(calibration.error_px) if calibration and calibration.error_px is not None else None,
+            calibration_error_px=(
+                float(calibration.error_px)
+                if calibration and calibration.error_px is not None
+                else None
+            ),
             completed_task_count=completed_task_count,
             gaze_batch_count=gaze_batch_count,
             gaze_sample_count=gaze_sample_count,
             analysis_status=job.status if job else None,
-            source="synthetic-demo" if session.participant_alias == "Synthetic demo participant" else "participant-session",
-            events=[SessionTimelineEvent(kind=event.kind, occurred_at=event.occurred_at) for event in events],
+            source=(
+                "synthetic-demo"
+                if session.participant_alias == "Synthetic demo participant"
+                else "participant-session"
+            ),
+            events=[
+                SessionTimelineEvent(kind=event.kind, occurred_at=event.occurred_at)
+                for event in events
+            ],
         ))
     return ParticipantSessionSummaryListResponse(items=items, total=len(items))
 
