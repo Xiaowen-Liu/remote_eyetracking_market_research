@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/participant-sessions/{session_id}/calibrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Calibration */
+        post: operations["recordCalibrationResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/participant-sessions/{session_id}/consent": {
         parameters: {
             query?: never;
@@ -15,6 +32,57 @@ export interface paths {
         put?: never;
         /** Record Consent */
         post: operations["recordParticipantConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant-sessions/{session_id}/gaze-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest Gaze Batch */
+        post: operations["ingestGazeBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant-sessions/{session_id}/task-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Task Run */
+        post: operations["startTaskRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant-sessions/{session_id}/task-runs/{task_run_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Task Run */
+        post: operations["completeTaskRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -258,6 +326,59 @@ export interface components {
              */
             minimum_quality: "strong" | "variable" | "limited";
         };
+        /** CalibrationResultCreate */
+        CalibrationResultCreate: {
+            /** Attempt */
+            attempt: number;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /** Diagnostics */
+            diagnostics?: {
+                [key: string]: unknown;
+            };
+            /** Error Px */
+            error_px?: number | null;
+            /** Observed Sample Count */
+            observed_sample_count: number;
+            quality_grade: components["schemas"]["QualityGrade"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Target Count */
+            target_count: number;
+        };
+        /** CalibrationResultResponse */
+        CalibrationResultResponse: {
+            /** Accepted */
+            accepted: boolean;
+            /** Attempt */
+            attempt: number;
+            /** Attempts Remaining */
+            attempts_remaining: number;
+            /** Error Px */
+            error_px: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lifecycle: components["schemas"]["SessionLifecycle"];
+            /** Observed Sample Count */
+            observed_sample_count: number;
+            quality_grade: components["schemas"]["QualityGrade"];
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Target Count */
+            target_count: number;
+        };
         /** CollectionPolicy */
         CollectionPolicy: {
             /**
@@ -311,6 +432,87 @@ export interface components {
             error: components["schemas"]["ErrorDetail"];
             /** Request Id */
             request_id: string;
+        };
+        /** GazeBatchCreate */
+        GazeBatchCreate: {
+            /**
+             * Captured From
+             * Format: date-time
+             */
+            captured_from: string;
+            /**
+             * Captured To
+             * Format: date-time
+             */
+            captured_to: string;
+            /**
+             * Client Batch Id
+             * Format: uuid
+             */
+            client_batch_id: string;
+            /** Samples */
+            samples: components["schemas"]["GazeSampleCreate"][];
+            /**
+             * Schema Version
+             * @default 1.0
+             * @constant
+             */
+            schema_version: "1.0";
+            /** Sequence */
+            sequence: number;
+        };
+        /** GazeBatchResponse */
+        GazeBatchResponse: {
+            /**
+             * Client Batch Id
+             * Format: uuid
+             */
+            client_batch_id: string;
+            /** Highest Sequence Received */
+            highest_sequence_received: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Missing Sequences */
+            missing_sequences: number[];
+            /** Payload Checksum */
+            payload_checksum: string;
+            /** Replayed */
+            replayed: boolean;
+            /** Sample Count */
+            sample_count: number;
+            /** Sequence */
+            sequence: number;
+        };
+        /** GazeSampleCreate */
+        GazeSampleCreate: {
+            /** Confidence */
+            confidence?: number | null;
+            /**
+             * Scroll X
+             * @default 0
+             */
+            scroll_x: number;
+            /**
+             * Scroll Y
+             * @default 0
+             */
+            scroll_y: number;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Viewport Height */
+            viewport_height: number;
+            /** Viewport Width */
+            viewport_width: number;
+            /** X Normalized */
+            x_normalized: number;
+            /** Y Normalized */
+            y_normalized: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -480,6 +682,11 @@ export interface components {
             study: components["schemas"]["StudySummary"];
             version: components["schemas"]["StudyVersionResponse"];
         };
+        /**
+         * QualityGrade
+         * @enum {string}
+         */
+        QualityGrade: "strong" | "variable" | "limited" | "failed";
         /**
          * SessionLifecycle
          * @enum {string}
@@ -684,6 +891,52 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * TaskOutcome
+         * @enum {string}
+         */
+        TaskOutcome: "running" | "completed" | "skipped" | "timed_out";
+        /** TaskRunComplete */
+        TaskRunComplete: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "completed" | "skipped" | "timed_out";
+        };
+        /** TaskRunCreate */
+        TaskRunCreate: {
+            /** Task Position */
+            task_position: number;
+        };
+        /** TaskRunResponse */
+        TaskRunResponse: {
+            /** Ended At */
+            ended_at: string | null;
+            /** First Sequence */
+            first_sequence: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Sequence */
+            last_sequence: number | null;
+            outcome: components["schemas"]["TaskOutcome"];
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            session_lifecycle: components["schemas"]["SessionLifecycle"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Task Position */
+            task_position: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -706,6 +959,61 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    recordCalibrationResult: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalibrationResultCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationResultResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     recordParticipantConsent: {
         parameters: {
             query?: never;
@@ -730,6 +1038,172 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConsentResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingestGazeBatch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GazeBatchCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GazeBatchResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    startTaskRun: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRunCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRunResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    completeTaskRun: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                task_run_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRunComplete"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRunResponse"];
                 };
             };
             /** @description Unauthorized */

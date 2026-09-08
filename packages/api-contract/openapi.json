@@ -130,6 +130,134 @@
         "title": "CalibrationPolicy",
         "type": "object"
       },
+      "CalibrationResultCreate": {
+        "properties": {
+          "attempt": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "diagnostics": {
+            "additionalProperties": true,
+            "title": "Diagnostics",
+            "type": "object"
+          },
+          "error_px": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Px"
+          },
+          "observed_sample_count": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Observed Sample Count",
+            "type": "integer"
+          },
+          "quality_grade": {
+            "$ref": "#/components/schemas/QualityGrade"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "target_count": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Target Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attempt",
+          "started_at",
+          "completed_at",
+          "target_count",
+          "observed_sample_count",
+          "quality_grade"
+        ],
+        "title": "CalibrationResultCreate",
+        "type": "object"
+      },
+      "CalibrationResultResponse": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "attempts_remaining": {
+            "title": "Attempts Remaining",
+            "type": "integer"
+          },
+          "error_px": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Px"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/SessionLifecycle"
+          },
+          "observed_sample_count": {
+            "title": "Observed Sample Count",
+            "type": "integer"
+          },
+          "quality_grade": {
+            "$ref": "#/components/schemas/QualityGrade"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "target_count": {
+            "title": "Target Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "attempt",
+          "lifecycle",
+          "target_count",
+          "observed_sample_count",
+          "error_px",
+          "quality_grade",
+          "accepted",
+          "attempts_remaining"
+        ],
+        "title": "CalibrationResultResponse",
+        "type": "object"
+      },
       "CollectionPolicy": {
         "properties": {
           "sample_interval_ms": {
@@ -242,6 +370,172 @@
           "request_id"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "GazeBatchCreate": {
+        "properties": {
+          "captured_from": {
+            "format": "date-time",
+            "title": "Captured From",
+            "type": "string"
+          },
+          "captured_to": {
+            "format": "date-time",
+            "title": "Captured To",
+            "type": "string"
+          },
+          "client_batch_id": {
+            "format": "uuid",
+            "title": "Client Batch Id",
+            "type": "string"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/GazeSampleCreate"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Samples",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "client_batch_id",
+          "sequence",
+          "captured_from",
+          "captured_to",
+          "samples"
+        ],
+        "title": "GazeBatchCreate",
+        "type": "object"
+      },
+      "GazeBatchResponse": {
+        "properties": {
+          "client_batch_id": {
+            "format": "uuid",
+            "title": "Client Batch Id",
+            "type": "string"
+          },
+          "highest_sequence_received": {
+            "title": "Highest Sequence Received",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "missing_sequences": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Missing Sequences",
+            "type": "array"
+          },
+          "payload_checksum": {
+            "title": "Payload Checksum",
+            "type": "string"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "sample_count": {
+            "title": "Sample Count",
+            "type": "integer"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "client_batch_id",
+          "sequence",
+          "sample_count",
+          "payload_checksum",
+          "replayed",
+          "highest_sequence_received",
+          "missing_sequences"
+        ],
+        "title": "GazeBatchResponse",
+        "type": "object"
+      },
+      "GazeSampleCreate": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "scroll_x": {
+            "default": 0,
+            "title": "Scroll X",
+            "type": "number"
+          },
+          "scroll_y": {
+            "default": 0,
+            "title": "Scroll Y",
+            "type": "number"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "viewport_height": {
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Viewport Height",
+            "type": "integer"
+          },
+          "viewport_width": {
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Viewport Width",
+            "type": "integer"
+          },
+          "x_normalized": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X Normalized",
+            "type": "number"
+          },
+          "y_normalized": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y Normalized",
+            "type": "number"
+          }
+        },
+        "required": [
+          "timestamp",
+          "x_normalized",
+          "y_normalized",
+          "viewport_width",
+          "viewport_height"
+        ],
+        "title": "GazeSampleCreate",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -671,6 +965,16 @@
         ],
         "title": "PublishResponse",
         "type": "object"
+      },
+      "QualityGrade": {
+        "enum": [
+          "strong",
+          "variable",
+          "limited",
+          "failed"
+        ],
+        "title": "QualityGrade",
+        "type": "string"
       },
       "SessionLifecycle": {
         "enum": [
@@ -1234,6 +1538,125 @@
         "title": "TaskDraft",
         "type": "object"
       },
+      "TaskOutcome": {
+        "enum": [
+          "running",
+          "completed",
+          "skipped",
+          "timed_out"
+        ],
+        "title": "TaskOutcome",
+        "type": "string"
+      },
+      "TaskRunComplete": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "completed",
+              "skipped",
+              "timed_out"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "TaskRunComplete",
+        "type": "object"
+      },
+      "TaskRunCreate": {
+        "properties": {
+          "task_position": {
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Task Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task_position"
+        ],
+        "title": "TaskRunCreate",
+        "type": "object"
+      },
+      "TaskRunResponse": {
+        "properties": {
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "first_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Sequence"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sequence"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/TaskOutcome"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_lifecycle": {
+            "$ref": "#/components/schemas/SessionLifecycle"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "task_position": {
+            "title": "Task Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "task_position",
+          "outcome",
+          "started_at",
+          "ended_at",
+          "first_sequence",
+          "last_sequence",
+          "session_lifecycle"
+        ],
+        "title": "TaskRunResponse",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1280,10 +1703,99 @@
     "description": "Versioned REST API for research projects, published eye-tracking protocols, participant sessions, sample ingestion, and analysis.",
     "summary": "Eye-tracking research platform API",
     "title": "WebGaze API",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/participant-sessions/{session_id}/calibrations": {
+      "post": {
+        "operationId": "recordCalibrationResult",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalibrationResultCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Calibration",
+        "tags": [
+          "participant sessions"
+        ]
+      }
+    },
     "/api/v1/participant-sessions/{session_id}/consent": {
       "post": {
         "operationId": "recordParticipantConsent",
@@ -1368,6 +1880,283 @@
           }
         },
         "summary": "Record Consent",
+        "tags": [
+          "participant sessions"
+        ]
+      }
+    },
+    "/api/v1/participant-sessions/{session_id}/gaze-batches": {
+      "post": {
+        "operationId": "ingestGazeBatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GazeBatchCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GazeBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingest Gaze Batch",
+        "tags": [
+          "participant sessions"
+        ]
+      }
+    },
+    "/api/v1/participant-sessions/{session_id}/task-runs": {
+      "post": {
+        "operationId": "startTaskRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Task Run",
+        "tags": [
+          "participant sessions"
+        ]
+      }
+    },
+    "/api/v1/participant-sessions/{session_id}/task-runs/{task_run_id}/complete": {
+      "post": {
+        "operationId": "completeTaskRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRunComplete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Task Run",
         "tags": [
           "participant sessions"
         ]

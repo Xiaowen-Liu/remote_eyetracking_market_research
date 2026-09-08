@@ -15,7 +15,7 @@ def create_app() -> FastAPI:
             "Versioned REST API for research projects, published eye-tracking "
             "protocols, participant sessions, sample ingestion, and analysis."
         ),
-        version="0.2.0",
+        version="0.3.0",
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/docs",
         redoc_url="/api/redoc",
@@ -30,6 +30,7 @@ def create_app() -> FastAPI:
             "Idempotency-Key",
             "X-Request-ID",
             "X-Demo-Owner-ID",
+            "Authorization",
         ],
     )
     install_error_handlers(app)

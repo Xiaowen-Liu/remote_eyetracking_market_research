@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from .models import ProjectStatus, SessionLifecycle, StudyLifecycle
+from .models import ProjectStatus, QualityGrade, SessionLifecycle, StudyLifecycle, TaskOutcome
 
 
 class ApiModel(BaseModel):
@@ -215,6 +215,100 @@ class ConsentResponse(ApiModel):
     lifecycle: SessionLifecycle
     consent_version: str
     consented_at: datetime
+
+
+class CalibrationResultCreate(ApiModel):
+    attempt: int = Field(ge=1, le=10)
+    started_at: datetime
+    completed_at: datetime
+    target_count: int = Field(ge=1, le=100)
+    observed_sample_count: int = Field(ge=0, le=100_000)
+    error_px: float | None = Field(default=None, ge=0, le=100_000)
+    quality_grade: QualityGrade
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_calibration_timing(self) -> "CalibrationResultCreate":
+        if self.completed_at < self.started_at:
+            raise ValueError("Calibration completion cannot precede its start")
+        if self.quality_grade != QualityGrade.FAILED and self.error_px is None:
+            raise ValueError("A completed calibration requires an accuracy error")
+        return self
+
+
+class CalibrationResultResponse(ApiModel):
+    id: UUID
+    session_id: UUID
+    attempt: int
+    lifecycle: SessionLifecycle
+    target_count: int
+    observed_sample_count: int
+    error_px: float | None
+    quality_grade: QualityGrade
+    accepted: bool
+    attempts_remaining: int
+
+
+class TaskRunCreate(ApiModel):
+    task_position: int = Field(ge=1, le=4)
+
+
+class TaskRunComplete(ApiModel):
+    outcome: Literal[TaskOutcome.COMPLETED, TaskOutcome.SKIPPED, TaskOutcome.TIMED_OUT]
+
+
+class TaskRunResponse(ApiModel):
+    id: UUID
+    session_id: UUID
+    task_position: int
+    outcome: TaskOutcome
+    started_at: datetime
+    ended_at: datetime | None
+    first_sequence: int | None
+    last_sequence: int | None
+    session_lifecycle: SessionLifecycle
+
+
+class GazeSampleCreate(ApiModel):
+    timestamp: datetime
+    x_normalized: float = Field(ge=0, le=1, allow_inf_nan=False)
+    y_normalized: float = Field(ge=0, le=1, allow_inf_nan=False)
+    confidence: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    scroll_x: float = Field(default=0, allow_inf_nan=False)
+    scroll_y: float = Field(default=0, allow_inf_nan=False)
+    viewport_width: int = Field(ge=1, le=10_000)
+    viewport_height: int = Field(ge=1, le=10_000)
+
+
+class GazeBatchCreate(ApiModel):
+    client_batch_id: UUID
+    sequence: int = Field(ge=0)
+    schema_version: Literal["1.0"] = "1.0"
+    captured_from: datetime
+    captured_to: datetime
+    samples: list[GazeSampleCreate] = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def validate_batch_timing(self) -> "GazeBatchCreate":
+        if self.captured_to < self.captured_from:
+            raise ValueError("Batch end cannot precede its start")
+        if any(
+            sample.timestamp < self.captured_from or sample.timestamp > self.captured_to
+            for sample in self.samples
+        ):
+            raise ValueError("Every sample timestamp must fall inside the batch interval")
+        return self
+
+
+class GazeBatchResponse(ApiModel):
+    id: UUID
+    client_batch_id: UUID
+    sequence: int
+    sample_count: int
+    payload_checksum: str
+    replayed: bool
+    highest_sequence_received: int
+    missing_sequences: list[int]
 
 
 class OpenApiMetadata(ApiModel):

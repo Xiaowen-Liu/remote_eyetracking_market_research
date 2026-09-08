@@ -49,4 +49,14 @@ def test_openapi_has_stable_operation_ids_and_error_schema(client):
         schema["paths"]["/api/v1/participate/{token}"]["get"]["operationId"]
         == "resolveParticipantLink"
     )
+    assert (
+        schema["paths"]["/api/v1/participant-sessions/{session_id}/calibrations"]["post"]
+        ["operationId"]
+        == "recordCalibrationResult"
+    )
+    assert (
+        schema["paths"]["/api/v1/participant-sessions/{session_id}/gaze-batches"]["post"]
+        ["operationId"]
+        == "ingestGazeBatch"
+    )
     assert "ErrorResponse" in schema["components"]["schemas"]
