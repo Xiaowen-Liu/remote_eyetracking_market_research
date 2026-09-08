@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,6 +96,30 @@ describe("Study Builder", () => {
     expect(screen.getAllByRole("button", { name: "Open project" })).toHaveLength(2);
   });
 
+  it("creates a named project from the dashboard", async () => {
+    const user = userEvent.setup();
+    apiMocks.createProject.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000012",
+      owner_id: "00000000-0000-4000-8000-000000000001",
+      name: "Accessibility follow-up",
+      research_question: "How do people visually navigate checkout?",
+      status: "active",
+      created_at: "2026-09-07T00:00:00Z",
+      updated_at: "2026-09-07T00:00:00Z",
+    });
+    render(<App />);
+
+    await screen.findByText("Checkout UX research");
+    await user.click(screen.getByRole("button", { name: "Projects" }));
+    await user.click(screen.getByRole("button", { name: "New project" }));
+    await user.type(screen.getByLabelText("Project name"), "Accessibility follow-up");
+    await user.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => {
+      expect(apiMocks.createProject).toHaveBeenCalledWith("Accessibility follow-up");
+    });
+  });
+
   it("keeps a published version read-only until a revision is created", async () => {
     const user = userEvent.setup();
     apiMocks.listStudies.mockResolvedValue({
@@ -139,6 +163,11 @@ describe("Study Builder", () => {
 
     expect(await screen.findByText("Published · v1")).toBeInTheDocument();
     expect(screen.getByLabelText("Study title")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "+ Add task" })).toHaveAttribute(
+      "title",
+      "Edit study to add tasks",
+    );
+    expect(screen.getByText("This version is live. Select Edit study to change its tasks.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Publish study" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Copy participant link" }));
