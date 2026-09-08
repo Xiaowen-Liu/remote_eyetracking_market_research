@@ -46,6 +46,7 @@ export function App() {
 
 function StudyBuilder() {
   const bootstrapStarted = useRef(false);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [study, setStudy] = useState<StudyDraftResponse | null>(null);
   const [draft, setDraft] = useState<StudyDraft>(emptyDraft);
@@ -55,6 +56,7 @@ function StudyBuilder() {
   const [notice, setNotice] = useState<Notice>(null);
   const [participantUrl, setParticipantUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
 
   useEffect(() => {
     if (bootstrapStarted.current) return;
@@ -64,21 +66,39 @@ function StudyBuilder() {
 
   async function bootstrap() {
     try {
-      const projects = await api.listProjects();
+      const projectList = await api.listProjects();
       const current =
-        projects.items[0] ?? (await api.createProject("Checkout UX research"));
-      setProject(current);
-      const studies = await api.listStudies(current.id);
-      if (studies.items[0]) {
-        const existing = await api.getDraft(studies.items[0].id);
-        setStudy(existing);
-        setDraft(toDraft(existing));
-        setDirty(false);
-        setEditing(existing.current_published_version === null);
-        if (existing.current_published_version) {
-          const link = await api.getParticipantLink(existing.id);
-          setParticipantUrl(link.participant_url);
-        }
+        projectList.items[0] ?? (await api.createProject("Checkout UX research"));
+      const available = projectList.items.length ? projectList.items : [current];
+      setProjects(available);
+      await selectProject(current);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function selectProject(nextProject: Project) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      setProject(nextProject);
+      setProjectMenuOpen(false);
+      setStudy(null);
+      setDraft(emptyDraft);
+      setDirty(false);
+      setEditing(true);
+      setParticipantUrl(null);
+      const studies = await api.listStudies(nextProject.id);
+      if (!studies.items[0]) return;
+      const existing = await api.getDraft(studies.items[0].id);
+      setStudy(existing);
+      setDraft(toDraft(existing));
+      setEditing(existing.current_published_version === null);
+      if (existing.current_published_version) {
+        const link = await api.getParticipantLink(existing.id);
+        setParticipantUrl(link.participant_url);
       }
     } catch (error) {
       showError(error);
@@ -237,9 +257,45 @@ function StudyBuilder() {
 
       <main>
         <nav className="breadcrumbs" aria-label="Breadcrumb">
-          <span>Projects</span><span>/</span>
+          <button
+            type="button"
+            className="project-nav-button"
+            onClick={() => setProjectMenuOpen((open) => !open)}
+            aria-expanded={projectMenuOpen}
+          >
+            Projects
+          </button><span>/</span>
           <strong>{project?.name ?? "Loading…"}</strong>
         </nav>
+
+        {projectMenuOpen && (
+          <section className="project-menu" aria-label="Projects">
+            <div className="project-menu-heading">
+              <div>
+                <p className="eyebrow">Projects</p>
+                <h2>Switch research context</h2>
+              </div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setProjectMenuOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            {projects.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={`project-option ${item.id === project?.id ? "active" : ""}`}
+                onClick={() => void selectProject(item)}
+              >
+                <span>{item.name}</span>
+                <small>{item.id === project?.id ? "Current project" : "Open project"}</small>
+              </button>
+            ))}
+          </section>
+        )}
 
         <section className="page-heading">
           <div>
