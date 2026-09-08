@@ -370,7 +370,10 @@ def publish_study(
             id=link.id,
             study_version_id=published.id,
             token=raw_token,
-            participant_url=f"/api/v1/participate/{raw_token}",
+            # This is a browser navigation URL, not the API endpoint used to
+            # resolve the protocol. Keeping the two paths separate prevents a
+            # copied participant link from being served as an API request.
+            participant_url=f"/participate/{raw_token}",
         ),
     )
 
@@ -404,7 +407,7 @@ def get_active_participant_link(
         id=link.id,
         study_version_id=link.study_version_id,
         token=link.public_code,
-        participant_url=f"/api/v1/participate/{link.public_code}",
+        participant_url=f"/participate/{link.public_code}",
     )
 
 

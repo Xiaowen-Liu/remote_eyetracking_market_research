@@ -43,7 +43,7 @@ describe("Study Builder", () => {
     });
     apiMocks.listStudies.mockResolvedValue({ items: [], total: 0 });
     apiMocks.getParticipantLink.mockResolvedValue({
-      participant_url: "/api/v1/participate/demo-link",
+      participant_url: "/participate/demo-link",
     });
   });
 
