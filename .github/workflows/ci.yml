@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: .venv/bin/ruff check apps/api
       - run: npm test
+      - run: npm run build:web
       - run: npm run generate:contract
       - name: Verify generated API contract is committed
         run: git diff --exit-code -- packages/api-contract

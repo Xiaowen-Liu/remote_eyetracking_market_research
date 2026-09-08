@@ -1,22 +1,39 @@
 {
   "name": "webgaze-eye-tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "build:web": "tsc -p apps/web/tsconfig.json && vite build --config apps/web/vite.config.ts",
     "db:migrate": "cd apps/api && ../../.venv/bin/alembic upgrade head",
     "db:seed": ".venv/bin/python -m webgaze_api.seed",
     "generate:openapi": ".venv/bin/python apps/api/scripts/export_openapi.py",
     "generate:types": "openapi-typescript packages/api-contract/openapi.json -o packages/api-contract/src/schema.d.ts",
     "generate:contract": "npm run generate:openapi && npm run generate:types",
-    "test:extension": "node --test",
+    "test:extension": "node --test test/session.test.js",
+    "test:web": "vitest run --config apps/web/vite.config.ts",
     "test:api": ".venv/bin/pytest apps/api/tests -q --cov=webgaze_api --cov-report=term-missing",
-    "test": "npm run test:extension && npm run test:api"
+    "test": "npm run test:extension && npm run test:web && npm run test:api"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
-    "openapi-typescript": "^7.10.1"
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "jsdom": "^26.1.0",
+    "openapi-typescript": "^7.10.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.4",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   }
 }

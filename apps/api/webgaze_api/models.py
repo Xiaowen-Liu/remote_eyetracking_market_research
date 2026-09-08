@@ -128,6 +128,7 @@ class StudyVersion(Base):
         ForeignKey("studies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_revision: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     consent_version: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -136,14 +137,15 @@ class StudyVersion(Base):
     calibration_policy: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     collection_policy: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     retention_days: Mapped[int] = mapped_column(Integer, nullable=False)
-    published_by: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    published_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    published_by: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     study: Mapped[Study] = relationship(back_populates="versions")
     tasks: Mapped[list[Task]] = relationship(
         back_populates="study_version", cascade="all, delete-orphan", order_by="Task.position"
+    )
+    participant_links: Mapped[list[ParticipantLink]] = relationship(
+        back_populates="study_version", cascade="all, delete-orphan"
     )
 
 
@@ -198,12 +200,15 @@ class ParticipantLink(Base):
         ForeignKey("study_versions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)
+    public_code: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     max_sessions: Mapped[int | None] = mapped_column(Integer)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    study_version: Mapped[StudyVersion] = relationship(back_populates="participant_links")
 
 
 class ParticipantSession(Base):
@@ -214,6 +219,7 @@ class ParticipantSession(Base):
         ForeignKey("study_versions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     participant_alias: Mapped[str] = mapped_column(String(80), nullable=False)
+    access_token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     lifecycle: Mapped[SessionLifecycle] = mapped_column(
         Enum(SessionLifecycle, native_enum=False), default=SessionLifecycle.CREATED, nullable=False
     )
@@ -231,6 +237,8 @@ class ParticipantSession(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    study_version: Mapped[StudyVersion] = relationship()
 
 
 class CalibrationResult(Base):
