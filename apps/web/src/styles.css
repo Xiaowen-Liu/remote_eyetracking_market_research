@@ -20,14 +20,18 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .breadcrumbs strong { color: #35423b; font-weight: 600; }
 .project-nav-button { border: 0; padding: 0; color: #56665b; background: transparent; font-weight: 700; }
 .project-nav-button:hover { color: #294235; text-decoration: underline; }
-.project-menu { width: min(560px, 100%); margin: -18px 0 28px; padding: 18px; background: #fff; border: 1px solid #d9ded8; border-radius: 12px; box-shadow: 0 16px 45px #24312610; }
-.project-menu-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 12px; }
-.project-menu h2 { margin: 5px 0 0; font: 500 20px/1.2 Georgia, serif; }
-.project-option { width: 100%; display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 13px; color: #334139; text-align: left; background: #f7f8f4; border: 1px solid transparent; border-radius: 8px; }
-.project-option + .project-option { margin-top: 8px; }
-.project-option:hover, .project-option.active { background: #edf3e6; border-color: #b8ca9d; }
-.project-option span { font-weight: 750; }
-.project-option small { color: #748078; white-space: nowrap; }
+.dashboard-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 8px 0 34px; }
+.dashboard-heading h1 { font: 500 clamp(38px, 6vw, 62px)/1.05 Georgia, serif; letter-spacing: -.04em; margin: 0 0 10px; }
+.dashboard-heading p { color: #657069; margin: 0; max-width: 600px; }
+.dashboard-action { width: auto; min-width: 130px; }
+.project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.project-card { display: flex; flex-direction: column; min-height: 230px; padding: 22px; background: #fff; border: 1px solid #d9ded8; border-radius: 14px; }
+.project-card.current { border-color: #adc68a; box-shadow: 0 12px 36px #2431260d; }
+.project-card-topline { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.status.active { color: #456c1c; background: #e3f0cb; }
+.current-label { color: #78837c; font-size: 11px; }
+.project-card h2 { margin: 30px 0 9px; font: 500 25px/1.15 Georgia, serif; }
+.project-card p { flex: 1; color: #68736c; line-height: 1.5; font-size: 14px; margin: 0; }
 .page-heading { display: flex; justify-content: space-between; gap: 32px; align-items: flex-start; margin-bottom: 28px; }
 .page-heading h1 { font: 500 clamp(30px, 4vw, 46px)/1.08 Georgia, serif; margin: 4px 0 10px; letter-spacing: -.035em; }
 .page-heading p:not(.eyebrow) { color: #657069; margin: 0; max-width: 680px; }
@@ -119,4 +123,6 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
   .task-card { grid-template-columns: 1fr; }
   .task-index { padding-top: 0; }
   .environment { display: none; }
+  .dashboard-heading { display: grid; align-items: start; }
+  .dashboard-action { width: 100%; }
 }

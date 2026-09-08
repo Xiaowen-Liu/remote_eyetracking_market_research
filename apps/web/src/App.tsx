@@ -56,7 +56,7 @@ function StudyBuilder() {
   const [notice, setNotice] = useState<Notice>(null);
   const [participantUrl, setParticipantUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
 
   useEffect(() => {
     if (bootstrapStarted.current) return;
@@ -84,7 +84,7 @@ function StudyBuilder() {
     setNotice(null);
     try {
       setProject(nextProject);
-      setProjectMenuOpen(false);
+      setDashboardOpen(false);
       setStudy(null);
       setDraft(emptyDraft);
       setDirty(false);
@@ -245,6 +245,16 @@ function StudyBuilder() {
   const publishedVersion = study?.current_published_version ?? null;
   const isLocked = publishedVersion !== null && !editing;
 
+  if (dashboardOpen) {
+    return (
+      <ProjectDashboard
+        projects={projects}
+        currentProjectId={project?.id ?? null}
+        onOpenProject={(nextProject) => void selectProject(nextProject)}
+      />
+    );
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -260,42 +270,12 @@ function StudyBuilder() {
           <button
             type="button"
             className="project-nav-button"
-            onClick={() => setProjectMenuOpen((open) => !open)}
-            aria-expanded={projectMenuOpen}
+            onClick={() => setDashboardOpen(true)}
           >
             Projects
           </button><span>/</span>
           <strong>{project?.name ?? "Loading…"}</strong>
         </nav>
-
-        {projectMenuOpen && (
-          <section className="project-menu" aria-label="Projects">
-            <div className="project-menu-heading">
-              <div>
-                <p className="eyebrow">Projects</p>
-                <h2>Switch research context</h2>
-              </div>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() => setProjectMenuOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            {projects.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                className={`project-option ${item.id === project?.id ? "active" : ""}`}
-                onClick={() => void selectProject(item)}
-              >
-                <span>{item.name}</span>
-                <small>{item.id === project?.id ? "Current project" : "Open project"}</small>
-              </button>
-            ))}
-          </section>
-        )}
 
         <section className="page-heading">
           <div>
@@ -569,6 +549,55 @@ function StudyBuilder() {
             )}
           </aside>
         </div>
+      </main>
+    </div>
+  );
+}
+
+function ProjectDashboard({
+  projects,
+  currentProjectId,
+  onOpenProject,
+}: {
+  projects: Project[];
+  currentProjectId: string | null;
+  onOpenProject: (project: Project) => void;
+}) {
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="/" aria-label="WebGaze Research home">
+          <span className="brand-mark" aria-hidden="true">◉</span>
+          WebGaze Research
+        </a>
+        <span className="environment">Independent demo</span>
+      </header>
+      <main>
+        <p className="eyebrow">Research workspace</p>
+        <div className="dashboard-heading">
+          <div>
+            <h1>Projects</h1>
+            <p>Organize studies, participant protocols, and analysis work in one place.</p>
+          </div>
+          <button className="primary-button dashboard-action" type="button" disabled>
+            New project
+          </button>
+        </div>
+        <section className="project-grid" aria-label="Research projects">
+          {projects.map((item) => (
+            <article className={`project-card ${item.id === currentProjectId ? "current" : ""}`} key={item.id}>
+              <div className="project-card-topline">
+                <span className="status active">Active</span>
+                {item.id === currentProjectId && <span className="current-label">Currently open</span>}
+              </div>
+              <h2>{item.name}</h2>
+              <p>{item.research_question ?? "No research question added yet."}</p>
+              <button className="secondary-button full" type="button" onClick={() => onOpenProject(item)}>
+                Open project
+              </button>
+            </article>
+          ))}
+        </section>
       </main>
     </div>
   );
