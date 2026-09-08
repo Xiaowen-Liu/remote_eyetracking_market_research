@@ -5,6 +5,7 @@ import {
   ApiClientError,
   type AnalysisJob,
   type AnalysisResult,
+  type ParticipantSessionSummary,
   type Project,
   type StudyDraft,
   type StudyDraftResponse,
@@ -665,6 +666,7 @@ function ResultsDashboard({
   onBack: () => void;
 }) {
   const [jobs, setJobs] = useState<AnalysisJob[]>([]);
+  const [sessions, setSessions] = useState<ParticipantSessionSummary[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [resultsByJob, setResultsByJob] = useState<Record<string, AnalysisResult>>({});
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -679,7 +681,9 @@ function ResultsDashboard({
     setBusy(true);
     try {
       const response = await api.listStudyAnalysisJobs(study.id);
+      const sessionResponse = await api.listStudyParticipantSessions(study.id);
       setJobs(response.items);
+      setSessions(sessionResponse.items);
       const latest = response.items[0];
       const completed = response.items.filter((job) => job.status === "succeeded");
       const loaded = await Promise.all(
@@ -799,6 +803,7 @@ function ResultsDashboard({
             <p className="panel-description">Status: {selectedJob?.status}. Submitted results remain immutable after processing.</p>
             {jobs.length > 1 && <label className="job-selector">Choose session<select value={selectedJobId ?? ""} onChange={(event) => selectJob(event.target.value)}>{jobs.map((job, index) => <option key={job.id} value={job.id}>Session {jobs.length - index} · {job.status}</option>)}</select></label>}
             {selectedJob && selectedJob.status !== "succeeded" && <button className="primary-button" type="button" disabled={busy} onClick={() => void runLatestJob(selectedJob)}>Process selected analysis</button>}
+            {sessions.length > 0 && <div className="session-health"><p className="eyebrow">Collection health</p>{sessions.slice(0, 3).map((session) => <div className="session-health-row" key={session.id}><strong>{session.participant_alias}</strong><span>{session.source === "synthetic-demo" ? "Synthetic demo" : `${session.completed_task_count} tasks · ${session.gaze_sample_count} samples`}</span><small>Calibration {session.calibration_quality ?? "not recorded"} · {session.analysis_status ?? session.lifecycle}</small></div>)}</div>}
           </aside>
           {result && <section className="results-panel">
             <div className="results-panel-header">

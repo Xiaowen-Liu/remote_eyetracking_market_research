@@ -116,6 +116,11 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .publish-panel li.complete { color: #354239; }
 .publish-panel li.complete::before { content: "✓"; color: #55752f; font-weight: 800; }
 .publish-panel .primary-button { color: #f7faf5; background: #293b32; border-color: #293b32; }
+.session-health { display: grid; gap: 10px; margin-top: 20px; padding-top: 17px; border-top: 1px solid #e5e8e3; }
+.session-health .eyebrow { margin: 0; }
+.session-health-row { display: grid; gap: 3px; padding: 10px; background: #f5f7f2; border-radius: 7px; }
+.session-health-row strong { font-size: 12px; }
+.session-health-row span, .session-health-row small { color: #6a756e; font-size: 11px; line-height: 1.35; }
 .publish-panel .secondary-button { color: #354139; border-color: #c8d0c9; }
 .fine-print { color: #737d77; font-size: 11px; line-height: 1.5; margin: 15px 0 0; }
 .participant-link { margin-top: 17px; padding-top: 16px; border-top: 1px solid #e5e8e3; display: grid; gap: 7px; }

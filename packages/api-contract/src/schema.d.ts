@@ -332,6 +332,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/studies/{study_id}/participant-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Study Participant Sessions */
+        get: operations["listStudyParticipantSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/studies/{study_id}/publish": {
         parameters: {
             query?: never;
@@ -782,6 +799,47 @@ export interface components {
              */
             retention_expires_at: string;
         };
+        /** ParticipantSessionSummary */
+        ParticipantSessionSummary: {
+            analysis_status: components["schemas"]["AnalysisStatus"] | null;
+            /** Calibration Error Px */
+            calibration_error_px: number | null;
+            calibration_quality: components["schemas"]["QualityGrade"] | null;
+            /** Completed Task Count */
+            completed_task_count: number;
+            /** Consented At */
+            consented_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Events */
+            events: components["schemas"]["SessionTimelineEvent"][];
+            /** Gaze Batch Count */
+            gaze_batch_count: number;
+            /** Gaze Sample Count */
+            gaze_sample_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lifecycle: components["schemas"]["SessionLifecycle"];
+            /** Participant Alias */
+            participant_alias: string;
+            /** Source */
+            source: string;
+            /** Submitted At */
+            submitted_at: string | null;
+        };
+        /** ParticipantSessionSummaryListResponse */
+        ParticipantSessionSummaryListResponse: {
+            /** Items */
+            items: components["schemas"]["ParticipantSessionSummary"][];
+            /** Total */
+            total: number;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /** Name */
@@ -902,6 +960,16 @@ export interface components {
              * Format: uuid
              */
             session_id: string;
+        };
+        /** SessionTimelineEvent */
+        SessionTimelineEvent: {
+            /** Kind */
+            kind: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
         };
         /** StudyCreate */
         StudyCreate: {
@@ -2268,6 +2336,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParticipantLinkResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listStudyParticipantSessions: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantSessionSummaryListResponse"];
                 };
             };
             /** @description Not Found */
