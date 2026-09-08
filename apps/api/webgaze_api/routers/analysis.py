@@ -1,7 +1,12 @@
+import csv
+import io
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,6 +24,7 @@ from ..models import (
     AnalysisJob,
     AnalysisResult,
     AnalysisStatus,
+    AuditEvent,
     ParticipantSession,
     ResearchProject,
     SessionLifecycle,
@@ -35,6 +41,31 @@ from ..schemas import (
 
 router = APIRouter(tags=["analysis"])
 DbSession = Depends(get_db)
+
+
+def export_filename(job: AnalysisJob, extension: str) -> str:
+    return f"webgaze-analysis-{job.id}.{extension}"
+
+
+def task_rows(result: AnalysisResult) -> list[dict[str, object]]:
+    source = result.diagnostics.get("source", "participant-session")
+    rows: list[dict[str, object]] = []
+    for metric in result.task_metrics.get("tasks", []):
+        centroid = metric.get("centroid") or {}
+        rows.append(
+            {
+                "result_id": str(result.id),
+                "source": source,
+                "task_position": metric.get("task_position"),
+                "task_title": metric.get("task_title"),
+                "outcome": metric.get("outcome"),
+                "sample_count": metric.get("sample_count"),
+                "mean_confidence": metric.get("mean_confidence"),
+                "centroid_x_normalized": centroid.get("x_normalized"),
+                "centroid_y_normalized": centroid.get("y_normalized"),
+            }
+        )
+    return rows
 
 
 @router.post(
@@ -217,3 +248,64 @@ def get_analysis_result(
     if not result:
         raise ApiError(409, "ANALYSIS_RESULT_PENDING", "Analysis has not completed")
     return analysis_result_payload(result)
+
+
+@router.get(
+    "/analysis-jobs/{job_id}/export",
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    operation_id="exportAnalysisResult",
+)
+def export_analysis_result(
+    job_id: uuid.UUID,
+    owner_id: CurrentOwnerId,
+    db: Session = DbSession,
+    format: Literal["json", "csv"] = "json",
+) -> Response:
+    job = owned_analysis_job(db, job_id, owner_id)
+    result = result_for_job(db, job.id)
+    if not result:
+        raise ApiError(409, "ANALYSIS_RESULT_PENDING", "Analysis has not completed")
+    db.add(
+        AuditEvent(
+            actor_id=owner_id,
+            action="analysis.exported",
+            resource_type="analysis_result",
+            resource_id=result.id,
+            event_metadata={"format": format, "source": result.diagnostics.get("source")},
+        )
+    )
+    db.commit()
+    if format == "csv":
+        buffer = io.StringIO()
+        fieldnames = [
+            "result_id",
+            "source",
+            "task_position",
+            "task_title",
+            "outcome",
+            "sample_count",
+            "mean_confidence",
+            "centroid_x_normalized",
+            "centroid_y_normalized",
+        ]
+        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(task_rows(result))
+        return StreamingResponse(
+            iter([buffer.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{export_filename(job, "csv")}"'
+            },
+        )
+    payload = {
+        "schema_version": "analysis-export-v1",
+        "job": analysis_job_payload(job).model_dump(mode="json"),
+        "result": analysis_result_payload(result).model_dump(mode="json"),
+        "task_metrics": task_rows(result),
+    }
+    return Response(
+        json.dumps(payload, sort_keys=True),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{export_filename(job, "json")}"'},
+    )

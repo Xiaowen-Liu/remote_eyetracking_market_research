@@ -68,6 +68,18 @@ def test_submission_queues_idempotent_analysis_and_task_metrics(client: TestClie
     assert repeated_run.status_code == 200
     assert repeated_run.json()["id"] == result_body["id"]
 
+    exported_json = client.get(f"/api/v1/analysis-jobs/{job_id}/export?format=json")
+    assert exported_json.status_code == 200
+    assert exported_json.headers["content-type"].startswith("application/json")
+    assert exported_json.json()["schema_version"] == "analysis-export-v1"
+    assert exported_json.json()["task_metrics"][0]["task_position"] == 1
+
+    exported_csv = client.get(f"/api/v1/analysis-jobs/{job_id}/export?format=csv")
+    assert exported_csv.status_code == 200
+    assert exported_csv.headers["content-type"].startswith("text/csv")
+    assert "task_position,task_title" in exported_csv.text
+    assert "Find pricing" in exported_csv.text
+
 
 def test_synthetic_results_are_disclosed_and_idempotent(client: TestClient) -> None:
     project_id = create_project(client)
