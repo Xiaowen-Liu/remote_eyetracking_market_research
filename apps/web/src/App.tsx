@@ -40,6 +40,65 @@ const emptyDraft: StudyDraft = {
 
 type Notice = { kind: "success" | "error"; text: string } | null;
 
+type TaskAggregate = {
+  position: number;
+  title: string;
+  sessionCount: number;
+  sampleCount: number;
+  meanConfidence: number | null;
+};
+
+function numberValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function aggregateTaskMetrics(results: AnalysisResult[]): TaskAggregate[] {
+  const buckets = new Map<number, {
+    title: string;
+    sessionCount: number;
+    sampleCount: number;
+    confidenceTotal: number;
+    confidenceWeight: number;
+  }>();
+
+  for (const result of results) {
+    const metrics = (result.task_metrics.tasks as Array<Record<string, unknown>> | undefined) ?? [];
+    for (const metric of metrics) {
+      const position = numberValue(metric.task_position);
+      if (position === null) continue;
+      const sampleCount = numberValue(metric.sample_count) ?? 0;
+      const confidence = numberValue(metric.mean_confidence);
+      const bucket = buckets.get(position) ?? {
+        title: String(metric.task_title ?? `Task ${position}`),
+        sessionCount: 0,
+        sampleCount: 0,
+        confidenceTotal: 0,
+        confidenceWeight: 0,
+      };
+      bucket.sessionCount += 1;
+      bucket.sampleCount += sampleCount;
+      if (confidence !== null) {
+        const weight = sampleCount || 1;
+        bucket.confidenceTotal += confidence * weight;
+        bucket.confidenceWeight += weight;
+      }
+      buckets.set(position, bucket);
+    }
+  }
+
+  return [...buckets.entries()]
+    .sort(([first], [second]) => first - second)
+    .map(([position, bucket]) => ({
+      position,
+      title: bucket.title,
+      sessionCount: bucket.sessionCount,
+      sampleCount: bucket.sampleCount,
+      meanConfidence: bucket.confidenceWeight
+        ? bucket.confidenceTotal / bucket.confidenceWeight
+        : null,
+    }));
+}
+
 export function App() {
   const token = participantTokenFromPath();
   if (token) return <ParticipantRunner token={token} />;
@@ -607,6 +666,8 @@ function ResultsDashboard({
 }) {
   const [jobs, setJobs] = useState<AnalysisJob[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [resultsByJob, setResultsByJob] = useState<Record<string, AnalysisResult>>({});
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(true);
 
@@ -620,8 +681,20 @@ function ResultsDashboard({
       const response = await api.listStudyAnalysisJobs(study.id);
       setJobs(response.items);
       const latest = response.items[0];
-      if (latest?.status === "succeeded") {
-        setResult(await api.getAnalysisResult(latest.id));
+      const completed = response.items.filter((job) => job.status === "succeeded");
+      const loaded = await Promise.all(
+        completed.map(async (job) => [job.id, await api.getAnalysisResult(job.id)] as const),
+      );
+      const nextResults = Object.fromEntries(loaded);
+      setResultsByJob(nextResults);
+      const selected = selectedJobId && nextResults[selectedJobId]
+        ? selectedJobId
+        : latest?.id ?? null;
+      setSelectedJobId(selected);
+      if (selected && nextResults[selected]) {
+        setResult(nextResults[selected]);
+      } else {
+        setResult(null);
       }
     } catch (error) {
       const text = error instanceof ApiClientError ? error.message : "Could not load analysis jobs.";
@@ -637,6 +710,8 @@ function ResultsDashboard({
     try {
       const nextResult = await api.runAnalysisJob(job.id);
       setResult(nextResult);
+      setSelectedJobId(job.id);
+      setResultsByJob((current) => ({ ...current, [job.id]: nextResult }));
       setJobs((current) => current.map((item) => item.id === job.id ? { ...item, status: "succeeded" } : item));
     } catch (error) {
       const text = error instanceof ApiClientError ? error.message : "Analysis could not run.";
@@ -664,15 +739,21 @@ function ResultsDashboard({
     }
   }
 
+  function selectJob(jobId: string) {
+    setSelectedJobId(jobId);
+    setResult(resultsByJob[jobId] ?? null);
+  }
+
   async function downloadExport(format: "json" | "csv") {
-    if (!latest) return;
+    const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? latest;
+    if (!selectedJob) return;
     setBusy(true);
     try {
-      const blob = await api.downloadAnalysisExport(latest.id, format);
+      const blob = await api.downloadAnalysisExport(selectedJob.id, format);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `webgaze-analysis-${latest.id}.${format}`;
+      link.download = `webgaze-analysis-${selectedJob.id}.${format}`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -684,7 +765,14 @@ function ResultsDashboard({
   }
 
   const latest = jobs[0];
+  const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? latest;
   const taskMetrics = (result?.task_metrics.tasks as Array<Record<string, unknown>> | undefined) ?? [];
+  const completedResults = Object.values(resultsByJob);
+  const aggregateEligibleResults = completedResults.filter(
+    (completedResult) => completedResult.diagnostics.aggregate_eligible === true,
+  );
+  const aggregateSessionCount = completedResults.length;
+  const aggregateMetrics = aggregateTaskMetrics(aggregateEligibleResults);
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -699,19 +787,38 @@ function ResultsDashboard({
             <h1>{study.title}</h1>
             <p>Task-level metrics are versioned outputs from submitted participant sessions.</p>
           </div>
-          <span className={`status ${latest?.status ?? "draft"}`}>{latest ? latest.status : "No sessions"}</span>
+          <span className={`status ${selectedJob?.status ?? "draft"}`}>{selectedJob ? selectedJob.status : "No sessions"}</span>
         </section>
         {notice && <div className={`notice ${notice.kind}`} role="alert">{notice.text}</div>}
         {busy && <div className="loading" role="status">Loading results…</div>}
         {!busy && !latest && <section className="empty-results"><h2>No submitted sessions yet</h2><p>Load a clearly labelled synthetic result set to explore the dashboard before camera-based collection is enabled.</p><button className="primary-button" type="button" onClick={() => void loadSyntheticResults()}>Load synthetic demo results</button></section>}
         {!busy && latest && <section className="results-grid">
           <aside className="publish-panel">
-            <p className="eyebrow">Latest analysis job</p>
-            <h2>{latest.algorithm_version}</h2>
-            <p className="panel-description">Status: {latest.status}. Submitted results remain immutable after processing.</p>
-            {latest.status !== "succeeded" && <button className="primary-button" type="button" disabled={busy} onClick={() => void runLatestJob(latest)}>Process queued analysis</button>}
+            <p className="eyebrow">Analysis session</p>
+            <h2>{selectedJob?.algorithm_version}</h2>
+            <p className="panel-description">Status: {selectedJob?.status}. Submitted results remain immutable after processing.</p>
+            {jobs.length > 1 && <label className="job-selector">Choose session<select value={selectedJobId ?? ""} onChange={(event) => selectJob(event.target.value)}>{jobs.map((job, index) => <option key={job.id} value={job.id}>Session {jobs.length - index} · {job.status}</option>)}</select></label>}
+            {selectedJob && selectedJob.status !== "succeeded" && <button className="primary-button" type="button" disabled={busy} onClick={() => void runLatestJob(selectedJob)}>Process selected analysis</button>}
           </aside>
-          {result && <section className="results-panel"><div className="results-panel-header"><h2>Task metrics</h2><div className="export-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => void downloadExport("csv")}>Download CSV</button><button className="secondary-button" type="button" disabled={busy} onClick={() => void downloadExport("json")}>Download JSON</button></div></div>{result.diagnostics.source === "synthetic-demo" && <div className="notice success">Synthetic demo data — generated for this public portfolio, not collected from a person or camera.</div>}<p className="supporting">{String(result.diagnostics.sample_count)} samples · calibration {String(result.quality.calibration_quality ?? "unavailable")}</p><div className="metric-list">{taskMetrics.map((metric) => <article className="metric-card" key={String(metric.task_position)}><strong>Task {String(metric.task_position)} · {String(metric.task_title)}</strong><span>{String(metric.outcome)}</span><dl><div><dt>Samples</dt><dd>{String(metric.sample_count)}</dd></div><div><dt>Mean confidence</dt><dd>{metric.mean_confidence == null ? "—" : String(metric.mean_confidence)}</dd></div><div><dt>Gaze centroid</dt><dd>{metric.centroid && typeof metric.centroid === "object" ? `${String((metric.centroid as Record<string, unknown>).x_normalized)}, ${String((metric.centroid as Record<string, unknown>).y_normalized)}` : "—"}</dd></div></dl></article>)}</div></section>}
+          {result && <section className="results-panel">
+            <div className="results-panel-header">
+              <h2>Task metrics</h2>
+              <div className="export-actions">
+                <button className="secondary-button" type="button" disabled={busy} onClick={() => void downloadExport("csv")}>Download CSV</button>
+                <button className="secondary-button" type="button" disabled={busy} onClick={() => void downloadExport("json")}>Download JSON</button>
+              </div>
+            </div>
+            {aggregateSessionCount > 1 && <p className="comparison-note">Viewing one selected session alongside {aggregateSessionCount - 1} additional completed session{aggregateSessionCount === 2 ? "" : "s"}. Export remains scoped to this session.</p>}
+            {result.diagnostics.source === "synthetic-demo" && <div className="notice success">Synthetic demo data — generated for this public portfolio, not collected from a person or camera.</div>}
+            <p className="supporting">{String(result.diagnostics.sample_count)} samples · calibration {String(result.quality.calibration_quality ?? "unavailable")}</p>
+            <div className="metric-list">{taskMetrics.map((metric) => <article className="metric-card" key={String(metric.task_position)}><strong>Task {String(metric.task_position)} · {String(metric.task_title)}</strong><span>{String(metric.outcome)}</span><dl><div><dt>Samples</dt><dd>{String(metric.sample_count)}</dd></div><div><dt>Mean confidence</dt><dd>{metric.mean_confidence == null ? "—" : String(metric.mean_confidence)}</dd></div><div><dt>Gaze centroid</dt><dd>{metric.centroid && typeof metric.centroid === "object" ? `${String((metric.centroid as Record<string, unknown>).x_normalized)}, ${String((metric.centroid as Record<string, unknown>).y_normalized)}` : "—"}</dd></div></dl></article>)}</div>
+            {aggregateMetrics.length > 0 && <section className="aggregate-summary" aria-label="Aggregate metrics">
+              <div><p className="eyebrow">Comparable sessions</p><h3>Aggregate task metrics</h3></div>
+              <p>{aggregateEligibleResults.length} consented participant session{aggregateEligibleResults.length === 1 ? "" : "s"}; synthetic sessions are excluded.</p>
+              <div className="aggregate-list">{aggregateMetrics.map((metric) => <article key={metric.position}><strong>Task {metric.position} · {metric.title}</strong><span>{metric.sessionCount} sessions · {metric.sampleCount} samples · mean confidence {metric.meanConfidence?.toFixed(2) ?? "—"}</span></article>)}</div>
+            </section>}
+            {aggregateSessionCount > 0 && aggregateMetrics.length === 0 && <p className="aggregate-unavailable">Aggregate claims are unavailable: this demo currently contains synthetic or otherwise ineligible sessions only.</p>}
+          </section>}
         </section>}
       </main>
     </div>
