@@ -99,11 +99,13 @@ def test_publish_creates_immutable_snapshot_and_is_idempotent(client: TestClient
     assert body["study"]["lifecycle"] == "published"
     assert body["version"]["version_number"] == 1
     assert body["version"]["source_revision"] == 1
-    assert len(body["participant_link"]["token"]) >= 32
-    assert body["participant_link"]["participant_url"] == f"/participate/{body['participant_link']['token']}"
+    participant_link = body["participant_link"]
+    token = participant_link["token"]
+    assert len(token) >= 32
+    assert participant_link["participant_url"] == f"/participate/{token}"
     assert body["replayed"] is False
 
-    protocol = client.get(f"/api/v1/participate/{body['participant_link']['token']}")
+    protocol = client.get(f"/api/v1/participate/{token}")
     assert protocol.status_code == 200
     assert protocol.json()["title"] == "Checkout attention study"
     assert [task["position"] for task in protocol.json()["tasks"]] == [1, 2]
