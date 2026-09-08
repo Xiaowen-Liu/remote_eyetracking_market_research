@@ -6,6 +6,12 @@ export type StudyDraftResponse = components["schemas"]["StudyDraftResponse"];
 export type StudySummary = components["schemas"]["StudySummary"];
 export type PublishResponse = components["schemas"]["PublishResponse"];
 export type ParticipantLink = components["schemas"]["ParticipantLinkResponse"];
+export type PublicStudyProtocol = components["schemas"]["PublicStudyProtocol"];
+export type ParticipantSession = components["schemas"]["ParticipantSessionResponse"];
+export type CalibrationResult = components["schemas"]["CalibrationResultResponse"];
+export type TaskRun = components["schemas"]["TaskRunResponse"];
+export type GazeBatchCreate = components["schemas"]["GazeBatchCreate"];
+export type GazeBatchResponse = components["schemas"]["GazeBatchResponse"];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -28,6 +34,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
   return response.status === 204 ? (undefined as T) : response.json();
+}
+
+function participantHeaders(accessToken: string) {
+  return { Authorization: `Bearer ${accessToken}` };
 }
 
 export const api = {
@@ -59,5 +69,61 @@ export const api = {
     request<PublishResponse>(`/studies/${studyId}/publish`, {
       method: "POST",
       headers: { "Idempotency-Key": crypto.randomUUID() },
+    }),
+  resolveParticipantLink: (token: string) =>
+    request<PublicStudyProtocol>(`/participate/${token}`),
+  createParticipantSession: (token: string) =>
+    request<ParticipantSession>(`/participate/${token}/sessions`, {
+      method: "POST",
+      body: JSON.stringify({
+        browser_family: navigator.userAgent.includes("Firefox") ? "Firefox" : "Chromium",
+        viewport_width: window.innerWidth,
+        viewport_height: window.innerHeight,
+        device_pixel_ratio: window.devicePixelRatio,
+      }),
+    }),
+  recordConsent: (sessionId: string, accessToken: string, consentVersion: string) =>
+    request(`/participant-sessions/${sessionId}/consent`, {
+      method: "POST",
+      headers: participantHeaders(accessToken),
+      body: JSON.stringify({ accepted: true, consent_version: consentVersion }),
+    }),
+  recordCalibration: (
+    sessionId: string,
+    accessToken: string,
+    attempt: number,
+    startedAt: string,
+  ) =>
+    request<CalibrationResult>(`/participant-sessions/${sessionId}/calibrations`, {
+      method: "POST",
+      headers: participantHeaders(accessToken),
+      body: JSON.stringify({
+        attempt,
+        started_at: startedAt,
+        completed_at: new Date().toISOString(),
+        target_count: 9,
+        observed_sample_count: 45,
+        error_px: 42,
+        quality_grade: "strong",
+        diagnostics: { source: "synthetic-public-demo", camera_frames_uploaded: false },
+      }),
+    }),
+  startTask: (sessionId: string, accessToken: string, taskPosition: number) =>
+    request<TaskRun>(`/participant-sessions/${sessionId}/task-runs`, {
+      method: "POST",
+      headers: participantHeaders(accessToken),
+      body: JSON.stringify({ task_position: taskPosition }),
+    }),
+  completeTask: (sessionId: string, accessToken: string, taskRunId: string) =>
+    request<TaskRun>(`/participant-sessions/${sessionId}/task-runs/${taskRunId}/complete`, {
+      method: "POST",
+      headers: participantHeaders(accessToken),
+      body: JSON.stringify({ outcome: "completed" }),
+    }),
+  ingestGazeBatch: (sessionId: string, accessToken: string, batch: GazeBatchCreate) =>
+    request<GazeBatchResponse>(`/participant-sessions/${sessionId}/gaze-batches`, {
+      method: "POST",
+      headers: participantHeaders(accessToken),
+      body: JSON.stringify(batch),
     }),
 };

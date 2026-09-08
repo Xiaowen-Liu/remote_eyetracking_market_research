@@ -7,6 +7,7 @@ import {
   type StudyDraft,
   type StudyDraftResponse,
 } from "./api";
+import { ParticipantRunner, participantTokenFromPath } from "./ParticipantRunner";
 
 const emptyDraft: StudyDraft = {
   title: "Accessible checkout attention study",
@@ -38,6 +39,12 @@ const emptyDraft: StudyDraft = {
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 export function App() {
+  const token = participantTokenFromPath();
+  if (token) return <ParticipantRunner token={token} />;
+  return <StudyBuilder />;
+}
+
+function StudyBuilder() {
   const bootstrapStarted = useRef(false);
   const [project, setProject] = useState<Project | null>(null);
   const [study, setStudy] = useState<StudyDraftResponse | null>(null);
