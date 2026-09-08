@@ -9,9 +9,11 @@ from fastapi import APIRouter, Depends, Header, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..analysis import ALGORITHM_VERSION, analysis_job_payload
 from ..database import get_db
 from ..errors import ApiError
 from ..models import (
+    AnalysisJob,
     CalibrationResult,
     GazeSample,
     GazeSampleBatch,
@@ -35,6 +37,7 @@ from ..schemas import (
     GazeBatchResponse,
     ParticipantSessionCreate,
     ParticipantSessionResponse,
+    SessionSubmitResponse,
     TaskRunComplete,
     TaskRunCreate,
     TaskRunResponse,
@@ -407,6 +410,79 @@ def complete_task_run(
     )
     db.commit()
     return task_run_response(run, task, participant_session.lifecycle)
+
+
+@router.post(
+    "/participant-sessions/{session_id}/submit",
+    response_model=SessionSubmitResponse,
+    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    operation_id="submitParticipantSession",
+)
+def submit_participant_session(
+    participant_session: CurrentParticipantSession,
+    db: Session = DbSession,
+) -> SessionSubmitResponse:
+    existing = db.scalar(
+        select(AnalysisJob)
+        .where(
+            AnalysisJob.session_id == participant_session.id,
+            AnalysisJob.algorithm_version == ALGORITHM_VERSION,
+            AnalysisJob.attempt == 1,
+        )
+    )
+    if participant_session.lifecycle == SessionLifecycle.SUBMITTED and existing:
+        return SessionSubmitResponse(
+            session_id=participant_session.id,
+            lifecycle=participant_session.lifecycle,
+            analysis_job=analysis_job_payload(existing),
+            replayed=True,
+        )
+    if participant_session.lifecycle not in {SessionLifecycle.READY, SessionLifecycle.RUNNING}:
+        raise ApiError(409, "INVALID_SESSION_STATE", "This session cannot be submitted now")
+
+    running_task = db.scalar(
+        select(TaskRun.id).where(
+            TaskRun.session_id == participant_session.id,
+            TaskRun.outcome == TaskOutcome.RUNNING,
+        )
+    )
+    if running_task:
+        raise ApiError(409, "TASK_STILL_RUNNING", "Finish the current task before submission")
+    task_count = db.scalar(
+        select(func.count())
+        .select_from(Task)
+        .where(Task.study_version_id == participant_session.study_version_id)
+    )
+    ended_count = db.scalar(
+        select(func.count())
+        .select_from(TaskRun)
+        .where(TaskRun.session_id == participant_session.id)
+    )
+    if ended_count != task_count:
+        raise ApiError(409, "TASKS_INCOMPLETE", "Every study task must have an outcome")
+    _, missing = sequence_state(db, participant_session.id)
+    if missing:
+        raise ApiError(409, "GAZE_SEQUENCE_GAP", "Resolve missing gaze batches before submission")
+
+    now = datetime.now(timezone.utc)
+    participant_session.lifecycle = SessionLifecycle.SUBMITTED
+    participant_session.ended_at = now
+    job = AnalysisJob(
+        session_id=participant_session.id,
+        algorithm_version=ALGORITHM_VERSION,
+        attempt=1,
+        parameters={"sample_schema_version": "1.0", "task_segmentation": "sequence-boundaries"},
+    )
+    db.add(job)
+    db.add(event(participant_session, "session_submitted", now))
+    db.commit()
+    db.refresh(job)
+    return SessionSubmitResponse(
+        session_id=participant_session.id,
+        lifecycle=participant_session.lifecycle,
+        analysis_job=analysis_job_payload(job),
+        replayed=False,
+    )
 
 
 @router.post(

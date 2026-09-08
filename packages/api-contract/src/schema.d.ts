@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/api/v1/analysis-jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Analysis Job */
+        get: operations["getAnalysisJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis-jobs/{job_id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Analysis Result */
+        get: operations["getAnalysisResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis-jobs/{job_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Analysis */
+        post: operations["runAnalysisJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/participant-sessions/{session_id}/calibrations": {
         parameters: {
             query?: never;
@@ -49,6 +100,23 @@ export interface paths {
         put?: never;
         /** Ingest Gaze Batch */
         post: operations["ingestGazeBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant-sessions/{session_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Participant Session */
+        post: operations["submitParticipantSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -285,6 +353,79 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalysisJobResponse */
+        AnalysisJobResponse: {
+            /** Algorithm Version */
+            algorithm_version: string;
+            /** Attempt */
+            attempt: number;
+            /** Error Code */
+            error_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /**
+             * Queued At
+             * Format: date-time
+             */
+            queued_at: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Started At */
+            started_at: string | null;
+            status: components["schemas"]["AnalysisStatus"];
+        };
+        /** AnalysisResultResponse */
+        AnalysisResultResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Diagnostics */
+            diagnostics: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Quality */
+            quality: {
+                [key: string]: unknown;
+            };
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Task Metrics */
+            task_metrics: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * AnalysisStatus
+         * @enum {string}
+         */
+        AnalysisStatus: "queued" | "running" | "succeeded" | "failed";
         /** AreaOfInterestDraft */
         AreaOfInterestDraft: {
             /** Height */
@@ -692,6 +833,18 @@ export interface components {
          * @enum {string}
          */
         SessionLifecycle: "created" | "consented" | "calibrating" | "ready" | "running" | "paused" | "submitted" | "withdrawn" | "expired" | "abandoned";
+        /** SessionSubmitResponse */
+        SessionSubmitResponse: {
+            analysis_job: components["schemas"]["AnalysisJobResponse"];
+            lifecycle: components["schemas"]["SessionLifecycle"];
+            /** Replayed */
+            replayed: boolean;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
         /** StudyCreate */
         StudyCreate: {
             calibration_policy?: components["schemas"]["CalibrationPolicy"];
@@ -959,6 +1112,150 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getAnalysisJob: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisJobResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getAnalysisResult: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResultResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runAnalysisJob: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResultResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     recordCalibrationResult: {
         parameters: {
             query?: never;
@@ -1093,6 +1390,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GazeBatchResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submitParticipantSession: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionSubmitResponse"];
                 };
             };
             /** @description Unauthorized */

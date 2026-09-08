@@ -235,7 +235,7 @@ materials may and may not be used during implementation.
 | 2 | Session persistence + participant ID + Dashboard MVP | ✅ Complete |
 | 3 | Versioned Study Builder + participant protocol API | ✅ Complete |
 | 4 | Browser participant runner + offline batch buffer | ✅ Complete |
-| 5 | Async analysis pipeline + task-level results | Planned |
+| 5 | Versioned analysis jobs + task-level results | ✅ Complete |
 | 6 | Full Results Dashboard + export | Planned |
 
 ---

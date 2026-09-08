@@ -12,6 +12,7 @@ export type CalibrationResult = components["schemas"]["CalibrationResultResponse
 export type TaskRun = components["schemas"]["TaskRunResponse"];
 export type GazeBatchCreate = components["schemas"]["GazeBatchCreate"];
 export type GazeBatchResponse = components["schemas"]["GazeBatchResponse"];
+export type SessionSubmit = components["schemas"]["SessionSubmitResponse"];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -125,5 +126,10 @@ export const api = {
       method: "POST",
       headers: participantHeaders(accessToken),
       body: JSON.stringify(batch),
+    }),
+  submitSession: (sessionId: string, accessToken: string) =>
+    request<SessionSubmit>(`/participant-sessions/${sessionId}/submit`, {
+      method: "POST",
+      headers: participantHeaders(accessToken),
     }),
 };
