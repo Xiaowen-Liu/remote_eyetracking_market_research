@@ -263,6 +263,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/studies/{study_id}/analysis-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Study Analysis Jobs */
+        get: operations["listStudyAnalysisJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/studies/{study_id}/draft": {
         parameters: {
             query?: never;
@@ -353,6 +370,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalysisJobListResponse */
+        AnalysisJobListResponse: {
+            /** Items */
+            items: components["schemas"]["AnalysisJobResponse"][];
+            /** Total */
+            total: number;
+        };
         /** AnalysisJobResponse */
         AnalysisJobResponse: {
             /** Algorithm Version */
@@ -1977,6 +2001,48 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listStudyAnalysisJobs: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisJobListResponse"];
+                };
             };
             /** @description Not Found */
             404: {

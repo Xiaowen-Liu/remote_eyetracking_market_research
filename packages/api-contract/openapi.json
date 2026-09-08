@@ -1,6 +1,27 @@
 {
   "components": {
     "schemas": {
+      "AnalysisJobListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisJobResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AnalysisJobListResponse",
+        "type": "object"
+      },
       "AnalysisJobResponse": {
         "properties": {
           "algorithm_version": {
@@ -3280,6 +3301,75 @@
         "summary": "Delete Study",
         "tags": [
           "studies"
+        ]
+      }
+    },
+    "/api/v1/studies/{study_id}/analysis-jobs": {
+      "get": {
+        "operationId": "listStudyAnalysisJobs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "study_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Study Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-demo-owner-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Owner-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisJobListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Study Analysis Jobs",
+        "tags": [
+          "analysis"
         ]
       }
     },
