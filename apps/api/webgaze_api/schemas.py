@@ -336,6 +336,33 @@ class AnalysisJobListResponse(ApiModel):
     total: int
 
 
+class SessionTimelineEvent(ApiModel):
+    kind: str
+    occurred_at: datetime
+
+
+class ParticipantSessionSummary(ApiModel):
+    id: UUID
+    participant_alias: str
+    lifecycle: SessionLifecycle
+    created_at: datetime
+    consented_at: datetime | None
+    submitted_at: datetime | None
+    calibration_quality: QualityGrade | None
+    calibration_error_px: float | None
+    completed_task_count: int
+    gaze_batch_count: int
+    gaze_sample_count: int
+    analysis_status: AnalysisStatus | None
+    source: str
+    events: list[SessionTimelineEvent]
+
+
+class ParticipantSessionSummaryListResponse(ApiModel):
+    items: list[ParticipantSessionSummary]
+    total: int
+
+
 class SessionSubmitResponse(ApiModel):
     session_id: UUID
     lifecycle: SessionLifecycle

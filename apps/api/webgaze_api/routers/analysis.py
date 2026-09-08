@@ -7,7 +7,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..analysis import (
@@ -25,18 +25,25 @@ from ..models import (
     AnalysisResult,
     AnalysisStatus,
     AuditEvent,
+    CalibrationResult,
+    GazeSampleBatch,
     ParticipantSession,
     ResearchProject,
+    SessionEvent,
     SessionLifecycle,
     Study,
     StudyVersion,
     Task,
+    TaskRun,
 )
 from ..schemas import (
     AnalysisJobListResponse,
     AnalysisJobResponse,
     AnalysisResultResponse,
     ErrorResponse,
+    ParticipantSessionSummary,
+    ParticipantSessionSummaryListResponse,
+    SessionTimelineEvent,
 )
 
 router = APIRouter(tags=["analysis"])
@@ -207,6 +214,92 @@ def list_study_analysis_jobs(
     return AnalysisJobListResponse(
         items=[analysis_job_payload(job) for job in jobs], total=len(jobs)
     )
+
+
+@router.get(
+    "/studies/{study_id}/participant-sessions",
+    response_model=ParticipantSessionSummaryListResponse,
+    responses={404: {"model": ErrorResponse}},
+    operation_id="listStudyParticipantSessions",
+)
+def list_study_participant_sessions(
+    study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
+) -> ParticipantSessionSummaryListResponse:
+    study = db.scalar(
+        select(Study)
+        .join(ResearchProject)
+        .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
+    )
+    if not study:
+        raise ApiError(404, "STUDY_NOT_FOUND", "Study was not found")
+    sessions = list(
+        db.scalars(
+            select(ParticipantSession)
+            .join(StudyVersion, StudyVersion.id == ParticipantSession.study_version_id)
+            .where(StudyVersion.study_id == study.id)
+            .order_by(ParticipantSession.created_at.desc())
+        )
+    )
+    items: list[ParticipantSessionSummary] = []
+    for session in sessions:
+        calibration = db.scalar(
+            select(CalibrationResult)
+            .where(CalibrationResult.session_id == session.id)
+            .order_by(CalibrationResult.attempt.desc())
+        )
+        completed_task_count = db.scalar(
+            select(func.count()).select_from(TaskRun).where(
+                TaskRun.session_id == session.id, TaskRun.ended_at.is_not(None)
+            )
+        ) or 0
+        gaze_batch_count, gaze_sample_count = db.execute(
+            select(
+                func.count(GazeSampleBatch.id),
+                func.coalesce(func.sum(GazeSampleBatch.sample_count), 0),
+            )
+            .where(GazeSampleBatch.session_id == session.id)
+        ).one()
+        job = db.scalar(
+            select(AnalysisJob)
+            .where(AnalysisJob.session_id == session.id)
+            .order_by(AnalysisJob.queued_at.desc())
+        )
+        events = list(
+            db.scalars(
+                select(SessionEvent)
+                .where(SessionEvent.session_id == session.id)
+                .order_by(SessionEvent.occurred_at.desc())
+                .limit(6)
+            )
+        )
+        items.append(ParticipantSessionSummary(
+            id=session.id,
+            participant_alias=session.participant_alias,
+            lifecycle=session.lifecycle,
+            created_at=session.created_at,
+            consented_at=session.consented_at,
+            submitted_at=session.submitted_at,
+            calibration_quality=calibration.quality_grade if calibration else None,
+            calibration_error_px=(
+                float(calibration.error_px)
+                if calibration and calibration.error_px is not None
+                else None
+            ),
+            completed_task_count=completed_task_count,
+            gaze_batch_count=gaze_batch_count,
+            gaze_sample_count=gaze_sample_count,
+            analysis_status=job.status if job else None,
+            source=(
+                "synthetic-demo"
+                if session.participant_alias == "Synthetic demo participant"
+                else "participant-session"
+            ),
+            events=[
+                SessionTimelineEvent(kind=event.kind, occurred_at=event.occurred_at)
+                for event in events
+            ],
+        ))
+    return ParticipantSessionSummaryListResponse(items=items, total=len(items))
 
 
 @router.get(

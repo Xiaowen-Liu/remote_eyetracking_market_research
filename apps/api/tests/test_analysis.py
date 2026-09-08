@@ -108,3 +108,12 @@ def test_synthetic_results_are_disclosed_and_idempotent(client: TestClient) -> N
     assert jobs.status_code == 200
     assert jobs.json()["total"] == 1
     assert jobs.json()["items"][0]["status"] == "succeeded"
+
+    sessions = client.get(f"/api/v1/studies/{study['id']}/participant-sessions")
+    assert sessions.status_code == 200
+    assert sessions.json()["total"] == 1
+    session = sessions.json()["items"][0]
+    assert session["source"] == "synthetic-demo"
+    assert session["calibration_quality"] is None
+    assert session["gaze_sample_count"] == 0
+    assert session["analysis_status"] == "succeeded"
