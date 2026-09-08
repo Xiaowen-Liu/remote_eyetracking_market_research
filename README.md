@@ -111,8 +111,12 @@ published:
 - `POST /participant-sessions/{id}/gaze-batches` persists bounded, versioned
   batches with checksum-based idempotent replay and missing-sequence reports.
 
-These endpoints are intentionally API-first in this milestone; the browser
-participant runner and submission/analysis queue will consume them next.
+The browser participant route (`/participate/{token}`) now consumes this
+protocol as an explicit synthetic-data demo: consent, calibration, task
+boundaries, a browser-local batch queue, simulated connection loss, and retry
+all exercise the production API. It does not upload webcam frames or claim to
+measure real gaze in the standalone web experience. Session submission and the
+asynchronous analysis queue remain the next milestone.
 
 Run the M2 Study Builder in a second terminal:
 
@@ -230,7 +234,7 @@ materials may and may not be used during implementation.
 | 1 | Camera + calibration flow + live heatmap | ✅ Complete |
 | 2 | Session persistence + participant ID + Dashboard MVP | ✅ Complete |
 | 3 | Versioned Study Builder + participant protocol API | ✅ Complete |
-| 4 | Browser participant runner + offline batch buffer | 🔜 Next |
+| 4 | Browser participant runner + offline batch buffer | ✅ Complete |
 | 5 | Async analysis pipeline + task-level results | Planned |
 | 6 | Full Results Dashboard + export | Planned |
 

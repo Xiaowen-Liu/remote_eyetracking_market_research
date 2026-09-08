@@ -78,6 +78,21 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .published-link .primary-button { margin-top: 5px; }
 .published-link .primary-button.copied { color: #314020; background: #dfeecb; border-color: #c6dca8; }
 .link-note { margin: 18px 0 0; padding: 12px; color: #68736c; background: #f4f6f2; border-radius: 7px; font-size: 12px; line-height: 1.45; }
+.participant-shell { width: min(720px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
+.participant-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 42px; }
+.participant-card { padding: clamp(24px, 5vw, 52px); background: #fff; border: 1px solid #d9ded8; border-radius: 16px; box-shadow: 0 16px 60px #2431260c; }
+.participant-card h1 { font: 500 clamp(30px, 6vw, 50px)/1.08 Georgia, serif; letter-spacing: -.035em; margin: 6px 0 22px; }
+.participant-card h2 { font: 500 26px/1.18 Georgia, serif; margin: 6px 0 16px; }
+.participant-card > p { color: #536058; line-height: 1.6; }
+.participant-card .primary-button { margin-top: 18px; }
+.participant-card .secondary-button { margin: 12px 8px 0 0; }
+.participant-facts { display: grid; gap: 10px; padding: 18px 0 4px 20px; color: #536058; font-size: 14px; line-height: 1.45; }
+.calibration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin: 28px auto; width: min(320px, 100%); text-align: center; color: #699431; font-size: 21px; }
+.task-label { color: #58772b !important; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.connection-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 26px 0 8px; padding: 12px; color: #667169; background: #f4f6f2; border-radius: 8px; font-size: 13px; }
+.connection { border-radius: 999px; padding: 4px 8px; color: #fff; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.connection.online { background: #58772b; }
+.connection.offline { background: #9e5c27; }
 
 @media (max-width: 850px) {
   .workspace { grid-template-columns: 1fr; }
