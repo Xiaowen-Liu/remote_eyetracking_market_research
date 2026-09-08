@@ -646,6 +646,24 @@ function ResultsDashboard({
     }
   }
 
+  async function loadSyntheticResults() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const synthetic = await api.createSyntheticStudyResults(study.id);
+      setResult(synthetic);
+      await loadJobs();
+      setNotice({
+        kind: "success",
+        text: "Synthetic demo results loaded. They are not collected participant data.",
+      });
+    } catch (error) {
+      const text = error instanceof ApiClientError ? error.message : "Could not load synthetic results.";
+      setNotice({ kind: "error", text });
+      setBusy(false);
+    }
+  }
+
   const latest = jobs[0];
   const taskMetrics = (result?.task_metrics.tasks as Array<Record<string, unknown>> | undefined) ?? [];
   return (
@@ -666,7 +684,7 @@ function ResultsDashboard({
         </section>
         {notice && <div className={`notice ${notice.kind}`} role="alert">{notice.text}</div>}
         {busy && <div className="loading" role="status">Loading results…</div>}
-        {!busy && !latest && <section className="empty-results panel"><div className="panel-content"><h2>No submitted sessions yet</h2><p>Share the participant link, complete the study flow, then return here to process its queued analysis job.</p></div></section>}
+        {!busy && !latest && <section className="empty-results"><h2>No submitted sessions yet</h2><p>Load a clearly labelled synthetic result set to explore the dashboard before camera-based collection is enabled.</p><button className="primary-button" type="button" onClick={() => void loadSyntheticResults()}>Load synthetic demo results</button></section>}
         {!busy && latest && <section className="results-grid">
           <aside className="publish-panel">
             <p className="eyebrow">Latest analysis job</p>
@@ -674,7 +692,7 @@ function ResultsDashboard({
             <p className="panel-description">Status: {latest.status}. Submitted results remain immutable after processing.</p>
             {latest.status !== "succeeded" && <button className="primary-button" type="button" disabled={busy} onClick={() => void runLatestJob(latest)}>Process queued analysis</button>}
           </aside>
-          {result && <section className="panel"><div className="panel-content"><h2>Task metrics</h2><p className="supporting">{String(result.diagnostics.sample_count)} samples · calibration {String(result.quality.calibration_quality ?? "unavailable")}</p><div className="metric-list">{taskMetrics.map((metric) => <article className="metric-card" key={String(metric.task_position)}><strong>Task {String(metric.task_position)} · {String(metric.task_title)}</strong><span>{String(metric.outcome)}</span><dl><div><dt>Samples</dt><dd>{String(metric.sample_count)}</dd></div><div><dt>Mean confidence</dt><dd>{metric.mean_confidence == null ? "—" : String(metric.mean_confidence)}</dd></div><div><dt>Gaze centroid</dt><dd>{metric.centroid && typeof metric.centroid === "object" ? `${String((metric.centroid as Record<string, unknown>).x_normalized)}, ${String((metric.centroid as Record<string, unknown>).y_normalized)}` : "—"}</dd></div></dl></article>)}</div></div></section>}
+          {result && <section className="panel"><div className="panel-content"><h2>Task metrics</h2>{result.diagnostics.source === "synthetic-demo" && <div className="notice success">Synthetic demo data — generated for this public portfolio, not collected from a person or camera.</div>}<p className="supporting">{String(result.diagnostics.sample_count)} samples · calibration {String(result.quality.calibration_quality ?? "unavailable")}</p><div className="metric-list">{taskMetrics.map((metric) => <article className="metric-card" key={String(metric.task_position)}><strong>Task {String(metric.task_position)} · {String(metric.task_title)}</strong><span>{String(metric.outcome)}</span><dl><div><dt>Samples</dt><dd>{String(metric.sample_count)}</dd></div><div><dt>Mean confidence</dt><dd>{metric.mean_confidence == null ? "—" : String(metric.mean_confidence)}</dd></div><div><dt>Gaze centroid</dt><dd>{metric.centroid && typeof metric.centroid === "object" ? `${String((metric.centroid as Record<string, unknown>).x_normalized)}, ${String((metric.centroid as Record<string, unknown>).y_normalized)}` : "—"}</dd></div></dl></article>)}</div></div></section>}
         </section>}
       </main>
     </div>

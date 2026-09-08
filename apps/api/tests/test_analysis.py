@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from test_participants import gaze_batch, ready_session
+from test_studies import create_project, study_payload
 
 
 def complete_study_with_samples(client: TestClient) -> tuple[dict, dict[str, str]]:
@@ -66,3 +67,32 @@ def test_submission_queues_idempotent_analysis_and_task_metrics(client: TestClie
     repeated_run = client.post(f"/api/v1/analysis-jobs/{job_id}/run")
     assert repeated_run.status_code == 200
     assert repeated_run.json()["id"] == result_body["id"]
+
+
+def test_synthetic_results_are_disclosed_and_idempotent(client: TestClient) -> None:
+    project_id = create_project(client)
+    study = client.post(
+        f"/api/v1/projects/{project_id}/studies", json=study_payload()
+    ).json()
+    published = client.post(
+        f"/api/v1/studies/{study['id']}/publish",
+        headers={"Idempotency-Key": "synthetic-results"},
+    )
+    assert published.status_code == 200
+
+    endpoint = f"/api/v1/studies/{study['id']}/synthetic-results"
+    created = client.post(endpoint)
+    assert created.status_code == 200
+    body = created.json()
+    assert body["diagnostics"]["source"] == "synthetic-demo"
+    assert body["diagnostics"]["aggregate_eligible"] is False
+    assert len(body["task_metrics"]["tasks"]) == 2
+
+    repeated = client.post(endpoint)
+    assert repeated.status_code == 200
+    assert repeated.json()["id"] == body["id"]
+
+    jobs = client.get(f"/api/v1/studies/{study['id']}/analysis-jobs")
+    assert jobs.status_code == 200
+    assert jobs.json()["total"] == 1
+    assert jobs.json()["items"][0]["status"] == "succeeded"

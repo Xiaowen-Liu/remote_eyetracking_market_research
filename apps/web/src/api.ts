@@ -139,4 +139,6 @@ export const api = {
   runAnalysisJob: (jobId: string) =>
     request<AnalysisResult>(`/analysis-jobs/${jobId}/run`, { method: "POST" }),
   getAnalysisResult: (jobId: string) => request<AnalysisResult>(`/analysis-jobs/${jobId}/result`),
+  createSyntheticStudyResults: (studyId: string) =>
+    request<AnalysisResult>(`/studies/${studyId}/synthetic-results`, { method: "POST" }),
 };
