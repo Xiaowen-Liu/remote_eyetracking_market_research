@@ -112,11 +112,16 @@ describe("Study Builder", () => {
     await screen.findByText("Checkout UX research");
     await user.click(screen.getByRole("button", { name: "Projects" }));
     await user.click(screen.getByRole("button", { name: "New project" }));
+    expect(screen.getByRole("heading", { name: "Create a research project" })).toBeInTheDocument();
     await user.type(screen.getByLabelText("Project name"), "Accessibility follow-up");
+    await user.type(screen.getByLabelText(/Research question/), "Where do shoppers hesitate?");
     await user.click(screen.getByRole("button", { name: "Create project" }));
 
     await waitFor(() => {
-      expect(apiMocks.createProject).toHaveBeenCalledWith("Accessibility follow-up");
+      expect(apiMocks.createProject).toHaveBeenCalledWith(
+        "Accessibility follow-up",
+        "Where do shoppers hesitate?",
+      );
     });
   });
 

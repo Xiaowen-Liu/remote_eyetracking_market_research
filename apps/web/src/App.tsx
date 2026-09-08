@@ -118,6 +118,7 @@ function StudyBuilder() {
   const [participantUrl, setParticipantUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [projectCreationOpen, setProjectCreationOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false);
 
   useEffect(() => {
@@ -141,7 +142,7 @@ function StudyBuilder() {
     }
   }
 
-  async function selectProject(nextProject: Project) {
+  async function selectProject(nextProject: Project, isNewProject = false) {
     setBusy(true);
     setNotice(null);
     try {
@@ -149,7 +150,7 @@ function StudyBuilder() {
       setDashboardOpen(false);
       setResultsOpen(false);
       setStudy(null);
-      setDraft(emptyDraft);
+      setDraft(isNewProject ? { ...emptyDraft, title: "Untitled study", description: "" } : emptyDraft);
       setDirty(false);
       setEditing(true);
       setParticipantUrl(null);
@@ -170,13 +171,13 @@ function StudyBuilder() {
     }
   }
 
-  async function createProject(name: string) {
+  async function createProject(name: string, researchQuestion?: string) {
     setBusy(true);
     setNotice(null);
     try {
-      const created = await api.createProject(name);
+      const created = await api.createProject(name, researchQuestion);
       setProjects((current) => [created, ...current]);
-      await selectProject(created);
+      await selectProject(created, true);
       return true;
     } catch (error) {
       showError(error);
@@ -325,12 +326,20 @@ function StudyBuilder() {
   const isLocked = publishedVersion !== null && !editing;
 
   if (dashboardOpen) {
+    if (projectCreationOpen) {
+      return (
+        <ProjectCreationPage
+          onCancel={() => setProjectCreationOpen(false)}
+          onCreateProject={createProject}
+        />
+      );
+    }
     return (
       <ProjectDashboard
         projects={projects}
         currentProjectId={project?.id ?? null}
         onOpenProject={(nextProject) => void selectProject(nextProject)}
-        onCreateProject={createProject}
+        onCreateProject={() => setProjectCreationOpen(true)}
       />
     );
   }
@@ -834,25 +843,8 @@ function ProjectDashboard({
   projects: Project[];
   currentProjectId: string | null;
   onOpenProject: (project: Project) => void;
-  onCreateProject: (name: string) => Promise<boolean>;
+  onCreateProject: () => void;
 }) {
-  const [creating, setCreating] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submitProject(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const name = projectName.trim();
-    if (!name) return;
-    setSubmitting(true);
-    const created = await onCreateProject(name);
-    setSubmitting(false);
-    if (created) {
-      setProjectName("");
-      setCreating(false);
-    }
-  }
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -869,41 +861,9 @@ function ProjectDashboard({
             <h1>Projects</h1>
             <p>Organize studies, participant protocols, and analysis work in one place.</p>
           </div>
-          {creating ? (
-            <form className="new-project-form" onSubmit={(event) => void submitProject(event)}>
-              <label>
-                Project name
-                <input
-                  autoFocus
-                  value={projectName}
-                  onChange={(event) => setProjectName(event.target.value)}
-                  placeholder="e.g. Checkout accessibility"
-                  maxLength={160}
-                />
-              </label>
-              <div>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => setCreating(false)}
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={submitting || !projectName.trim()}
-                >
-                  {submitting ? "Creating…" : "Create project"}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <button className="primary-button dashboard-action" type="button" onClick={() => setCreating(true)}>
-              New project
-            </button>
-          )}
+          <button className="primary-button dashboard-action" type="button" onClick={onCreateProject}>
+            New project
+          </button>
         </div>
         <section className="project-grid" aria-label="Research projects">
           {projects.map((item) => (
@@ -920,6 +880,79 @@ function ProjectDashboard({
             </article>
           ))}
         </section>
+      </main>
+    </div>
+  );
+}
+
+function ProjectCreationPage({
+  onCancel,
+  onCreateProject,
+}: {
+  onCancel: () => void;
+  onCreateProject: (name: string, researchQuestion?: string) => Promise<boolean>;
+}) {
+  const [projectName, setProjectName] = useState("");
+  const [researchQuestion, setResearchQuestion] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submitProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = projectName.trim();
+    if (!name) return;
+    setSubmitting(true);
+    await onCreateProject(name, researchQuestion);
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="/" aria-label="WebGaze Research home">
+          <span className="brand-mark" aria-hidden="true">◉</span>
+          WebGaze Research
+        </a>
+        <span className="environment">Independent demo</span>
+      </header>
+      <main className="project-creation-main">
+        <button className="project-nav-button" type="button" onClick={onCancel}>← Back to projects</button>
+        <section className="creation-heading">
+          <p className="eyebrow">New project</p>
+          <h1>Create a research project</h1>
+          <p>A project groups related study protocols, participant sessions, and analysis results.</p>
+        </section>
+        <form className="project-creation-card" onSubmit={(event) => void submitProject(event)}>
+          <div>
+            <h2>Project details</h2>
+            <p>Start with the research context. You can create the first study next.</p>
+          </div>
+          <label className="field first-field">
+            Project name
+            <input
+              autoFocus
+              value={projectName}
+              onChange={(event) => setProjectName(event.target.value)}
+              placeholder="e.g. Checkout accessibility"
+              maxLength={160}
+            />
+          </label>
+          <label className="field">
+            Research question <span className="optional-label">Optional</span>
+            <textarea
+              value={researchQuestion}
+              onChange={(event) => setResearchQuestion(event.target.value)}
+              placeholder="e.g. Where do first-time shoppers hesitate before checkout?"
+              maxLength={4000}
+              rows={4}
+            />
+          </label>
+          <div className="creation-actions">
+            <button className="secondary-button" type="button" onClick={onCancel} disabled={submitting}>Cancel</button>
+            <button className="primary-button" type="submit" disabled={submitting || !projectName.trim()}>
+              {submitting ? "Creating project…" : "Create project"}
+            </button>
+          </div>
+        </form>
       </main>
     </div>
   );

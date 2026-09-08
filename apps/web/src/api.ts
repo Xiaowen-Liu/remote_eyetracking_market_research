@@ -57,12 +57,12 @@ function participantHeaders(accessToken: string) {
 
 export const api = {
   listProjects: () => request<{ items: Project[]; total: number }>("/projects"),
-  createProject: (name: string) =>
+  createProject: (name: string, researchQuestion?: string) =>
     request<Project>("/projects", {
       method: "POST",
       body: JSON.stringify({
         name,
-        research_question: "How do people visually navigate checkout?",
+        research_question: researchQuestion?.trim() || null,
       }),
     }),
   listStudies: (projectId: string) =>
