@@ -22,9 +22,9 @@ Manifest V3, FastAPI, and PostgreSQL.
 - **Session recording** — gaze points sampled at ~10 fps, auto-screenshots on URL changes, scroll stops, and significant DOM mutations (e.g. modals opening)
 - **Results Dashboard** — view screenshots side-by-side with heatmap overlays; load the current session or import a participant's exported JSON
 - **Export** — one-click JSON export containing all gaze points, screenshots, dwell times, and AOI data
-- **Local-first collection** — webcam frames remain on-device, and the extension
-  does not send session data to the M1 API unless a later milestone adds an
-  explicit, consent-aware upload flow
+- **Consent-aware collection API** — participant sessions are token-scoped,
+  calibration quality gates collection, tasks produce durable boundaries, and
+  gaze batches are validated and safe to retry
 
 ---
 
@@ -55,11 +55,11 @@ popup.js ──► background.js (Service Worker)
                         startTracking()         ← heatmap + gaze dot active
 ```
 
-The repository is evolving into a full-stack platform. The M1 API foundation
-adds a normalized research domain model, versioned REST endpoints, reversible
-database migrations, stable error contracts, and generated TypeScript types.
-The existing extension remains usable while later milestones connect collection
-and analysis to the API.
+The repository is evolving into a full-stack platform. The API now includes a
+normalized research domain model, versioned REST endpoints, reversible database
+migrations, stable error contracts, generated TypeScript types, and an explicit
+participant collection state machine. The existing extension remains usable
+while the next milestone connects its browser collection client to this API.
 
 **Key design decisions:**
 
@@ -92,10 +92,27 @@ npm run db:seed
 .venv/bin/uvicorn webgaze_api.main:app --app-dir apps/api --reload
 ```
 
-The OpenAPI UI is available at `http://localhost:8000/api/docs`. Project
-endpoints use a documented temporary demo identity seam during M1; production
-authentication is intentionally deferred and must be implemented before public
-deployment.
+The OpenAPI UI is available at `http://localhost:8000/api/docs`. Researcher
+project endpoints use a documented temporary demo identity seam during this
+portfolio milestone; production researcher authentication and abuse controls
+are still required before handling real research data. Participant collection
+uses the scoped capability token described below.
+
+The participant protocol is available under `/api/v1` after a study is
+published:
+
+- `POST /participate/{token}/sessions` creates an anonymous session and returns
+  a one-time capability token.
+- `POST /participant-sessions/{id}/consent` records the exact consent version.
+- `POST /participant-sessions/{id}/calibrations` records ordered quality-gated
+  calibration attempts.
+- `POST /participant-sessions/{id}/task-runs` and its completion endpoint
+  enforce ordered, non-overlapping task runs.
+- `POST /participant-sessions/{id}/gaze-batches` persists bounded, versioned
+  batches with checksum-based idempotent replay and missing-sequence reports.
+
+These endpoints are intentionally API-first in this milestone; the browser
+participant runner and submission/analysis queue will consume them next.
 
 Run the M2 Study Builder in a second terminal:
 
@@ -147,7 +164,8 @@ Deploy the API first, copy its Railway public origin into Vercel as
 final Vercel origin. Keep all demo data synthetic: authentication and abuse
 controls remain required before this API can host real research data.
 
-The initial production release was deployed from the CLI. GitHub-triggered
+The current production API is deployed from the CLI using `apps/api` as the
+Railway service root. GitHub-triggered
 deployments should be enabled after granting both hosting providers access to
 this repository and choosing `main` as the production branch.
 
@@ -211,10 +229,10 @@ materials may and may not be used during implementation.
 |-------|---------|--------|
 | 1 | Camera + calibration flow + live heatmap | ✅ Complete |
 | 2 | Session persistence + participant ID + Dashboard MVP | ✅ Complete |
-| 3 | AOI Builder (auto-propose + manual draw) | 🔜 Next |
-| 4 | Participant onboarding (remote + in-person) | Planned |
-| 5 | Full Results Dashboard (dwell time, AOI stats) | Planned |
-| 6 | Chrome Web Store distribution + polish | Planned |
+| 3 | Versioned Study Builder + participant protocol API | ✅ Complete |
+| 4 | Browser participant runner + offline batch buffer | 🔜 Next |
+| 5 | Async analysis pipeline + task-level results | Planned |
+| 6 | Full Results Dashboard + export | Planned |
 
 ---
 
