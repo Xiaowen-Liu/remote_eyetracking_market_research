@@ -6,10 +6,11 @@ import {
   ApiClientError,
   type GazeBatchCreate,
   type PublicStudyProtocol,
+  type SessionSubmit,
   type TaskRun,
 } from "./api";
 
-type Phase = "loading" | "consent" | "calibration" | "ready" | "running" | "complete" | "error";
+type Phase = "loading" | "consent" | "calibration" | "ready" | "running" | "submitting" | "complete" | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
 type AccessSession = { id: string; accessToken: string };
 type StoredSession = AccessSession & {
@@ -45,6 +46,7 @@ export function ParticipantRunner({ token }: { token: string }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [offlineDemo, setOfflineDemo] = useState(false);
   const [calibrationAttempt, setCalibrationAttempt] = useState(1);
+  const [submission, setSubmission] = useState<SessionSubmit | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
@@ -215,11 +217,27 @@ export function ParticipantRunner({ token }: { token: string }) {
     try {
       await api.completeTask(session.id, session.accessToken, activeRun.id);
       const nextCompleted = completedTasks + 1;
-      const nextPhase: Phase = nextCompleted === protocol.tasks.length ? "complete" : "ready";
+      const nextPhase: Phase = nextCompleted === protocol.tasks.length ? "submitting" : "ready";
       setCompletedTasks(nextCompleted);
       setActiveRun(null);
       setPhase(nextPhase);
       persist(nextPhase, session, { completedTasks: nextCompleted, activeRun: null });
+      if (nextPhase === "submitting") await submitForAnalysis();
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitForAnalysis() {
+    if (!session) return;
+    setBusy(true);
+    try {
+      const submitted = await api.submitSession(session.id, session.accessToken);
+      setSubmission(submitted);
+      setPhase("complete");
+      persist("complete", session, { activeRun: null });
     } catch (error) {
       showError(error);
     } finally {
@@ -282,9 +300,18 @@ export function ParticipantRunner({ token }: { token: string }) {
           </>}
 
           {phase === "complete" && <>
-            <h2>Tasks recorded</h2>
-            <p>All task boundaries and acknowledged synthetic gaze batches are stored. Session submission and asynchronous analysis are the next platform milestone.</p>
+            <h2>Analysis queued</h2>
+            <p>All task boundaries and acknowledged synthetic gaze batches are stored. This session is queued for versioned task-level analysis.</p>
+            {submission && <p className="fine-print">Job {submission.analysis_job.id.slice(0, 8)} · {submission.analysis_job.algorithm_version}</p>}
             <p className="fine-print">No webcam frames were uploaded by this demo.</p>
+          </>}
+
+          {phase === "submitting" && <>
+            <h2>Ready to queue analysis</h2>
+            <p>All tasks are complete. Submit this session to create an analysis job.</p>
+            <button className="primary-button" disabled={busy} onClick={() => void submitForAnalysis()}>
+              {busy ? "Queueing analysis…" : "Submit for analysis"}
+            </button>
           </>}
         </>}
       </section>

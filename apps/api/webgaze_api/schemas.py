@@ -4,7 +4,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from .models import ProjectStatus, QualityGrade, SessionLifecycle, StudyLifecycle, TaskOutcome
+from .models import (
+    AnalysisStatus,
+    ProjectStatus,
+    QualityGrade,
+    SessionLifecycle,
+    StudyLifecycle,
+    TaskOutcome,
+)
 
 
 class ApiModel(BaseModel):
@@ -309,6 +316,36 @@ class GazeBatchResponse(ApiModel):
     replayed: bool
     highest_sequence_received: int
     missing_sequences: list[int]
+
+
+class AnalysisJobResponse(ApiModel):
+    id: UUID
+    session_id: UUID
+    algorithm_version: str
+    status: AnalysisStatus
+    attempt: int
+    parameters: dict[str, Any]
+    queued_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    error_code: str | None
+
+
+class SessionSubmitResponse(ApiModel):
+    session_id: UUID
+    lifecycle: SessionLifecycle
+    analysis_job: AnalysisJobResponse
+    replayed: bool
+
+
+class AnalysisResultResponse(ApiModel):
+    id: UUID
+    job_id: UUID
+    session_id: UUID
+    quality: dict[str, Any]
+    task_metrics: dict[str, Any]
+    diagnostics: dict[str, Any]
+    created_at: datetime
 
 
 class OpenApiMetadata(ApiModel):
