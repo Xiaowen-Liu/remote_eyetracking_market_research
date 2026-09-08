@@ -24,6 +24,18 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .dashboard-heading h1 { font: 500 clamp(38px, 6vw, 62px)/1.05 Georgia, serif; letter-spacing: -.04em; margin: 0 0 10px; }
 .dashboard-heading p { color: #657069; margin: 0; max-width: 600px; }
 .dashboard-action { width: auto; min-width: 130px; }
+.project-creation-main { width: min(760px, 92vw); }
+.creation-heading { margin: 20px 0 28px; }
+.creation-heading h1 { margin: 6px 0 10px; font: 500 clamp(38px, 6vw, 58px)/1.05 Georgia, serif; letter-spacing: -.04em; }
+.creation-heading p:not(.eyebrow) { max-width: 570px; margin: 0; color: #657069; line-height: 1.5; }
+.project-creation-card { display: grid; gap: 17px; padding: 28px; background: #fff; border: 1px solid #d9ded8; border-radius: 14px; box-shadow: 0 16px 48px #2431260a; }
+.project-creation-card h2 { margin: 0 0 7px; font: 500 25px/1.2 Georgia, serif; }
+.project-creation-card p { margin: 0; color: #68736c; font-size: 14px; line-height: 1.45; }
+.project-creation-card .field { margin-top: 0; }
+.project-creation-card .first-field { margin-top: 5px; }
+.optional-label { color: #7a847d; font-weight: 500; }
+.creation-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 4px; }
+.creation-actions .primary-button, .creation-actions .secondary-button { width: auto; margin: 0; }
 .results-heading { margin-top: 18px; }
 .results-grid { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; align-items: start; }
 .results-panel { padding: 28px 32px; background: #fff; border: 1px solid #d9ded8; border-radius: 12px; }
@@ -162,6 +174,8 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
   .environment { display: none; }
   .dashboard-heading { display: grid; align-items: start; }
   .dashboard-action { width: 100%; }
+  .creation-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .creation-actions .primary-button, .creation-actions .secondary-button { width: 100%; }
   .export-actions { width: 100%; }
   .export-actions .secondary-button { flex: 1; }
 }
