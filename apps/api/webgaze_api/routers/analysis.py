@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..analysis import (
@@ -13,10 +14,48 @@ from ..analysis import (
 from ..database import get_db
 from ..dependencies import CurrentOwnerId
 from ..errors import ApiError
-from ..schemas import AnalysisJobResponse, AnalysisResultResponse, ErrorResponse
+from ..models import AnalysisJob, ParticipantSession, ResearchProject, Study, StudyVersion
+from ..schemas import (
+    AnalysisJobListResponse,
+    AnalysisJobResponse,
+    AnalysisResultResponse,
+    ErrorResponse,
+)
 
 router = APIRouter(tags=["analysis"])
 DbSession = Depends(get_db)
+
+
+@router.get(
+    "/studies/{study_id}/analysis-jobs",
+    response_model=AnalysisJobListResponse,
+    responses={404: {"model": ErrorResponse}},
+    operation_id="listStudyAnalysisJobs",
+)
+def list_study_analysis_jobs(
+    study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
+) -> AnalysisJobListResponse:
+    query = (
+        select(AnalysisJob)
+        .join(ParticipantSession, ParticipantSession.id == AnalysisJob.session_id)
+        .join(StudyVersion, StudyVersion.id == ParticipantSession.study_version_id)
+        .join(Study, Study.id == StudyVersion.study_id)
+        .join(ResearchProject, ResearchProject.id == Study.project_id)
+        .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
+        .order_by(AnalysisJob.queued_at.desc())
+    )
+    jobs = list(db.scalars(query))
+    if not jobs:
+        study_exists = db.scalar(
+            select(Study.id)
+            .join(ResearchProject)
+            .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
+        )
+        if not study_exists:
+            raise ApiError(404, "STUDY_NOT_FOUND", "Study was not found")
+    return AnalysisJobListResponse(
+        items=[analysis_job_payload(job) for job in jobs], total=len(jobs)
+    )
 
 
 @router.get(

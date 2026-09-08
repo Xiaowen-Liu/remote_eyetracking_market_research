@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
   ApiClientError,
+  type AnalysisJob,
+  type AnalysisResult,
   type Project,
   type StudyDraft,
   type StudyDraftResponse,
@@ -57,6 +59,7 @@ function StudyBuilder() {
   const [participantUrl, setParticipantUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [resultsOpen, setResultsOpen] = useState(false);
 
   useEffect(() => {
     if (bootstrapStarted.current) return;
@@ -85,6 +88,7 @@ function StudyBuilder() {
     try {
       setProject(nextProject);
       setDashboardOpen(false);
+      setResultsOpen(false);
       setStudy(null);
       setDraft(emptyDraft);
       setDirty(false);
@@ -270,6 +274,10 @@ function StudyBuilder() {
         onCreateProject={createProject}
       />
     );
+  }
+
+  if (resultsOpen && study) {
+    return <ResultsDashboard study={study} onBack={() => setResultsOpen(false)} />;
   }
 
   return (
@@ -526,6 +534,13 @@ function StudyBuilder() {
                 >
                   Edit study
                 </button>
+                <button
+                  type="button"
+                  className="secondary-button full"
+                  onClick={() => setResultsOpen(true)}
+                >
+                  View results
+                </button>
                 <p className="fine-print">
                   To stop new participants, close the study or revoke its link.
                 </p>
@@ -578,6 +593,89 @@ function StudyBuilder() {
             )}
           </aside>
         </div>
+      </main>
+    </div>
+  );
+}
+
+function ResultsDashboard({
+  study,
+  onBack,
+}: {
+  study: StudyDraftResponse;
+  onBack: () => void;
+}) {
+  const [jobs, setJobs] = useState<AnalysisJob[]>([]);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [busy, setBusy] = useState(true);
+
+  useEffect(() => {
+    void loadJobs();
+  }, [study.id]);
+
+  async function loadJobs() {
+    setBusy(true);
+    try {
+      const response = await api.listStudyAnalysisJobs(study.id);
+      setJobs(response.items);
+      const latest = response.items[0];
+      if (latest?.status === "succeeded") {
+        setResult(await api.getAnalysisResult(latest.id));
+      }
+    } catch (error) {
+      const text = error instanceof ApiClientError ? error.message : "Could not load analysis jobs.";
+      setNotice({ kind: "error", text });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runLatestJob(job: AnalysisJob) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const nextResult = await api.runAnalysisJob(job.id);
+      setResult(nextResult);
+      setJobs((current) => current.map((item) => item.id === job.id ? { ...item, status: "succeeded" } : item));
+    } catch (error) {
+      const text = error instanceof ApiClientError ? error.message : "Analysis could not run.";
+      setNotice({ kind: "error", text });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const latest = jobs[0];
+  const taskMetrics = (result?.task_metrics.tasks as Array<Record<string, unknown>> | undefined) ?? [];
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="/" aria-label="WebGaze Research home"><span className="brand-mark">◉</span>WebGaze Research</a>
+        <span className="environment">Independent demo</span>
+      </header>
+      <main>
+        <button className="project-nav-button" type="button" onClick={onBack}>← Back to study</button>
+        <section className="page-heading results-heading">
+          <div>
+            <p className="eyebrow">Research results</p>
+            <h1>{study.title}</h1>
+            <p>Task-level metrics are versioned outputs from submitted participant sessions.</p>
+          </div>
+          <span className={`status ${latest?.status ?? "draft"}`}>{latest ? latest.status : "No sessions"}</span>
+        </section>
+        {notice && <div className={`notice ${notice.kind}`} role="alert">{notice.text}</div>}
+        {busy && <div className="loading" role="status">Loading results…</div>}
+        {!busy && !latest && <section className="empty-results panel"><div className="panel-content"><h2>No submitted sessions yet</h2><p>Share the participant link, complete the study flow, then return here to process its queued analysis job.</p></div></section>}
+        {!busy && latest && <section className="results-grid">
+          <aside className="publish-panel">
+            <p className="eyebrow">Latest analysis job</p>
+            <h2>{latest.algorithm_version}</h2>
+            <p className="panel-description">Status: {latest.status}. Submitted results remain immutable after processing.</p>
+            {latest.status !== "succeeded" && <button className="primary-button" type="button" disabled={busy} onClick={() => void runLatestJob(latest)}>Process queued analysis</button>}
+          </aside>
+          {result && <section className="panel"><div className="panel-content"><h2>Task metrics</h2><p className="supporting">{String(result.diagnostics.sample_count)} samples · calibration {String(result.quality.calibration_quality ?? "unavailable")}</p><div className="metric-list">{taskMetrics.map((metric) => <article className="metric-card" key={String(metric.task_position)}><strong>Task {String(metric.task_position)} · {String(metric.task_title)}</strong><span>{String(metric.outcome)}</span><dl><div><dt>Samples</dt><dd>{String(metric.sample_count)}</dd></div><div><dt>Mean confidence</dt><dd>{metric.mean_confidence == null ? "—" : String(metric.mean_confidence)}</dd></div><div><dt>Gaze centroid</dt><dd>{metric.centroid && typeof metric.centroid === "object" ? `${String((metric.centroid as Record<string, unknown>).x_normalized)}, ${String((metric.centroid as Record<string, unknown>).y_normalized)}` : "—"}</dd></div></dl></article>)}</div></div></section>}
+        </section>}
       </main>
     </div>
   );

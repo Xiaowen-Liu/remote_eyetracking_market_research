@@ -13,6 +13,8 @@ export type TaskRun = components["schemas"]["TaskRunResponse"];
 export type GazeBatchCreate = components["schemas"]["GazeBatchCreate"];
 export type GazeBatchResponse = components["schemas"]["GazeBatchResponse"];
 export type SessionSubmit = components["schemas"]["SessionSubmitResponse"];
+export type AnalysisJob = components["schemas"]["AnalysisJobResponse"];
+export type AnalysisResult = components["schemas"]["AnalysisResultResponse"];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -132,4 +134,9 @@ export const api = {
       method: "POST",
       headers: participantHeaders(accessToken),
     }),
+  listStudyAnalysisJobs: (studyId: string) =>
+    request<{ items: AnalysisJob[]; total: number }>(`/studies/${studyId}/analysis-jobs`),
+  runAnalysisJob: (jobId: string) =>
+    request<AnalysisResult>(`/analysis-jobs/${jobId}/run`, { method: "POST" }),
+  getAnalysisResult: (jobId: string) => request<AnalysisResult>(`/analysis-jobs/${jobId}/result`),
 };

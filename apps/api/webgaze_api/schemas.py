@@ -331,6 +331,11 @@ class AnalysisJobResponse(ApiModel):
     error_code: str | None
 
 
+class AnalysisJobListResponse(ApiModel):
+    items: list[AnalysisJobResponse]
+    total: int
+
+
 class SessionSubmitResponse(ApiModel):
     session_id: UUID
     lifecycle: SessionLifecycle
