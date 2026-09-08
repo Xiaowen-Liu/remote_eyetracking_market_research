@@ -39,6 +39,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.status === 204 ? (undefined as T) : response.json();
 }
 
+async function download(path: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE}/api/v1${path}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiClientError(
+      body?.error?.message ?? `Request failed (${response.status})`,
+      body?.error?.code ?? "REQUEST_FAILED",
+    );
+  }
+  return response.blob();
+}
+
 function participantHeaders(accessToken: string) {
   return { Authorization: `Bearer ${accessToken}` };
 }
@@ -141,4 +153,6 @@ export const api = {
   getAnalysisResult: (jobId: string) => request<AnalysisResult>(`/analysis-jobs/${jobId}/result`),
   createSyntheticStudyResults: (studyId: string) =>
     request<AnalysisResult>(`/studies/${studyId}/synthetic-results`, { method: "POST" }),
+  downloadAnalysisExport: (jobId: string, format: "json" | "csv") =>
+    download(`/analysis-jobs/${jobId}/export?format=${format}`),
 };

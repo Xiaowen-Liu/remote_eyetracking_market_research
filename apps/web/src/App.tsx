@@ -664,6 +664,25 @@ function ResultsDashboard({
     }
   }
 
+  async function downloadExport(format: "json" | "csv") {
+    if (!latest) return;
+    setBusy(true);
+    try {
+      const blob = await api.downloadAnalysisExport(latest.id, format);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `webgaze-analysis-${latest.id}.${format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const text = error instanceof ApiClientError ? error.message : "Could not export results.";
+      setNotice({ kind: "error", text });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const latest = jobs[0];
   const taskMetrics = (result?.task_metrics.tasks as Array<Record<string, unknown>> | undefined) ?? [];
   return (
@@ -692,7 +711,7 @@ function ResultsDashboard({
             <p className="panel-description">Status: {latest.status}. Submitted results remain immutable after processing.</p>
             {latest.status !== "succeeded" && <button className="primary-button" type="button" disabled={busy} onClick={() => void runLatestJob(latest)}>Process queued analysis</button>}
           </aside>
-          {result && <section className="results-panel"><h2>Task metrics</h2>{result.diagnostics.source === "synthetic-demo" && <div className="notice success">Synthetic demo data — generated for this public portfolio, not collected from a person or camera.</div>}<p className="supporting">{String(result.diagnostics.sample_count)} samples · calibration {String(result.quality.calibration_quality ?? "unavailable")}</p><div className="metric-list">{taskMetrics.map((metric) => <article className="metric-card" key={String(metric.task_position)}><strong>Task {String(metric.task_position)} · {String(metric.task_title)}</strong><span>{String(metric.outcome)}</span><dl><div><dt>Samples</dt><dd>{String(metric.sample_count)}</dd></div><div><dt>Mean confidence</dt><dd>{metric.mean_confidence == null ? "—" : String(metric.mean_confidence)}</dd></div><div><dt>Gaze centroid</dt><dd>{metric.centroid && typeof metric.centroid === "object" ? `${String((metric.centroid as Record<string, unknown>).x_normalized)}, ${String((metric.centroid as Record<string, unknown>).y_normalized)}` : "—"}</dd></div></dl></article>)}</div></section>}
+          {result && <section className="results-panel"><div className="results-panel-header"><h2>Task metrics</h2><div className="export-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => void downloadExport("csv")}>Download CSV</button><button className="secondary-button" type="button" disabled={busy} onClick={() => void downloadExport("json")}>Download JSON</button></div></div>{result.diagnostics.source === "synthetic-demo" && <div className="notice success">Synthetic demo data — generated for this public portfolio, not collected from a person or camera.</div>}<p className="supporting">{String(result.diagnostics.sample_count)} samples · calibration {String(result.quality.calibration_quality ?? "unavailable")}</p><div className="metric-list">{taskMetrics.map((metric) => <article className="metric-card" key={String(metric.task_position)}><strong>Task {String(metric.task_position)} · {String(metric.task_title)}</strong><span>{String(metric.outcome)}</span><dl><div><dt>Samples</dt><dd>{String(metric.sample_count)}</dd></div><div><dt>Mean confidence</dt><dd>{metric.mean_confidence == null ? "—" : String(metric.mean_confidence)}</dd></div><div><dt>Gaze centroid</dt><dd>{metric.centroid && typeof metric.centroid === "object" ? `${String((metric.centroid as Record<string, unknown>).x_normalized)}, ${String((metric.centroid as Record<string, unknown>).y_normalized)}` : "—"}</dd></div></dl></article>)}</div></section>}
         </section>}
       </main>
     </div>
