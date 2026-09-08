@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/participant-sessions/{session_id}/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Consent */
+        post: operations["recordParticipantConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/participate/{token}": {
         parameters: {
             query?: never;
@@ -15,6 +32,23 @@ export interface paths {
         get: operations["resolveParticipantLink"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participate/{token}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Participant Session */
+        post: operations["createParticipantSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -237,6 +271,32 @@ export interface components {
              */
             screenshots_enabled: boolean;
         };
+        /** ConsentCreate */
+        ConsentCreate: {
+            /**
+             * Accepted
+             * @constant
+             */
+            accepted: true;
+            /** Consent Version */
+            consent_version: string;
+        };
+        /** ConsentResponse */
+        ConsentResponse: {
+            /** Consent Version */
+            consent_version: string;
+            /**
+             * Consented At
+             * Format: date-time
+             */
+            consented_at: string;
+            lifecycle: components["schemas"]["SessionLifecycle"];
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
         /** ErrorDetail */
         ErrorDetail: {
             /** Code */
@@ -288,6 +348,38 @@ export interface components {
             study_version_id: string;
             /** Token */
             token: string;
+        };
+        /** ParticipantSessionCreate */
+        ParticipantSessionCreate: {
+            /** Browser Family */
+            browser_family?: string | null;
+            /**
+             * Device Pixel Ratio
+             * @default 1
+             */
+            device_pixel_ratio: number;
+            /** Viewport Height */
+            viewport_height: number;
+            /** Viewport Width */
+            viewport_width: number;
+        };
+        /** ParticipantSessionResponse */
+        ParticipantSessionResponse: {
+            /** Access Token */
+            access_token?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lifecycle: components["schemas"]["SessionLifecycle"];
+            /** Participant Alias */
+            participant_alias: string;
+            /**
+             * Retention Expires At
+             * Format: date-time
+             */
+            retention_expires_at: string;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -388,6 +480,11 @@ export interface components {
             study: components["schemas"]["StudySummary"];
             version: components["schemas"]["StudyVersionResponse"];
         };
+        /**
+         * SessionLifecycle
+         * @enum {string}
+         */
+        SessionLifecycle: "created" | "consented" | "calibrating" | "ready" | "running" | "paused" | "submitted" | "withdrawn" | "expired" | "abandoned";
         /** StudyCreate */
         StudyCreate: {
             calibration_policy?: components["schemas"]["CalibrationPolicy"];
@@ -609,6 +706,61 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    recordParticipantConsent: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     resolveParticipantLink: {
         parameters: {
             query?: never;
@@ -627,6 +779,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicStudyProtocol"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    createParticipantSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantSessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantSessionResponse"];
                 };
             };
             /** @description Not Found */

@@ -148,6 +148,56 @@
         "title": "CollectionPolicy",
         "type": "object"
       },
+      "ConsentCreate": {
+        "properties": {
+          "accepted": {
+            "const": true,
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "consent_version": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Consent Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accepted",
+          "consent_version"
+        ],
+        "title": "ConsentCreate",
+        "type": "object"
+      },
+      "ConsentResponse": {
+        "properties": {
+          "consent_version": {
+            "title": "Consent Version",
+            "type": "string"
+          },
+          "consented_at": {
+            "format": "date-time",
+            "title": "Consented At",
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/SessionLifecycle"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "lifecycle",
+          "consent_version",
+          "consented_at"
+        ],
+        "title": "ConsentResponse",
+        "type": "object"
+      },
       "ErrorDetail": {
         "properties": {
           "code": {
@@ -253,6 +303,87 @@
           "participant_url"
         ],
         "title": "ParticipantLinkResponse",
+        "type": "object"
+      },
+      "ParticipantSessionCreate": {
+        "properties": {
+          "browser_family": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Browser Family"
+          },
+          "device_pixel_ratio": {
+            "default": 1,
+            "maximum": 10.0,
+            "minimum": 0.5,
+            "title": "Device Pixel Ratio",
+            "type": "number"
+          },
+          "viewport_height": {
+            "maximum": 10000.0,
+            "minimum": 320.0,
+            "title": "Viewport Height",
+            "type": "integer"
+          },
+          "viewport_width": {
+            "maximum": 10000.0,
+            "minimum": 320.0,
+            "title": "Viewport Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "viewport_width",
+          "viewport_height"
+        ],
+        "title": "ParticipantSessionCreate",
+        "type": "object"
+      },
+      "ParticipantSessionResponse": {
+        "properties": {
+          "access_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Token"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/SessionLifecycle"
+          },
+          "participant_alias": {
+            "title": "Participant Alias",
+            "type": "string"
+          },
+          "retention_expires_at": {
+            "format": "date-time",
+            "title": "Retention Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "lifecycle",
+          "participant_alias",
+          "retention_expires_at"
+        ],
+        "title": "ParticipantSessionResponse",
         "type": "object"
       },
       "ProjectCreate": {
@@ -540,6 +671,22 @@
         ],
         "title": "PublishResponse",
         "type": "object"
+      },
+      "SessionLifecycle": {
+        "enum": [
+          "created",
+          "consented",
+          "calibrating",
+          "ready",
+          "running",
+          "paused",
+          "submitted",
+          "withdrawn",
+          "expired",
+          "abandoned"
+        ],
+        "title": "SessionLifecycle",
+        "type": "string"
       },
       "StudyCreate": {
         "properties": {
@@ -1137,6 +1284,95 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/participant-sessions/{session_id}/consent": {
+      "post": {
+        "operationId": "recordParticipantConsent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Consent",
+        "tags": [
+          "participant sessions"
+        ]
+      }
+    },
     "/api/v1/participate/{token}": {
       "get": {
         "operationId": "resolveParticipantLink",
@@ -1196,6 +1432,78 @@
         "summary": "Resolve Participant Link",
         "tags": [
           "studies"
+        ]
+      }
+    },
+    "/api/v1/participate/{token}/sessions": {
+      "post": {
+        "operationId": "createParticipantSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantSessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Participant Session",
+        "tags": [
+          "participant sessions"
         ]
       }
     },

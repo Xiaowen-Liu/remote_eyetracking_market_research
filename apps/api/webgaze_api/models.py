@@ -219,6 +219,7 @@ class ParticipantSession(Base):
         ForeignKey("study_versions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     participant_alias: Mapped[str] = mapped_column(String(80), nullable=False)
+    access_token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     lifecycle: Mapped[SessionLifecycle] = mapped_column(
         Enum(SessionLifecycle, native_enum=False), default=SessionLifecycle.CREATED, nullable=False
     )
@@ -236,6 +237,8 @@ class ParticipantSession(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    study_version: Mapped[StudyVersion] = relationship()
 
 
 class CalibrationResult(Base):

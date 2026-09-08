@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from .models import ProjectStatus, StudyLifecycle
+from .models import ProjectStatus, SessionLifecycle, StudyLifecycle
 
 
 class ApiModel(BaseModel):
@@ -188,6 +188,33 @@ class PublicStudyProtocol(ApiModel):
     calibration_policy: CalibrationPolicy
     collection_policy: CollectionPolicy
     tasks: list[PublicTask]
+
+
+class ParticipantSessionCreate(ApiModel):
+    browser_family: str | None = Field(default=None, max_length=40)
+    viewport_width: int = Field(ge=320, le=10_000)
+    viewport_height: int = Field(ge=320, le=10_000)
+    device_pixel_ratio: float = Field(default=1, ge=0.5, le=10)
+
+
+class ParticipantSessionResponse(ApiModel):
+    id: UUID
+    lifecycle: SessionLifecycle
+    participant_alias: str
+    access_token: str | None = None
+    retention_expires_at: datetime
+
+
+class ConsentCreate(ApiModel):
+    accepted: Literal[True]
+    consent_version: str = Field(min_length=1, max_length=40)
+
+
+class ConsentResponse(ApiModel):
+    session_id: UUID
+    lifecycle: SessionLifecycle
+    consent_version: str
+    consented_at: datetime
 
 
 class OpenApiMetadata(ApiModel):
