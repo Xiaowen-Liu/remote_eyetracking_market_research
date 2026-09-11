@@ -1,0 +1,12 @@
+:root { color: #17241e; background: #f7f7f2; font: 14px/1.45 system-ui, sans-serif; }
+body { margin: 0; min-width: 340px; }
+main { padding: 20px; }
+h1, h2, h3 { font-family: Georgia, serif; line-height: 1.1; margin: 0 0 10px; }
+h1 { font-size: 28px; } h2 { font-size: 21px; } h3 { font-size: 17px; }
+.eyebrow { color: #537c2c; font-size: 11px; font-weight: 800; letter-spacing: .12em; margin: 0 0 6px; text-transform: uppercase; }
+.quiet { color: #617067; } .consent { background: #fff; border-left: 3px solid #82ad42; padding: 10px; white-space: pre-wrap; }
+label { display: grid; font-weight: 700; gap: 5px; margin: 13px 0; }
+input { border: 1px solid #b8c0b9; border-radius: 6px; box-sizing: border-box; font: inherit; padding: 9px; width: 100%; }
+.advanced { color: #617067; font-size: 12px; } .check { display: flex; align-items: flex-start; font-weight: 500; gap: 8px; } .check input { margin-top: 3px; width: auto; }
+button { background: #294735; border: 1px solid #294735; border-radius: 6px; color: white; cursor: pointer; font: inherit; font-weight: 800; padding: 10px 12px; } button:disabled { cursor: not-allowed; opacity: .45; }
+#status { color: #526158; min-height: 20px; margin: 15px 0 0; } #status.error { color: #9b3028; }

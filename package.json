@@ -12,7 +12,7 @@
     "generate:openapi": ".venv/bin/python apps/api/scripts/export_openapi.py",
     "generate:types": "openapi-typescript packages/api-contract/openapi.json -o packages/api-contract/src/schema.d.ts",
     "generate:contract": "npm run generate:openapi && npm run generate:types",
-    "test:extension": "node --test test/session.test.js test/collector-artifact.test.js",
+    "test:extension": "node --test test/session.test.js test/collector-artifact.test.js test/study-session.test.js",
     "test:web": "vitest run --config apps/web/vite.config.ts",
     "test:api": ".venv/bin/pytest apps/api/tests -q --cov=webgaze_api --cov-report=term-missing",
     "test": "npm run test:extension && npm run test:web && npm run test:api"

@@ -9,10 +9,10 @@ extension session storage. Visible-tab snapshots require the researcher to turn
 on the policy before starting the collection session. Raw camera video is never
 stored in the artifact.
 
-This first slice deliberately does not claim gaze inference inside arbitrary
-pages. The current bridge adds on-device MediaPipe landmarks, an explicit
-in-page camera control, a nine-point calibration fit, a gaze cursor, and a
-local heat trail. It remains experimental and calibration-dependent.
+The extension is an experimental participant client for a published study. It
+uses on-device MediaPipe landmarks, an explicit in-page camera control, and a
+nine-point calibration fit to produce coordinate estimates. It remains
+calibration-dependent and is not a validated attention measurement.
 
 ## Load locally
 
@@ -20,11 +20,32 @@ local heat trail. It remains experimental and calibration-dependent.
 2. Open `chrome://extensions`, enable Developer mode, and choose **Load
    unpacked**.
 3. Select `collector-extension/` (not `collector-extension/dist/`).
-4. Open a target page, use the collector popup to start a session, then click
-   **Enable camera locally** in the page overlay.
+4. In the researcher app, publish a study that has **experimental webcam gaze**
+   enabled, then copy its participant link.
+5. Open the target page for the study, open the extension popup, paste that
+   participant link, and explicitly accept the displayed consent text.
+6. The extension creates the anonymous participant session, opens the first
+   task URL, and shows the in-page camera control. Click **Enable camera
+   locally**, grant the browser camera permission, and complete nine-point
+   calibration.
+7. When the server accepts calibration quality, return to the popup, start each
+   task, and complete it from the popup. Finish by submitting the session.
 
 The extension bundle is packaged locally. On first camera use it fetches the
 MediaPipe WASM/model assets; those are model/runtime data, not webcam data.
+Camera frames and landmarks stay in the active browser tab. During a running,
+consented task, the API receives only estimated normalized coordinates plus
+timestamp, scroll, and viewport context. The participant access token is held
+in extension session storage and is not written to the exported artifact.
+
+## Server-backed lifecycle
+
+The extension uses the same server-owned participant lifecycle as the web
+client: capability link resolution → consent → calibration acceptance → ordered
+task runs → idempotent, sequence-numbered gaze batches → submit. Completing a
+task drains the final local samples before the task-run completion request. If
+the network fails before a batch acknowledgement, the pending batch remains in
+session storage with its client batch id and sequence for safe retry.
 
 ## Replay coordinate contract
 
