@@ -10,5 +10,19 @@ on the policy before starting the collection session. Raw camera video is never
 stored in the artifact.
 
 This first slice deliberately does not claim gaze inference inside arbitrary
-pages. The next slice will add a reviewed bridge between the on-device gaze
-estimator and this collector, plus an overlay/replay format.
+pages. The current bridge adds on-device MediaPipe landmarks, an explicit
+in-page camera control, a gaze cursor, and a local heat trail. Its initial
+screen mapping is intentionally labelled experimental until the extension
+calibration/replay slice is complete.
+
+## Load locally
+
+1. Run `npm run build:collector`.
+2. Open `chrome://extensions`, enable Developer mode, and choose **Load
+   unpacked**.
+3. Select `collector-extension/` (not `collector-extension/dist/`).
+4. Open a target page, use the collector popup to start a session, then click
+   **Enable camera locally** in the page overlay.
+
+The extension bundle is packaged locally. On first camera use it fetches the
+MediaPipe WASM/model assets; those are model/runtime data, not webcam data.

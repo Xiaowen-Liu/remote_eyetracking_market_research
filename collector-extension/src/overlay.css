@@ -1,0 +1,6 @@
+#webgaze-collector-overlay { position: fixed; z-index: 2147483647; inset: 0; pointer-events: none; font: 12px system-ui, sans-serif; }
+#webgaze-collector-overlay [data-webgaze-status] { position: fixed; left: 16px; bottom: 16px; padding: 8px 10px; color: #eff8e8; background: #183022; border-radius: 8px; box-shadow: 0 4px 20px #0004; }
+#webgaze-collector-overlay button { position: fixed; left: 16px; bottom: 52px; pointer-events: auto; padding: 9px 12px; color: #17301e; background: #b8e96a; border: 0; border-radius: 8px; font-weight: 700; cursor: pointer; }
+#webgaze-collector-overlay [data-webgaze-dot], .webgaze-heat-point { position: fixed; transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%; }
+#webgaze-collector-overlay [data-webgaze-dot] { width: 14px; height: 14px; background: #ff5e4a; border: 3px solid #fff; box-shadow: 0 0 0 3px #ff5e4a66; }
+.webgaze-heat-point { width: 38px; height: 38px; background: #ff914766; filter: blur(6px); }
