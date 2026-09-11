@@ -25,3 +25,23 @@ local heat trail. It remains experimental and calibration-dependent.
 
 The extension bundle is packaged locally. On first camera use it fetches the
 MediaPipe WASM/model assets; those are model/runtime data, not webcam data.
+
+## Replay coordinate contract
+
+Each calibrated gaze sample uses normalized visible-viewport coordinates and
+records the page URL, viewport size, scroll offset, and timestamp observed at
+capture time. The overlay may render at display refresh rate, while artifact
+sampling is bounded to approximately 10 Hz. Opt-in snapshots preserve the same
+viewport and scroll context. Background storage mutations are serialized so
+dense event and gaze batches cannot overwrite one another during asynchronous
+read-modify-write operations.
+
+The local Results viewer groups samples by matching URL and the time interval
+between adjacent snapshots, then aggregates them into bounded heatmap cells.
+This keeps replay rendering proportional across display sizes and avoids
+placing samples from another navigation onto the selected screenshot. Older
+artifacts without capture context remain readable; when there is only one
+snapshot, their session-level samples are shown as a compatibility fallback.
+
+The heatmap is an exploratory visualization of estimated browser coordinates.
+It is not a fixation classifier or a validated measure of visual attention.

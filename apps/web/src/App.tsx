@@ -12,7 +12,7 @@ import {
 } from "./api";
 import { ParticipantRunner, participantTokenFromPath } from "./ParticipantRunner";
 import { ExperimentalEyeTracking } from "./ExperimentalEyeTracking";
-import { parseCollectorArtifact, type CollectorArtifact } from "./collectorArtifact";
+import { buildHeatmap, gazeSamplesForSnapshot, parseCollectorArtifact, type CollectorArtifact } from "./collectorArtifact";
 
 const emptyDraft: StudyDraft = {
   title: "Accessible checkout attention study",
@@ -821,6 +821,8 @@ function ResultsDashboard({
   );
   const aggregateSessionCount = completedResults.length;
   const aggregateMetrics = aggregateTaskMetrics(aggregateEligibleResults);
+  const replaySamples = collectorArtifact ? gazeSamplesForSnapshot(collectorArtifact, selectedSnapshot) : [];
+  const replayHeatmap = buildHeatmap(replaySamples);
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -877,7 +879,7 @@ function ResultsDashboard({
           {collectorArtifact && <div className="collector-artifact-grid">
             <aside className="collector-summary"><p className="eyebrow">Session artifact</p><strong>{collectorArtifact.sessionId}</strong><span>{collectorArtifact.gazeSamples?.length ?? 0} estimated samples</span><span>{collectorArtifact.events.length} timeline events</span><span>{collectorArtifact.snapshots.length} consented snapshots</span><small>Raw camera video: never exported</small></aside>
             <section className="collector-timeline"><h3>Timeline</h3>{collectorArtifact.events.length === 0 && <p>No page events were captured.</p>}<ol>{collectorArtifact.events.slice(0, 12).map((event, index) => <li key={`${event.at}-${index}`}><strong>{event.type.replaceAll("-", " ")}</strong><span>{new Date(event.at).toLocaleTimeString()} · {event.url}</span></li>)}</ol></section>
-            <section className="collector-snapshot"><h3>Visible-tab snapshot</h3>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" /><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => setSelectedSnapshot((current) => current - 1)}>Previous</button><span>{selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => setSelectedSnapshot((current) => current + 1)}>Next</button></div></>}</section>
+            <section className="collector-snapshot"><div className="snapshot-title"><h3>Visible-tab gaze replay</h3><span>{replaySamples.length} samples in this segment</span></div>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><div className="snapshot-stage"><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" />{replayHeatmap.map((cell) => <i className="replay-heat-cell" key={`${cell.x}-${cell.y}`} style={{ left: `${cell.x * 100}%`, top: `${cell.y * 100}%`, opacity: 0.18 + cell.intensity * 0.62, transform: `translate(-50%, -50%) scale(${0.72 + cell.intensity * 0.58})` }} title={`${cell.count} estimated samples`} />)}</div><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => setSelectedSnapshot((current) => current - 1)}>Previous</button><span>{selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => setSelectedSnapshot((current) => current + 1)}>Next</button></div></>}</section>
           </div>}
         </section>}
       </main>

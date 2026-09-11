@@ -62,6 +62,7 @@ More detailed reasoning is in the [architecture notes](docs/architecture.md) and
 - Owner-scoped API resources, generated REST documentation, and contract checks
 - Experimental webcam mode: on-device face/iris landmarks → nine-point calibration → estimated coordinate batches after consent
 - Clean-room MV3 collector: explicit in-page camera start, arbitrary-page event timeline, optional visible-tab snapshots, and local artifact review
+- Snapshot-linked gaze replay with URL/time/viewport context and bounded heatmap aggregation
 
 ## Repository layout
 
