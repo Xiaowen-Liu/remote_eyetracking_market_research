@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       let next = addEvent(session, message.event);
       if (session.captureSnapshots && ["page-open", "history-navigation", "scroll-settled"].includes(message.event.type)) {
       const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "jpeg", quality: 72 });
-        next = addSnapshot(next, { dataUrl, url: message.event.url, reason: message.event.type });
+        next = addSnapshot(next, { dataUrl, url: message.event.url, reason: message.event.type, viewport: message.event.detail?.viewport, scroll: message.event.detail?.scroll });
       }
       await write(next); respond({ ok: true }); return;
     }

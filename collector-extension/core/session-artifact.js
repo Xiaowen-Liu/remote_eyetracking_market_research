@@ -9,7 +9,7 @@ export function addEvent(session, event) {
 
 export function addSnapshot(session, snapshot) {
   if (!session.captureSnapshots || !snapshot?.dataUrl) return session;
-  return { ...session, snapshots: [...session.snapshots, { at: snapshot.at ?? new Date().toISOString(), url: snapshot.url, reason: snapshot.reason, dataUrl: snapshot.dataUrl }] };
+  return { ...session, snapshots: [...session.snapshots, { at: snapshot.at ?? new Date().toISOString(), url: snapshot.url, reason: snapshot.reason, dataUrl: snapshot.dataUrl, viewport: snapshot.viewport, scroll: snapshot.scroll }] };
 }
 
 export function exportArtifact(session, endedAt = new Date().toISOString()) {

@@ -1,4 +1,5 @@
-const send = (type, detail = null) => chrome.runtime.sendMessage({ type: "PAGE_EVENT", event: { type, detail, url: location.href } });
+const pageContext = () => ({ viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } });
+const send = (type, detail = null) => chrome.runtime.sendMessage({ type: "PAGE_EVENT", event: { type, detail: { ...pageContext(), value: detail }, url: location.href } });
 let scrollTimer;
 addEventListener("scroll", () => { clearTimeout(scrollTimer); scrollTimer = setTimeout(() => send("scroll-settled", { x: scrollX, y: scrollY }), 250); }, { passive: true });
 addEventListener("popstate", () => send("history-navigation"));

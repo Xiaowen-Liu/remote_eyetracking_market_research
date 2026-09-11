@@ -6,7 +6,8 @@ let landmarker: FaceLandmarker | null = null;
 let video: HTMLVideoElement | null = null;
 let frame: number | null = null;
 let enabled = false;
-let samples: { x: number; y: number; at: string }[] = [];
+type CapturedSample = { x: number; y: number; at: string; url: string; viewport: { width: number; height: number }; scroll: { x: number; y: number } };
+let samples: CapturedSample[] = [];
 let latestFeature: Point | null = null;
 let calibrationIndex = 0;
 let calibrationSamples: CalibrationSample[] = [];
@@ -70,7 +71,7 @@ function tick(root: HTMLDivElement) {
     const [x, y] = predictGaze(model, next);
     const point = root.querySelector<HTMLElement>("[data-webgaze-dot]")!; point.style.left = `${x * 100}%`; point.style.top = `${y * 100}%`;
     const heat = document.createElement("i"); heat.className = "webgaze-heat-point"; heat.style.left = `${x * 100}%`; heat.style.top = `${y * 100}%`; root.querySelector("[data-webgaze-heat]")!.append(heat); if (root.querySelectorAll(".webgaze-heat-point").length > 90) heat.parentElement!.firstElementChild?.remove();
-    samples.push({ x, y, at: new Date().toISOString() }); if (samples.length >= 10) { chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
+    samples.push({ x, y, at: new Date().toISOString(), url: location.href, viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } }); if (samples.length >= 10) { chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
   }
   frame = requestAnimationFrame(() => tick(root));
 }
