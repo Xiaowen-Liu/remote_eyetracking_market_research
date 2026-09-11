@@ -11,9 +11,8 @@ stored in the artifact.
 
 This first slice deliberately does not claim gaze inference inside arbitrary
 pages. The current bridge adds on-device MediaPipe landmarks, an explicit
-in-page camera control, a gaze cursor, and a local heat trail. Its initial
-screen mapping is intentionally labelled experimental until the extension
-calibration/replay slice is complete.
+in-page camera control, a nine-point calibration fit, a gaze cursor, and a
+local heat trail. It remains experimental and calibration-dependent.
 
 ## Load locally
 
