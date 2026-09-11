@@ -33,6 +33,11 @@ browser-context capability, not a feature the Vercel page can emulate.
    JSON**, and show the local timeline and snapshot review. Explain that this
    view does not upload the artifact to the API.
 
+If installing the extension is impractical for a short portfolio walkthrough,
+select **Load synthetic replay** in the same Results section. It uses a
+prominently labelled, in-repository fixture to demonstrate the replay UI; it
+does not represent a participant session or camera capture.
+
 ## Talking points
 
 - Published versions are immutable, so protocol edits do not rewrite a participant's historical session.
