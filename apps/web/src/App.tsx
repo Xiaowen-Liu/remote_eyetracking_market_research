@@ -11,6 +11,7 @@ import {
   type StudyDraftResponse,
 } from "./api";
 import { ParticipantRunner, participantTokenFromPath } from "./ParticipantRunner";
+import { ExperimentalEyeTracking } from "./ExperimentalEyeTracking";
 
 const emptyDraft: StudyDraft = {
   title: "Accessible checkout attention study",
@@ -101,6 +102,7 @@ function aggregateTaskMetrics(results: AnalysisResult[]): TaskAggregate[] {
 }
 
 export function App() {
+  if (window.location.pathname === "/experimental/eye-tracking") return <ExperimentalEyeTracking />;
   const token = participantTokenFromPath();
   if (token) return <ParticipantRunner token={token} />;
   return <StudyBuilder />;

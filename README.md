@@ -60,6 +60,7 @@ More detailed reasoning is in the [architecture notes](docs/architecture.md) and
 - Researcher results dashboard, session comparison, collection-health summaries
 - CSV and JSON analysis exports with export audit events
 - Owner-scoped API resources, generated REST documentation, and contract checks
+- Local-only experimental eye tracking: webcam → on-device face/iris landmarks → nine-point calibration → gaze estimate
 
 ## Repository layout
 
@@ -71,6 +72,7 @@ extension/                Separate browser-extension collection baseline
 docs/adr/                 Architectural decision records
 docs/clean-room/          Public functional spec, data dictionary, and boundaries
 docs/demo-runbook.md      Five-minute recruiter/interview demo
+docs/experimental-eye-tracking.md  Local-only experimental eye-tracking design and limits
 ```
 
 ## Run locally
@@ -94,6 +96,11 @@ npm run dev:web
 ```
 
 Open `http://localhost:5173`. API documentation is available at `http://localhost:8000/api/docs`.
+
+The public participant route remains synthetic by design. For the separate,
+real webcam-based experimental client, open
+`http://localhost:5173/experimental/eye-tracking` and read the
+[experimental tracking guide](docs/experimental-eye-tracking.md) first.
 
 ## Verify changes
 
