@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { ParticipantRunner, participantTokenFromPath } from "./ParticipantRunner";
 import { ExperimentalEyeTracking } from "./ExperimentalEyeTracking";
+import { parseCollectorArtifact, type CollectorArtifact } from "./collectorArtifact";
 
 const emptyDraft: StudyDraft = {
   title: "Accessible checkout attention study",
@@ -699,6 +700,8 @@ function ResultsDashboard({
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(true);
+  const [collectorArtifact, setCollectorArtifact] = useState<CollectorArtifact | null>(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState(0);
 
   useEffect(() => {
     void loadJobs();
@@ -773,6 +776,20 @@ function ResultsDashboard({
   function selectJob(jobId: string) {
     setSelectedJobId(jobId);
     setResult(resultsByJob[jobId] ?? null);
+  }
+
+  async function importCollectorArtifact(file: File | undefined) {
+    if (!file) return;
+    try {
+      const parsed = parseCollectorArtifact(JSON.parse(await file.text()));
+      setCollectorArtifact(parsed);
+      setSelectedSnapshot(0);
+      setNotice({ kind: "success", text: "Collector session opened locally. It has not been uploaded to this study." });
+    } catch (error) {
+      setCollectorArtifact(null);
+      const text = error instanceof Error ? error.message : "Could not read collector export.";
+      setNotice({ kind: "error", text });
+    }
   }
 
   async function downloadExport(format: "json" | "csv") {
@@ -851,6 +868,17 @@ function ResultsDashboard({
             </section>}
             {aggregateSessionCount > 0 && aggregateMetrics.length === 0 && <p className="aggregate-unavailable">Aggregate claims are unavailable: this demo currently contains synthetic or otherwise ineligible sessions only.</p>}
           </section>}
+        </section>}
+        {!busy && <section className="collector-review" aria-label="Collector session review">
+          <div className="collector-review-heading">
+            <div><p className="eyebrow">Local collector review</p><h2>Open an extension session</h2><p>Use this for a private researcher-side review of the exported artifact. The JSON stays in this browser and is not submitted to the API.</p></div>
+            <label className="secondary-button collector-import">Open collector JSON<input type="file" accept="application/json,.json" onChange={(event) => void importCollectorArtifact(event.target.files?.[0])} /></label>
+          </div>
+          {collectorArtifact && <div className="collector-artifact-grid">
+            <aside className="collector-summary"><p className="eyebrow">Session artifact</p><strong>{collectorArtifact.sessionId}</strong><span>{collectorArtifact.gazeSamples?.length ?? 0} estimated samples</span><span>{collectorArtifact.events.length} timeline events</span><span>{collectorArtifact.snapshots.length} consented snapshots</span><small>Raw camera video: never exported</small></aside>
+            <section className="collector-timeline"><h3>Timeline</h3>{collectorArtifact.events.length === 0 && <p>No page events were captured.</p>}<ol>{collectorArtifact.events.slice(0, 12).map((event, index) => <li key={`${event.at}-${index}`}><strong>{event.type.replaceAll("-", " ")}</strong><span>{new Date(event.at).toLocaleTimeString()} · {event.url}</span></li>)}</ol></section>
+            <section className="collector-snapshot"><h3>Visible-tab snapshot</h3>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" /><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => setSelectedSnapshot((current) => current - 1)}>Previous</button><span>{selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => setSelectedSnapshot((current) => current + 1)}>Next</button></div></>}</section>
+          </div>}
         </section>}
       </main>
     </div>
