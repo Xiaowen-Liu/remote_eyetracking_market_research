@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "WebGaze Research Collector (Experimental)",
+  "version": "0.1.0",
+  "description": "Clean-room browser collector for consented UX-research session events and optional visible-tab snapshots.",
+  "permissions": ["activeTab", "storage", "tabs", "downloads"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "WebGaze Collector" },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle" }]
+}
