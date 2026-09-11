@@ -13,6 +13,7 @@ import {
 import { ParticipantRunner, participantTokenFromPath } from "./ParticipantRunner";
 import { ExperimentalEyeTracking } from "./ExperimentalEyeTracking";
 import { buildHeatmap, gazeSamplesForSnapshot, parseCollectorArtifact, type CollectorArtifact } from "./collectorArtifact";
+import { syntheticCollectorReplay } from "./demoCollectorArtifact";
 
 const emptyDraft: StudyDraft = {
   title: "Accessible checkout attention study",
@@ -792,6 +793,12 @@ function ResultsDashboard({
     }
   }
 
+  function loadSyntheticCollectorReplay() {
+    setCollectorArtifact(syntheticCollectorReplay);
+    setSelectedSnapshot(0);
+    setNotice({ kind: "success", text: "Synthetic collector replay loaded. It is generated demo data, not a participant session or camera capture." });
+  }
+
   async function downloadExport(format: "json" | "csv") {
     const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? latest;
     if (!selectedJob) return;
@@ -874,10 +881,10 @@ function ResultsDashboard({
         {!busy && <section className="collector-review" aria-label="Collector session review">
           <div className="collector-review-heading">
             <div><p className="eyebrow">Local collector review</p><h2>Open an extension session</h2><p>Use this for a private researcher-side review of the exported artifact. The JSON stays in this browser and is not submitted to the API.</p></div>
-            <label className="secondary-button collector-import">Open collector JSON<input type="file" accept="application/json,.json" onChange={(event) => void importCollectorArtifact(event.target.files?.[0])} /></label>
+            <div className="collector-actions"><button className="secondary-button" type="button" onClick={loadSyntheticCollectorReplay}>Load synthetic replay</button><label className="secondary-button collector-import">Open collector JSON<input type="file" accept="application/json,.json" onChange={(event) => void importCollectorArtifact(event.target.files?.[0])} /></label></div>
           </div>
           {collectorArtifact && <div className="collector-artifact-grid">
-            <aside className="collector-summary"><p className="eyebrow">Session artifact</p><strong>{collectorArtifact.sessionId}</strong><span>{collectorArtifact.gazeSamples?.length ?? 0} estimated samples</span><span>{collectorArtifact.events.length} timeline events</span><span>{collectorArtifact.snapshots.length} consented snapshots</span><small>Raw camera video: never exported</small></aside>
+            <aside className="collector-summary"><p className="eyebrow">{collectorArtifact.sessionId === syntheticCollectorReplay.sessionId ? "Synthetic replay fixture" : "Session artifact"}</p><strong>{collectorArtifact.sessionId}</strong><span>{collectorArtifact.gazeSamples?.length ?? 0} estimated samples</span><span>{collectorArtifact.events.length} timeline events</span><span>{collectorArtifact.snapshots.length} consented snapshots</span><small>Raw camera video: never exported</small></aside>
             <section className="collector-timeline"><h3>Timeline</h3>{collectorArtifact.events.length === 0 && <p>No page events were captured.</p>}<ol>{collectorArtifact.events.slice(0, 12).map((event, index) => <li key={`${event.at}-${index}`}><strong>{event.type.replaceAll("-", " ")}</strong><span>{new Date(event.at).toLocaleTimeString()} · {event.url}</span></li>)}</ol></section>
             <section className="collector-snapshot"><div className="snapshot-title"><h3>Visible-tab gaze replay</h3><span>{replaySamples.length} samples in this segment</span></div>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><div className="snapshot-stage"><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" />{replayHeatmap.map((cell) => <i className="replay-heat-cell" key={`${cell.x}-${cell.y}`} style={{ left: `${cell.x * 100}%`, top: `${cell.y * 100}%`, opacity: 0.18 + cell.intensity * 0.62, transform: `translate(-50%, -50%) scale(${0.72 + cell.intensity * 0.58})` }} title={`${cell.count} estimated samples`} />)}</div><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => setSelectedSnapshot((current) => current - 1)}>Previous</button><span>{selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => setSelectedSnapshot((current) => current + 1)}>Next</button></div></>}</section>
           </div>}
