@@ -102,6 +102,7 @@ class CalibrationPolicy(ApiModel):
 class CollectionPolicy(ApiModel):
     screenshots_enabled: bool = False
     sample_interval_ms: int = Field(default=100, ge=25, le=1000)
+    webcam_gaze_enabled: bool = False
 
 
 class StudyDraft(ApiModel):

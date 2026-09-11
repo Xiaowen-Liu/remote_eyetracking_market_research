@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { enqueueBatch, flushPendingBatches, pendingBatches } from "./collection";
 import {
@@ -9,6 +9,8 @@ import {
   type SessionSubmit,
   type TaskRun,
 } from "./api";
+import { LiveGazeCapture } from "./LiveGazeCapture";
+import type { GazeFeature } from "./gazeMath";
 
 type Phase = "loading" | "consent" | "calibration" | "ready" | "running" | "submitting" | "complete" | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -49,6 +51,7 @@ export function ParticipantRunner({ token }: { token: string }) {
   const [submission, setSubmission] = useState<SessionSubmit | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const sequenceRef = useRef(0);
 
   function persist(
     nextPhase: Phase,
@@ -83,6 +86,7 @@ export function ParticipantRunner({ token }: { token: string }) {
           setSession({ id: stored.id, accessToken: stored.accessToken });
           setPhase(stored.phase === "running" && !stored.activeRun ? "ready" : stored.phase);
           setNextSequence(stored.nextSequence);
+          sequenceRef.current = stored.nextSequence;
           setCompletedTasks(stored.completedTasks);
           setActiveRun(stored.activeRun);
           setPendingCount(pendingBatches(window.localStorage, stored.id).length);
@@ -198,6 +202,7 @@ export function ParticipantRunner({ token }: { token: string }) {
     enqueueBatch(window.localStorage, session.id, batch);
     const newSequence = nextSequence + 1;
     setNextSequence(newSequence);
+    sequenceRef.current = newSequence;
     setPendingCount(pendingBatches(window.localStorage, session.id).length);
     persist("running", session, { nextSequence: newSequence, activeRun });
     if (offlineDemo) {
@@ -205,6 +210,22 @@ export function ParticipantRunner({ token }: { token: string }) {
     } else {
       await flush();
     }
+  }
+
+  function recordLiveSample(point: GazeFeature, confidence: number) {
+    if (!session || !activeRun || offlineDemo) return;
+    const now = new Date().toISOString();
+    const sequence = sequenceRef.current;
+    const batch: GazeBatchCreate = {
+      client_batch_id: crypto.randomUUID(), sequence, schema_version: "1.0", captured_from: now, captured_to: now,
+      samples: [{ timestamp: now, x_normalized: point[0], y_normalized: point[1], confidence, scroll_x: window.scrollX, scroll_y: window.scrollY, viewport_width: window.innerWidth, viewport_height: window.innerHeight }],
+    };
+    sequenceRef.current += 1;
+    setNextSequence(sequenceRef.current);
+    enqueueBatch(window.localStorage, session.id, batch);
+    setPendingCount(pendingBatches(window.localStorage, session.id).length);
+    persist("running", session, { nextSequence: sequenceRef.current, activeRun });
+    void flush();
   }
 
   async function finishTask() {
@@ -246,6 +267,7 @@ export function ParticipantRunner({ token }: { token: string }) {
   }
 
   const task = protocol?.tasks[completedTasks];
+  const experimentalWebcam = Boolean(protocol?.collection_policy.webcam_gaze_enabled);
   return (
     <main className="participant-shell">
       <header className="participant-header">
@@ -259,22 +281,20 @@ export function ParticipantRunner({ token }: { token: string }) {
           <p className="eyebrow">{phase === "running" ? `Task ${completedTasks + 1}` : "Participant study"}</p>
           <h1>{protocol.title}</h1>
           {notice && <div className={`notice ${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
+          {experimentalWebcam && (phase === "calibration" || phase === "ready" || phase === "running") && <LiveGazeCapture collecting={phase === "running"} sampleIntervalMs={protocol.collection_policy.sample_interval_ms} onGazeSample={recordLiveSample} onCalibrated={() => void completeCalibration()} />}
 
           {phase === "consent" && <>
             <p>{protocol.consent_text}</p>
             <ul className="participant-facts">
-              <li>Webcam frames stay on-device in this public demo.</li>
-              <li>Synthetic gaze coordinates are used to demonstrate the API flow.</li>
-              <li>You may leave before task completion; no real participant data is collected.</li>
+              <li>{experimentalWebcam ? "If enabled, webcam frames are processed only in this browser." : "Webcam frames stay on-device in this public demo."}</li>
+              <li>{experimentalWebcam ? "After calibration, estimated coordinate samples are sent to this study API; no camera frames are uploaded." : "Synthetic gaze coordinates are used to demonstrate the API flow."}</li>
+              <li>You may leave before task completion.</li>
             </ul>
             <button className="primary-button" disabled={busy} onClick={() => void acceptConsent()}>Accept and continue</button>
           </>}
 
           {phase === "calibration" && <>
-            <p>Complete a deterministic nine-point calibration simulation before task collection begins.</p>
-            <div className="calibration-grid" aria-label="Nine calibration targets">{Array.from({ length: 9 }, (_, index) => <span key={index}>●</span>)}</div>
-            <p className="fine-print">Attempt {calibrationAttempt} of {protocol.calibration_policy.maximum_attempts}. This public route sends a synthetic result; it does not claim laboratory-grade accuracy.</p>
-            <button className="primary-button" disabled={busy} onClick={() => void completeCalibration()}>Record synthetic calibration</button>
+            {experimentalWebcam ? <><p>Use your webcam to complete a local nine-point calibration before task collection begins.</p><p className="fine-print">This is an experimental browser estimate; it is not validated as a laboratory-grade measurement.</p></> : <><p>Complete a deterministic nine-point calibration simulation before task collection begins.</p><div className="calibration-grid" aria-label="Nine calibration targets">{Array.from({ length: 9 }, (_, index) => <span key={index}>●</span>)}</div><p className="fine-print">Attempt {calibrationAttempt} of {protocol.calibration_policy.maximum_attempts}. This public route sends a synthetic result; it does not claim laboratory-grade accuracy.</p><button className="primary-button" disabled={busy} onClick={() => void completeCalibration()}>Record synthetic calibration</button></>}
           </>}
 
           {phase === "ready" && task && <>
@@ -294,14 +314,14 @@ export function ParticipantRunner({ token }: { token: string }) {
               <span>{pendingCount} buffered batch{pendingCount === 1 ? "" : "es"}</span>
             </div>
             <button className="secondary-button" type="button" onClick={() => setOfflineDemo((value) => !value)}>{offlineDemo ? "Restore connection" : "Simulate connection loss"}</button>
-            <button className="secondary-button" type="button" disabled={busy} onClick={() => void recordSyntheticSample()}>Record synthetic gaze sample</button>
+            {!experimentalWebcam && <button className="secondary-button" type="button" disabled={busy} onClick={() => void recordSyntheticSample()}>Record synthetic gaze sample</button>}
             <button className="secondary-button" type="button" disabled={busy || offlineDemo || pendingCount === 0} onClick={() => void flush()}>Retry buffered batches</button>
             <button className="primary-button" disabled={busy} onClick={() => void finishTask()}>Finish task</button>
           </>}
 
           {phase === "complete" && <>
             <h2>Analysis queued</h2>
-            <p>All task boundaries and acknowledged synthetic gaze batches are stored. This session is queued for versioned task-level analysis.</p>
+            <p>All task boundaries and acknowledged {experimentalWebcam ? "estimated coordinate" : "synthetic gaze"} batches are stored. This session is queued for versioned task-level analysis.</p>
             {submission && <p className="fine-print">Job {submission.analysis_job.id.slice(0, 8)} · {submission.analysis_job.algorithm_version}</p>}
             <p className="fine-print">No webcam frames were uploaded by this demo.</p>
           </>}
