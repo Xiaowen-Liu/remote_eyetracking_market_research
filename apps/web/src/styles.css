@@ -160,7 +160,9 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .participant-calibration-board, .participant-live-preview { position: relative; min-height: 220px; overflow: hidden; padding: 18px; background: #f0f5e9; border: 1px solid #d0dec2; border-radius: 10px; }
 .participant-calibration-board > p { margin: 0; color: #667267; font-size: 12px; }
 .participant-calibration-board .secondary-button { position: absolute; bottom: 10px; left: 10px; }
+.participant-calibration-board .retry-calibration { left: 210px; }
 .participant-live-preview { min-height: 180px; color: #5e6b63; font-size: 13px; }
+.heat-point { position: absolute; width: 26px; height: 26px; transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%; background: #dc673566; filter: blur(3px); }
 .participant-facts { display: grid; gap: 10px; padding: 18px 0 4px 20px; color: #536058; font-size: 14px; line-height: 1.45; }
 .calibration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin: 28px auto; width: min(320px, 100%); text-align: center; color: #699431; font-size: 21px; }
 .task-label { color: #58772b !important; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
