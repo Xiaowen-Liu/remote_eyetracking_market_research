@@ -60,7 +60,8 @@ More detailed reasoning is in the [architecture notes](docs/architecture.md) and
 - Researcher results dashboard, session comparison, collection-health summaries
 - CSV and JSON analysis exports with export audit events
 - Owner-scoped API resources, generated REST documentation, and contract checks
-- Local-only experimental eye tracking: webcam → on-device face/iris landmarks → nine-point calibration → gaze estimate
+- Experimental webcam mode: on-device face/iris landmarks → nine-point calibration → estimated coordinate batches after consent
+- Clean-room MV3 collector: explicit in-page camera start, arbitrary-page event timeline, optional visible-tab snapshots, and local artifact review
 
 ## Repository layout
 
@@ -68,7 +69,7 @@ More detailed reasoning is in the [architecture notes](docs/architecture.md) and
 apps/api/                 FastAPI, SQLAlchemy models, Alembic migrations, tests
 apps/web/                 React/Vite researcher and participant experiences
 packages/api-contract/    Committed OpenAPI document and generated TS types
-extension/                Separate browser-extension collection baseline
+collector-extension/      Clean-room MV3 collector for consented arbitrary-page research sessions
 docs/adr/                 Architectural decision records
 docs/clean-room/          Public functional spec, data dictionary, and boundaries
 docs/demo-runbook.md      Five-minute recruiter/interview demo
@@ -101,6 +102,12 @@ The public participant route remains synthetic by design. For the separate,
 real webcam-based experimental client, open
 `http://localhost:5173/experimental/eye-tracking` and read the
 [experimental tracking guide](docs/experimental-eye-tracking.md) first.
+
+For browser-context collection on an arbitrary test page, build and load the
+extension with `npm run build:collector`; the [collector guide](docs/collector-extension.md)
+explains the explicit camera, snapshot, and local-review boundaries. Exported
+collector JSON can be opened from the **Research results** page. It is parsed
+locally in the browser and is never uploaded by that review UI.
 
 ## Verify changes
 
