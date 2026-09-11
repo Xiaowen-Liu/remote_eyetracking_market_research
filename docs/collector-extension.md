@@ -30,7 +30,11 @@ MediaPipe WASM/model assets; those are model/runtime data, not webcam data.
 
 Each calibrated gaze sample uses normalized visible-viewport coordinates and
 records the page URL, viewport size, scroll offset, and timestamp observed at
-capture time. Opt-in snapshots preserve the same viewport and scroll context.
+capture time. The overlay may render at display refresh rate, while artifact
+sampling is bounded to approximately 10 Hz. Opt-in snapshots preserve the same
+viewport and scroll context. Background storage mutations are serialized so
+dense event and gaze batches cannot overwrite one another during asynchronous
+read-modify-write operations.
 
 The local Results viewer groups samples by matching URL and the time interval
 between adjacent snapshots, then aggregates them into bounded heatmap cells.

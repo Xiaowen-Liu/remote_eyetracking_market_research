@@ -3,9 +3,10 @@ import { addEvent, addSnapshot, exportArtifact, newSession } from "./core/sessio
 const key = "webgaze.experimental.collector.session";
 const read = async () => (await chrome.storage.session.get(key))[key] ?? null;
 const write = (session) => chrome.storage.session.set({ [key]: session });
+let operations = Promise.resolve();
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  void (async () => {
+  operations = operations.then(async () => {
     const session = await read();
     if (message.type === "START_COLLECTION") { await write(newSession(message)); const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); if (tab?.id) await chrome.tabs.sendMessage(tab.id, { type: "COLLECTOR_ARM" }); respond({ ok: true }); return; }
     if (message.type === "STOP_COLLECTION") { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); if (tab?.id) await chrome.tabs.sendMessage(tab.id, { type: "COLLECTOR_STOP" }); respond({ artifact: session ? exportArtifact(session) : null }); await chrome.storage.session.remove(key); return; }
@@ -20,6 +21,6 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       await write(next); respond({ ok: true }); return;
     }
     respond({ ok: false });
-  })();
+  }).catch((error) => respond({ ok: false, error: error instanceof Error ? error.message : "Collector operation failed" }));
   return true;
 });

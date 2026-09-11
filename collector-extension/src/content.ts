@@ -8,6 +8,8 @@ let frame: number | null = null;
 let enabled = false;
 type CapturedSample = { x: number; y: number; at: string; url: string; viewport: { width: number; height: number }; scroll: { x: number; y: number } };
 let samples: CapturedSample[] = [];
+let lastSampleAt = 0;
+const sampleIntervalMs = 100;
 let latestFeature: Point | null = null;
 let calibrationIndex = 0;
 let calibrationSamples: CalibrationSample[] = [];
@@ -71,10 +73,15 @@ function tick(root: HTMLDivElement) {
     const [x, y] = predictGaze(model, next);
     const point = root.querySelector<HTMLElement>("[data-webgaze-dot]")!; point.style.left = `${x * 100}%`; point.style.top = `${y * 100}%`;
     const heat = document.createElement("i"); heat.className = "webgaze-heat-point"; heat.style.left = `${x * 100}%`; heat.style.top = `${y * 100}%`; root.querySelector("[data-webgaze-heat]")!.append(heat); if (root.querySelectorAll(".webgaze-heat-point").length > 90) heat.parentElement!.firstElementChild?.remove();
-    samples.push({ x, y, at: new Date().toISOString(), url: location.href, viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } }); if (samples.length >= 10) { chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
+    const now = performance.now();
+    if (now - lastSampleAt >= sampleIntervalMs) {
+      lastSampleAt = now;
+      samples.push({ x, y, at: new Date().toISOString(), url: location.href, viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } });
+      if (samples.length >= 10) { chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
+    }
   }
   frame = requestAnimationFrame(() => tick(root));
 }
 
-function stop() { enabled = false; model = null; calibrationIndex = 0; calibrationSamples = []; if (frame) cancelAnimationFrame(frame); video?.srcObject && (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop()); document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
+function stop() { enabled = false; model = null; calibrationIndex = 0; calibrationSamples = []; lastSampleAt = 0; if (frame) cancelAnimationFrame(frame); video?.srcObject && (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop()); document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
 chrome.runtime.onMessage.addListener((message) => { if (message.type === "COLLECTOR_ARM") overlay(); if (message.type === "COLLECTOR_STOP") stop(); });
