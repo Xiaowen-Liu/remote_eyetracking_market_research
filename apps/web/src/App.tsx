@@ -25,7 +25,7 @@ const emptyDraft: StudyDraft = {
     allow_retry: true,
     maximum_attempts: 3,
   },
-  collection_policy: { screenshots_enabled: false, sample_interval_ms: 100 },
+  collection_policy: { screenshots_enabled: false, sample_interval_ms: 100, webcam_gaze_enabled: false },
   retention_days: 30,
   tasks: [
     {
@@ -493,6 +493,22 @@ function StudyBuilder() {
 
             <section className="panel">
               <div className="section-number">03</div>
+              <div className="panel-content">
+                <h2>Collection mode</h2>
+                <p className="supporting">Synthetic telemetry is the public default. Webcam gaze requires a separate participant consent and stays experimental.</p>
+                <label className="capture-mode-toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.collection_policy?.webcam_gaze_enabled ?? false}
+                    onChange={(event) => updateDraft({ collection_policy: { ...(draft.collection_policy ?? { screenshots_enabled: false, sample_interval_ms: 100, webcam_gaze_enabled: false }), webcam_gaze_enabled: event.target.checked } })}
+                  />
+                  <span><strong>Enable experimental webcam gaze</strong><small>Participant frames stay in-browser; only consented coordinate samples are sent to this study API.</small></span>
+                </label>
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="section-number">04</div>
               <div className="panel-content">
                 <div className="section-heading">
                   <div>

@@ -105,6 +105,10 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .field input, .field textarea, .field select { width: 100%; border: 1px solid #cfd6cf; border-radius: 8px; color: #1e2b24; background: #fbfcfa; padding: 11px 12px; outline: none; transition: border-color .15s, box-shadow .15s; }
 .field input:focus, .field textarea:focus, .field select:focus { border-color: #617a36; box-shadow: 0 0 0 3px #e4edda; }
 .field textarea { resize: vertical; line-height: 1.45; }
+.capture-mode-toggle { display: flex; align-items: flex-start; gap: 12px; padding: 16px; color: #324038; background: #f4f7ef; border: 1px solid #d7e2ca; border-radius: 9px; cursor: pointer; }
+.capture-mode-toggle input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: #58772b; }
+.capture-mode-toggle span { display: grid; gap: 4px; }
+.capture-mode-toggle small { color: #68756c; font-size: 12px; line-height: 1.45; }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .section-heading > span { color: #6c786f; font-size: 13px; white-space: nowrap; }
 .task-list { display: grid; gap: 12px; margin-top: 12px; }
@@ -151,6 +155,14 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .participant-card > p { color: #536058; line-height: 1.6; }
 .participant-card .primary-button { margin-top: 18px; }
 .participant-card .secondary-button { margin: 12px 8px 0 0; }
+.live-gaze-capture { display: grid; gap: 12px; margin: 20px 0; }
+.live-gaze-capture .camera-frame { max-width: 420px; }
+.participant-calibration-board, .participant-live-preview { position: relative; min-height: 220px; overflow: hidden; padding: 18px; background: #f0f5e9; border: 1px solid #d0dec2; border-radius: 10px; }
+.participant-calibration-board > p { margin: 0; color: #667267; font-size: 12px; }
+.participant-calibration-board .secondary-button { position: absolute; bottom: 10px; left: 10px; }
+.participant-calibration-board .retry-calibration { left: 210px; }
+.participant-live-preview { min-height: 180px; color: #5e6b63; font-size: 13px; }
+.heat-point { position: absolute; width: 26px; height: 26px; transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%; background: #dc673566; filter: blur(3px); }
 .participant-facts { display: grid; gap: 10px; padding: 18px 0 4px 20px; color: #536058; font-size: 14px; line-height: 1.45; }
 .calibration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin: 28px auto; width: min(320px, 100%); text-align: center; color: #699431; font-size: 21px; }
 .task-label { color: #58772b !important; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }

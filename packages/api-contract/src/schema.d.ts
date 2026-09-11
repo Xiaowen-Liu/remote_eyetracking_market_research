@@ -607,6 +607,11 @@ export interface components {
              * @default false
              */
             screenshots_enabled: boolean;
+            /**
+             * Webcam Gaze Enabled
+             * @default false
+             */
+            webcam_gaze_enabled: boolean;
         };
         /** ConsentCreate */
         ConsentCreate: {

@@ -1,0 +1,3 @@
+const start = document.querySelector("#start"); const stop = document.querySelector("#stop"); const snapshots = document.querySelector("#snapshots");
+start.onclick = async () => { await chrome.runtime.sendMessage({ type: "START_COLLECTION", sessionId: crypto.randomUUID(), captureSnapshots: snapshots.checked }); window.close(); };
+stop.onclick = async () => { const { artifact } = await chrome.runtime.sendMessage({ type: "STOP_COLLECTION" }); if (!artifact) return; const url = URL.createObjectURL(new Blob([JSON.stringify(artifact, null, 2)], { type: "application/json" })); await chrome.downloads?.download?.({ url, filename: "webgaze-collector-artifact.json", saveAs: true }); };

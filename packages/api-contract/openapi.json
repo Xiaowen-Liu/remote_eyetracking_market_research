@@ -436,6 +436,11 @@
             "default": false,
             "title": "Screenshots Enabled",
             "type": "boolean"
+          },
+          "webcam_gaze_enabled": {
+            "default": false,
+            "title": "Webcam Gaze Enabled",
+            "type": "boolean"
           }
         },
         "title": "CollectionPolicy",
