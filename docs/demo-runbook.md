@@ -13,21 +13,23 @@ Demonstrate the complete researcher-to-result flow while being explicit that the
 5. Return to Results. Show collection-health metadata, task metrics, session selection, synthetic provenance, and JSON/CSV export.
 6. Open API docs and highlight the generated contract plus the independent test suite that locks the collection journey.
 
-## Optional browser-collector demo
+## Optional real extension demo
 
 Use this only locally with a self-controlled target page and a Chrome profile
-where the collector has been loaded from source. This is a separate
-browser-context capability, not a feature the Vercel page can emulate.
+where the collector has been loaded from source. This is a browser-context
+participant client, not a feature the Vercel page can emulate by itself.
 
 1. Run `npm run build:collector`, load `collector-extension/` as an unpacked
    extension, and open a test page you control.
-2. Start a collection session from the extension popup. Explain that page
-   events are kept in extension session storage and snapshots are opt-in.
+2. Copy a published study's participant link, paste it into the extension, and
+   explicitly accept its consent text. Explain that its API token stays only in
+   extension session storage and that snapshots are opt-in.
 3. Click **Enable camera locally** in the in-page overlay. Grant camera access
    only for this self-test, then record each of the nine visible calibration
-   targets. Show the calibrated cursor and local heat trail.
-4. Stop the collection session and download its JSON artifact. Point out that
-   it contains estimated coordinates, page events, and only any explicitly
+   targets. After server acceptance, start and complete the ordered tasks from
+   the extension popup.
+4. Submit the participant session and download its JSON artifact. Point out
+   that it contains estimated coordinates, page events, and only any explicitly
    enabled visible-tab snapshots—never raw webcam video.
 5. Return to **Research results**, open the exported JSON with **Open collector
    JSON**, and show the local timeline and snapshot review. Explain that this

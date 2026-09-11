@@ -4,7 +4,7 @@ An independent, clean-room full-stack UX-research platform for designing version
 
 **Live:** [web app](https://webgaze-research.vercel.app) · [API docs](https://remoteeyetrackingmarketresearch-production.up.railway.app/api/docs) · [health check](https://remoteeyetrackingmarketresearch-production.up.railway.app/healthz)
 
-> This is a public portfolio project. The standalone participant experience uses clearly disclosed synthetic samples; it does not collect camera frames or claim to estimate a person's gaze. No employer code, data, assets, or internal systems were used to implement this repository.
+> This is a public portfolio project. The standalone web participant experience uses clearly disclosed synthetic samples. The separate experimental extension can create calibration-dependent coordinate estimates on-device for a consented study; it never uploads camera frames. No employer code, data, assets, or internal systems were used to implement this repository.
 
 ## Why this exists
 
@@ -61,7 +61,7 @@ More detailed reasoning is in the [architecture notes](docs/architecture.md) and
 - CSV and JSON analysis exports with export audit events
 - Owner-scoped API resources, generated REST documentation, and contract checks
 - Experimental webcam mode: on-device face/iris landmarks → nine-point calibration → estimated coordinate batches after consent
-- Clean-room MV3 collector: explicit in-page camera start, arbitrary-page event timeline, optional visible-tab snapshots, and local artifact review
+- Clean-room MV3 participant extension: consent-aware published-study session, explicit on-device camera calibration, arbitrary-page event timeline, idempotent coordinate ingestion, optional visible-tab snapshots, and local artifact review
 - Snapshot-linked gaze replay with URL/time/viewport context and bounded heatmap aggregation
 
 ## Repository layout
@@ -104,11 +104,13 @@ real webcam-based experimental client, open
 `http://localhost:5173/experimental/eye-tracking` and read the
 [experimental tracking guide](docs/experimental-eye-tracking.md) first.
 
-For browser-context collection on an arbitrary test page, build and load the
-extension with `npm run build:collector`; the [collector guide](docs/collector-extension.md)
-explains the explicit camera, snapshot, and local-review boundaries. Exported
-collector JSON can be opened from the **Research results** page. It is parsed
-locally in the browser and is never uploaded by that review UI.
+For a real, browser-context participant flow on an arbitrary test page, build
+and load the extension with `npm run build:collector`. The
+[collector guide](docs/collector-extension.md) covers published-study consent,
+on-device calibration, task lifecycle, coordinate ingestion, snapshots, and
+local-review boundaries. Exported collector JSON can be opened from the
+**Research results** page. It is parsed locally in the browser and is never
+uploaded by that review UI.
 
 ## Verify changes
 

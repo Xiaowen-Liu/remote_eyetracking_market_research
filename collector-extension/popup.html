@@ -1,1 +1,28 @@
-<!doctype html><html><body><main><h1>WebGaze Collector</h1><p>Experimental, local browser collection.</p><label><input id="snapshots" type="checkbox"> Include visible-tab snapshots</label><button id="start">Start session</button><button id="stop">Stop & download</button><script type="module" src="popup.js"></script></main></body></html>
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="popup.css"><title>WebGaze Study</title></head>
+  <body>
+    <main>
+      <p class="eyebrow">Experimental participant client</p>
+      <h1>WebGaze Study</h1>
+      <p class="quiet">Camera frames and face landmarks stay in this browser tab. The study API receives consented coordinate estimates only.</p>
+      <section id="connect-panel">
+        <label>Participant link<input id="participant-link" type="url" placeholder="https://…/participate/…" autocomplete="off"></label>
+        <label class="advanced">API base<input id="api-base" type="url" value="https://remoteeyetrackingmarketresearch-production.up.railway.app" autocomplete="off"></label>
+        <label class="check"><input id="snapshots" type="checkbox"> Include consented visible-tab snapshots in my local artifact</label>
+        <button id="connect">Connect study</button>
+      </section>
+      <section id="study-panel" hidden>
+        <p class="eyebrow">Connected study</p><h2 id="study-title"></h2><p id="progress" class="quiet"></p>
+        <div id="consent-panel" hidden><h3>Participant consent</h3><p id="consent-text" class="consent"></p><label class="check"><input id="consent-check" type="checkbox"> I have read and accept this consent.</label><button id="accept-consent" disabled>Accept consent &amp; open calibration</button></div>
+        <div id="calibration-panel" hidden><h3>Calibrate on the study page</h3><p class="quiet">Allow the camera, look at each target, and record all nine points. When the server accepts the quality check, return here.</p><button id="refresh">Refresh status</button></div>
+        <div id="task-panel" hidden><h3 id="task-title"></h3><p id="task-prompt" class="quiet"></p><button id="start-task">Start task</button></div>
+        <div id="running-panel" hidden><h3>Task in progress</h3><p class="quiet">Coordinate estimates are being batched to the study API.</p><button id="complete-task">Complete task</button></div>
+        <div id="submit-panel" hidden><h3>All tasks complete</h3><p class="quiet">Submit this participant session to queue analysis.</p><button id="submit-study">Submit study</button></div>
+        <div id="complete-panel" hidden><h3>Study submitted</h3><p class="quiet">The participant session is immutable. You can download a local, coordinate-only extension artifact.</p><button id="download">Download local artifact</button></div>
+      </section>
+      <p id="status" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

@@ -14,6 +14,8 @@ let latestFeature: Point | null = null;
 let calibrationIndex = 0;
 let calibrationSamples: CalibrationSample[] = [];
 let model: GazeModel | null = null;
+let collecting = false;
+let calibrationStartedAt: string | null = null;
 const targets: Point[] = [[.12, .14], [.5, .14], [.88, .14], [.12, .5], [.5, .5], [.88, .5], [.12, .86], [.5, .86], [.88, .86]];
 
 function feature(landmarks: NormalizedLandmark[]): Point | null {
@@ -50,7 +52,27 @@ function recordCalibration(root: HTMLDivElement) {
   if (!next) { calibrationIndex = 0; calibrationSamples = []; root.querySelector("[data-webgaze-status]")!.textContent = "Calibration did not fit. Try again."; showTarget(root); return; }
   const error = calibrationError(next, calibrationSamples);
   if (error > .18) { calibrationIndex = 0; calibrationSamples = []; root.querySelector("[data-webgaze-status]")!.textContent = `Calibration weak (${(error * 100).toFixed(1)}% RMS). Try again.`; showTarget(root); return; }
-  model = next; root.querySelector("[data-webgaze-target]")!.setAttribute("hidden", ""); root.querySelector("[data-webgaze-calibrate]")!.setAttribute("hidden", ""); root.querySelector("[data-webgaze-status]")!.textContent = `Live calibrated estimate · ${(error * 100).toFixed(1)}% RMS`;
+  model = next;
+  root.querySelector("[data-webgaze-target]")!.setAttribute("hidden", "");
+  root.querySelector("[data-webgaze-calibrate]")!.setAttribute("hidden", "");
+  root.querySelector("[data-webgaze-status]")!.textContent = "Submitting calibration quality…";
+  const rms = error;
+  void chrome.runtime.sendMessage({
+    type: "CALIBRATION_COMPLETED",
+    calibration: {
+      attempt: 1,
+      startedAt: calibrationStartedAt ?? new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      observedSampleCount: calibrationSamples.length,
+      errorPx: rms * Math.hypot(innerWidth, innerHeight),
+      qualityGrade: rms <= .08 ? "strong" : "variable",
+      rms,
+    },
+  }).then((response) => {
+    root.querySelector("[data-webgaze-status]")!.textContent = response?.accepted
+      ? `Calibration accepted · ${(rms * 100).toFixed(1)}% RMS. Return to the extension to start Task 1.`
+      : "Calibration was not accepted. Try again.";
+  }).catch(() => { root.querySelector("[data-webgaze-status]")!.textContent = "Could not save calibration. Check the extension popup and retry."; });
 }
 
 async function startCamera(root: HTMLDivElement) {
@@ -61,7 +83,7 @@ async function startCamera(root: HTMLDivElement) {
     await video.play();
     const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm");
     landmarker = await FaceLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task" }, runningMode: "VIDEO", numFaces: 1 });
-    enabled = true; root.querySelector("[data-webgaze-enable]")!.remove(); root.querySelector("[data-webgaze-status]")!.textContent = "Look at each dot, then record it. Frames stay in this tab."; showTarget(root); tick(root);
+    enabled = true; collecting = false; calibrationStartedAt = new Date().toISOString(); root.querySelector("[data-webgaze-enable]")!.remove(); root.querySelector("[data-webgaze-status]")!.textContent = "Look at each dot, then record it. Frames stay in this tab."; showTarget(root); tick(root);
   } catch (error) { root.querySelector("[data-webgaze-status]")!.textContent = error instanceof Error ? error.message : "Camera could not start"; }
 }
 
@@ -74,7 +96,7 @@ function tick(root: HTMLDivElement) {
     const point = root.querySelector<HTMLElement>("[data-webgaze-dot]")!; point.style.left = `${x * 100}%`; point.style.top = `${y * 100}%`;
     const heat = document.createElement("i"); heat.className = "webgaze-heat-point"; heat.style.left = `${x * 100}%`; heat.style.top = `${y * 100}%`; root.querySelector("[data-webgaze-heat]")!.append(heat); if (root.querySelectorAll(".webgaze-heat-point").length > 90) heat.parentElement!.firstElementChild?.remove();
     const now = performance.now();
-    if (now - lastSampleAt >= sampleIntervalMs) {
+    if (collecting && now - lastSampleAt >= sampleIntervalMs) {
       lastSampleAt = now;
       samples.push({ x, y, at: new Date().toISOString(), url: location.href, viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } });
       if (samples.length >= 10) { chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
@@ -83,5 +105,17 @@ function tick(root: HTMLDivElement) {
   frame = requestAnimationFrame(() => tick(root));
 }
 
-function stop() { enabled = false; model = null; calibrationIndex = 0; calibrationSamples = []; lastSampleAt = 0; if (frame) cancelAnimationFrame(frame); video?.srcObject && (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop()); document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
-chrome.runtime.onMessage.addListener((message) => { if (message.type === "COLLECTOR_ARM") overlay(); if (message.type === "COLLECTOR_STOP") stop(); });
+function retryCalibration(root: HTMLDivElement) {
+  model = null; collecting = false; calibrationIndex = 0; calibrationSamples = []; calibrationStartedAt = new Date().toISOString();
+  root.querySelector("[data-webgaze-status]")!.textContent = "Try the calibration again. Keep both eyes visible.";
+  showTarget(root);
+}
+
+function stop() { enabled = false; collecting = false; model = null; calibrationIndex = 0; calibrationSamples = []; lastSampleAt = 0; if (frame) cancelAnimationFrame(frame); video?.srcObject && (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop()); document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
+chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+  if (message.type === "COLLECTOR_ARM") overlay();
+  if (message.type === "COLLECTOR_START_TASK") { collecting = true; const root = overlay(); root.querySelector("[data-webgaze-status]")!.textContent = `Collecting coordinates for ${message.taskTitle ?? "current task"}.`; }
+  if (message.type === "COLLECTOR_DRAIN_SAMPLES") { const drained = samples; samples = []; collecting = false; const root = document.querySelector<HTMLDivElement>("#webgaze-collector-overlay"); if (root) root.querySelector("[data-webgaze-status]")!.textContent = "Task saved. Return to the extension for the next task."; respond({ samples: drained }); }
+  if (message.type === "COLLECTOR_RETRY_CALIBRATION") retryCalibration(overlay());
+  if (message.type === "COLLECTOR_STOP") stop();
+});
