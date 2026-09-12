@@ -9,7 +9,6 @@ const targets: Point[] = [[.16, .14], [.5, .14], [.84, .14], [.16, .5], [.5, .5]
 const sampleIntervalMs = 100;
 const checkWindowSize = 18;
 const samplesPerTarget = 3;
-const calibrationClickDebounceMs = 180;
 const accuracyDurationMs = 5_000;
 const boundaryInsetPx = 28;
 const boundaryCornerClicksRequired = 2;
@@ -32,7 +31,6 @@ let calibrationRepeat = 0;
 let calibrationSamples: CalibrationSample[] = [];
 let model: GazeModel | null = null;
 let calibrationStartedAt: string | null = null;
-let lastCalibrationCaptureAt = 0;
 let faceFrame: FaceFrame = { detected: false, centered: false, inBounds: false, size: 0 };
 let calibrationStage: "camera" | "instructions" | "points" | "boundary" | "accuracy" | "submitting" = "camera";
 let accuracyStartedAt: number | null = null;
@@ -148,7 +146,7 @@ function showCalibrationInstructions(root: HTMLDivElement) {
 function beginCalibration(root: HTMLDivElement) {
   calibrationStage = "points";
   cleanupBoundaryCalibration();
-  calibrationStartedAt = new Date().toISOString(); calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; lastCalibrationCaptureAt = 0; model = null; collecting = false; accuracyStartedAt = null; accuracyErrors = [];
+  calibrationStartedAt = new Date().toISOString(); calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; model = null; collecting = false; accuracyStartedAt = null; accuracyErrors = [];
   root.querySelector("[data-webgaze-phase]")!.textContent = "Step 1 of 3";
   // The extension-origin iframe owns the granted stream and stays visibly alive as
   // the compact bottom-right preview throughout calibration.
@@ -163,7 +161,7 @@ function beginCalibration(root: HTMLDivElement) {
 
 function startBoundaryCalibration(root: HTMLDivElement) {
   cleanupBoundaryCalibration();
-  calibrationStage = "boundary"; boundaryMode = "corner"; boundaryCornerIndex = 0; boundaryCornerClicks = 0; lastCalibrationCaptureAt = 0;
+  calibrationStage = "boundary"; boundaryMode = "corner"; boundaryCornerIndex = 0; boundaryCornerClicks = 0;
   boundaryRoot = root;
   root.dataset.calibrationStep = "boundary";
   root.querySelector("[data-webgaze-phase]")!.textContent = "Step 2 of 3";
@@ -225,12 +223,9 @@ function recordBoundaryCorner(root: HTMLDivElement, event: MouseEvent) {
   const corner = boundaryPath()[boundaryCornerIndex];
   if (Math.hypot(event.clientX - corner.x, event.clientY - corner.y) > boundaryCornerRadiusPx) return;
   if (!faceFrame.inBounds) { setCalibrationStatus(root, "Move your face inside the guide before recording this corner."); return; }
-  const now = performance.now();
-  if (now - lastCalibrationCaptureAt < calibrationClickDebounceMs) return;
   if (featureWindow.length < 3 || motion(featureWindow) >= .08) { setCalibrationStatus(root, "Keep your face steady, then click this corner again."); return; }
   if (!addCalibrationSample(normalizePixelPoint(corner), 2)) return;
   boundaryCornerClicks += 1;
-  lastCalibrationCaptureAt = now;
   const target = root.querySelector<HTMLElement>("[data-webgaze-target]")!;
   target.textContent = `${boundaryCornerClicks}/${boundaryCornerClicksRequired}`;
   root.querySelector("[data-webgaze-progress-copy]")!.textContent = `Boundary corner ${boundaryCornerIndex + 1} of 5 · click ${boundaryCornerClicks} of 2`;
@@ -358,12 +353,10 @@ function startAccuracyCheck(root: HTMLDivElement) {
 function recordCalibration(root: HTMLDivElement) {
   const averaged = meanPoint(featureWindow);
   if (!faceFrame.inBounds) { setCalibrationStatus(root, "Move your face inside the boundary before recording this sample."); return; }
-  const now = performance.now();
-  if (now - lastCalibrationCaptureAt < calibrationClickDebounceMs) return;
   if (!averaged || featureWindow.length < 3 || motion(featureWindow) >= .08) { setCalibrationStatus(root, "Keep your face visible and steady, then click this point again."); return; }
   const target = targets[calibrationIndex];
   calibrationSamples = [...calibrationSamples, { feature: averaged, target }];
-  calibrationRepeat += 1; lastCalibrationCaptureAt = now;
+  calibrationRepeat += 1;
   if (calibrationRepeat < samplesPerTarget) { setCalibrationStatus(root, `Sample ${calibrationRepeat} of ${samplesPerTarget} saved. Keep looking at this dot.`); showPointTarget(root); return; }
   calibrationRepeat = 0;
   if (calibrationIndex < targets.length - 1) { calibrationIndex += 1; setCalibrationStatus(root, "Next point. Center your gaze on the green dot."); showPointTarget(root); return; }
@@ -419,7 +412,7 @@ function processFeature(root: HTMLDivElement, value: Point | null, frameData?: F
   }
 }
 
-function retryCalibration(root: HTMLDivElement) { cleanupBoundaryCalibration(); calibrationStage = "points"; model = null; collecting = false; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; lastCalibrationCaptureAt = 0; calibrationStartedAt = new Date().toISOString(); accuracyStartedAt = null; accuracyErrors = []; root.dataset.mode = "calibration"; root.dataset.calibrationStep = "points"; root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration"; root.querySelector("[data-webgaze-title]")!.textContent = "Point calibration"; setCalibrationStatus(root, `Calibration needs another attempt. Click each point ${samplesPerTarget} times.`); showPointTarget(root); }
+function retryCalibration(root: HTMLDivElement) { cleanupBoundaryCalibration(); calibrationStage = "points"; model = null; collecting = false; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; calibrationStartedAt = new Date().toISOString(); accuracyStartedAt = null; accuracyErrors = []; root.dataset.mode = "calibration"; root.dataset.calibrationStep = "points"; root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration"; root.querySelector("[data-webgaze-title]")!.textContent = "Point calibration"; setCalibrationStatus(root, `Calibration needs another attempt. Click each point ${samplesPerTarget} times.`); showPointTarget(root); }
 function stop() { cleanupBoundaryCalibration(); enabled = false; cameraReady = false; collecting = false; model = null; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; lastSampleAt = 0; document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
