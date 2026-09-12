@@ -16,6 +16,7 @@ function feature(landmarks: NormalizedLandmark[]): Point | null {
 
 function errorMessage(error: unknown) {
   if (error && typeof error === "object" && "message" in error) return String((error as { message?: unknown }).message ?? error);
+  if (error && typeof error === "object" && "type" in error) return `MediaPipe runtime load error (${String((error as { type?: unknown }).type ?? "unknown")})`;
   return String(error);
 }
 
@@ -34,7 +35,7 @@ async function start() {
     video = embedded ? document.querySelector<HTMLVideoElement>("#preview")! : document.createElement("video"); video.autoplay = true; video.muted = true; video.playsInline = true; video.srcObject = stream;
     await new Promise<void>((resolve, reject) => { const timeout = window.setTimeout(() => reject(new Error("Camera stream started but no video frames arrived")), 8000); video!.onloadedmetadata = () => { window.clearTimeout(timeout); resolve(); }; });
     await video.play().catch(() => undefined);
-    const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm");
+    const vision = await FilesetResolver.forVisionTasks(chrome.runtime.getURL("wasm"));
     landmarker = await FaceLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task" }, runningMode: "VIDEO", numFaces: 1, minFaceDetectionConfidence: .6, minFacePresenceConfidence: .6, minTrackingConfidence: .6 });
     detect();
     if (embedded) window.parent.postMessage({ type: "CAMERA_READY", source: "webgaze-camera-runtime" }, "*");
