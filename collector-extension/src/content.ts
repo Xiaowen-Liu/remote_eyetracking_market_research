@@ -88,7 +88,6 @@ function overlay() {
       </div>
     </main>
     <footer data-webgaze-progress hidden><strong data-webgaze-calibration-status></strong><span data-webgaze-progress-copy></span><i><b></b></i></footer>
-    <aside data-webgaze-face-boundary hidden aria-live="polite"><span data-webgaze-face-outline></span><strong data-webgaze-face-boundary-status>Checking face position…</strong><small>Keep your face inside the guide while recording each sample.</small></aside>
     <i data-webgaze-boundary-guide hidden></i><i data-webgaze-target hidden></i><div data-webgaze-heat></div><i data-webgaze-dot></i>
   </section>`;
   document.documentElement.append(root);
@@ -135,17 +134,6 @@ function showPointTarget(root: HTMLDivElement) {
   target.onclick = () => recordCalibration(root);
 }
 
-function updateFaceBoundary(root: HTMLDivElement) {
-  const panel = root.querySelector<HTMLElement>("[data-webgaze-face-boundary]")!;
-  const outline = root.querySelector<HTMLElement>("[data-webgaze-face-outline]")!;
-  const status = root.querySelector<HTMLElement>("[data-webgaze-face-boundary-status]")!;
-  if (root.dataset.mode !== "calibration") { panel.hidden = true; return; }
-  panel.hidden = false;
-  outline.classList.toggle("passed", faceFrame.inBounds);
-  outline.classList.toggle("warning", faceFrame.detected && !faceFrame.inBounds);
-  status.textContent = !faceFrame.detected ? "Face not detected" : faceFrame.inBounds ? "Face inside boundary" : !faceFrame.centered ? "Center your face" : "Move slightly back into frame";
-}
-
 function showCalibrationInstructions(root: HTMLDivElement) {
   calibrationStage = "instructions";
   root.dataset.mode = "calibration-intro";
@@ -171,7 +159,7 @@ function beginCalibration(root: HTMLDivElement) {
   root.querySelector("[data-webgaze-title]")!.textContent = "Point calibration";
   setCalibrationStatus(root, `Look at each green dot and click it ${samplesPerTarget} times while keeping your head still.`);
   root.querySelector<HTMLButtonElement>("[data-webgaze-begin]")!.hidden = true;
-  updateFaceBoundary(root); showPointTarget(root);
+  showPointTarget(root);
 }
 
 function startBoundaryCalibration(root: HTMLDivElement) {
@@ -391,7 +379,6 @@ function completeCalibration(root: HTMLDivElement) {
   const rms = Math.max(pointError, accuracyError);
   if (rms > .18) { retryCalibration(root); setCalibrationStatus(root, `Calibration was weak (${(rms * 100).toFixed(1)}% RMS). Try again in steadier lighting.`); return; }
   root.querySelector("[data-webgaze-target]")!.setAttribute("hidden", ""); root.querySelector("[data-webgaze-calibrate]")!.setAttribute("hidden", ""); root.querySelector("[data-webgaze-progress]")!.setAttribute("hidden", ""); root.querySelector("[data-webgaze-phase]")!.textContent = "Quality check"; root.querySelector("[data-webgaze-title]")!.textContent = "Calibration complete"; root.querySelector("[data-webgaze-status]")!.textContent = "Measurement complete. Submitting calibration quality…";
-  root.querySelector<HTMLElement>("[data-webgaze-face-boundary]")!.hidden = true;
   void chrome.runtime.sendMessage({ type: "CALIBRATION_COMPLETED", calibration: { attempt: 1, startedAt: calibrationStartedAt ?? new Date().toISOString(), completedAt: new Date().toISOString(), observedSampleCount: calibrationSamples.length * checkWindowSize, errorPx: rms * Math.hypot(innerWidth, innerHeight), qualityGrade: rms <= .08 ? "strong" : "variable", rms } }).then((response) => {
     root.querySelector("[data-webgaze-phase]")!.textContent = response?.accepted ? "Ready" : "Calibration";
     root.dataset.mode = response?.accepted ? "ready" : "calibration";
@@ -409,7 +396,6 @@ function processFeature(root: HTMLDivElement, value: Point | null, frameData?: F
   latestFeature = value;
   if (latestFeature) featureWindow = [...featureWindow.slice(-(checkWindowSize - 1)), latestFeature]; else featureWindow = [];
   updateCameraCheck(root);
-  updateFaceBoundary(root);
   if (latestFeature && model) {
     const [x, y] = predictGaze(model, latestFeature);
     const point = root.querySelector<HTMLElement>("[data-webgaze-dot]")!; point.style.left = `${x * 100}%`; point.style.top = `${y * 100}%`;
@@ -434,7 +420,7 @@ function processFeature(root: HTMLDivElement, value: Point | null, frameData?: F
   }
 }
 
-function retryCalibration(root: HTMLDivElement) { cleanupBoundaryCalibration(); calibrationStage = "points"; model = null; collecting = false; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; featureWindow = []; lastCalibrationFeatureFrame = featureFrameCount; calibrationStartedAt = new Date().toISOString(); accuracyStartedAt = null; accuracyErrors = []; root.dataset.mode = "calibration"; root.dataset.calibrationStep = "points"; root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration"; root.querySelector("[data-webgaze-title]")!.textContent = "Point calibration"; setCalibrationStatus(root, `Calibration needs another attempt. Click each point ${samplesPerTarget} times.`); updateFaceBoundary(root); showPointTarget(root); }
+function retryCalibration(root: HTMLDivElement) { cleanupBoundaryCalibration(); calibrationStage = "points"; model = null; collecting = false; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; featureWindow = []; lastCalibrationFeatureFrame = featureFrameCount; calibrationStartedAt = new Date().toISOString(); accuracyStartedAt = null; accuracyErrors = []; root.dataset.mode = "calibration"; root.dataset.calibrationStep = "points"; root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration"; root.querySelector("[data-webgaze-title]")!.textContent = "Point calibration"; setCalibrationStatus(root, `Calibration needs another attempt. Click each point ${samplesPerTarget} times.`); showPointTarget(root); }
 function stop() { cleanupBoundaryCalibration(); enabled = false; cameraReady = false; collecting = false; model = null; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; lastSampleAt = 0; document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {

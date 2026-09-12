@@ -30,8 +30,9 @@ calibration-dependent and is not a validated attention measurement.
    three-step calibration: three captures at each nine-point target; a closed
    boundary trace with two captures per corner, speed/rail validation,
    120 ms passive samples, and one mid-edge anchor; then a five-second
-   center-gaze accuracy check. The camera preview remains visible at bottom
-   right and the face-position guide remains visible at bottom left.
+   center-gaze accuracy check. Camera video and face-position guidance appear
+   only during camera check; calibration and study tasks keep the local camera
+   runtime active without displaying either element.
 7. When the server accepts calibration quality, return to the popup, start each
    task, and complete it from the popup. Finish by submitting the session.
 
