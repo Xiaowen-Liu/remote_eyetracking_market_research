@@ -3,7 +3,7 @@
   "name": "WebGaze Research Collector (Experimental)",
   "version": "0.1.0",
   "description": "Clean-room browser collector for consented UX-research session events and optional visible-tab snapshots.",
-  "permissions": ["activeTab", "storage", "tabs", "downloads", "offscreen", "videoCapture"],
+  "permissions": ["activeTab", "storage", "tabs", "downloads", "offscreen"],
   "host_permissions": ["https://cdn.jsdelivr.net/*", "https://storage.googleapis.com/*", "https://remoteeyetrackingmarketresearch-production.up.railway.app/*", "http://localhost:8000/*"],
   "background": { "service_worker": "background.js", "type": "module" },
   "web_accessible_resources": [{ "resources": ["dist/*"], "matches": ["<all_urls>"] }],
