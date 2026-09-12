@@ -94,14 +94,17 @@ function showTarget(root: HTMLDivElement) {
   root.querySelector("[data-webgaze-progress-copy]")!.textContent = `Calibration point ${calibrationIndex + 1} of 9`;
   root.querySelector<HTMLElement>("[data-webgaze-progress] b")!.style.width = `${((calibrationIndex + 1) / targets.length) * 100}%`;
   button.onclick = () => recordCalibration(root);
+  target.onclick = () => recordCalibration(root);
 }
 
 function beginCalibration(root: HTMLDivElement) {
-  calibrationStartedAt = new Date().toISOString(); calibrationIndex = 0; calibrationSamples = []; model = null; collecting = false;
+  calibrationStartedAt = new Date().toISOString(); calibrationIndex = 0; calibrationSamples = []; featureWindow = []; model = null; collecting = false;
   root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration";
-  root.querySelector("[data-webgaze-camera-canvas]")?.remove();
+  // Keep the extension-origin iframe alive while it becomes visually transparent.
+  // It owns the granted camera stream and continues emitting local face features.
+  root.querySelector<HTMLIFrameElement>("[data-webgaze-camera-canvas]")?.setAttribute("aria-hidden", "true");
   root.dataset.mode = "calibration";
-  root.querySelector("[data-webgaze-status]")!.textContent = "Look at the green dot, keep your head still, then record the point.";
+  root.querySelector("[data-webgaze-status]")!.textContent = "Look at the green dot, hold still briefly, then click the dot or record the point.";
   root.querySelector<HTMLButtonElement>("[data-webgaze-begin]")!.hidden = true;
   showTarget(root);
 }
