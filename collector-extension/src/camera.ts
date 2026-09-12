@@ -49,10 +49,15 @@ function stop() { if (frame) cancelAnimationFrame(frame); frame = null; landmark
 
 if (embedded) {
   document.documentElement.innerHTML = `<head><style>html,body{height:100%;margin:0}body{align-items:center;background:#fff;color:#142018;display:flex;font:15px/1.45 system-ui,sans-serif;justify-content:center}.card{max-width:520px;padding:32px;text-align:center}.eyebrow{color:#4e812f;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{font:500 54px/.98 Georgia,serif;letter-spacing:-.05em;margin:10px 0 16px}p{color:#58665b}.preview{align-items:center;background:#eef3ec;border:1px solid #d9e1d6;border-radius:12px;display:flex;justify-content:center;margin:22px auto 14px;max-width:420px;overflow:hidden;position:relative;aspect-ratio:16/10}.preview video{height:100%;object-fit:cover;transform:scaleX(-1);width:100%}.badge{background:#ffffffdd;border:1px solid #dbe3d8;border-radius:99px;bottom:12px;color:#40533f;font-size:12px;left:50%;padding:5px 9px;position:absolute;transform:translateX(-50%);white-space:nowrap}button{background:#1d3727;border:0;border-radius:7px;color:white;cursor:pointer;font:700 15px system-ui;padding:12px 22px}.privacy{font-size:12px;margin:18px auto 0;max-width:450px}</style></head><body><main class="card"><div class="eyebrow">Experimental participant session</div><h1>Check your camera</h1><p id="status">Start the camera check to request permission from this visible extension canvas.</p><div class="preview"><video id="preview" autoplay muted playsinline></video><span class="badge" id="badge">Camera is off</span></div><button id="start">Start camera check</button><p class="privacy">Camera frames and face landmarks stay inside this extension canvas. The study receives only consented coordinate estimates during an active task.</p></main></body>`;
-  document.querySelector<HTMLButtonElement>("#start")!.onclick = () => void start().then((result) => {
+  let readyToCalibrate = false;
+  document.querySelector<HTMLButtonElement>("#start")!.addEventListener("click", () => {
     const status = document.querySelector<HTMLElement>("#status")!, badge = document.querySelector<HTMLElement>("#badge")!, button = document.querySelector<HTMLButtonElement>("#start")!;
-    if (result.ok) { status.textContent = "Camera is ready. Center your face and hold still, then begin calibration."; badge.textContent = "Camera active"; button.textContent = "Begin 9-point calibration"; button.onclick = () => window.parent.postMessage({ type: "CAMERA_BEGIN_CALIBRATION", source: "webgaze-camera-runtime" }, "*"); }
-    else { status.textContent = `Camera check could not continue: ${result.error}`; button.textContent = "Try camera check again"; }
+    if (readyToCalibrate) { window.parent.postMessage({ type: "CAMERA_BEGIN_CALIBRATION", source: "webgaze-camera-runtime" }, "*"); return; }
+    status.textContent = "Requesting camera permission…"; badge.textContent = "Waiting for permission"; button.disabled = true;
+    void start().then((result) => {
+    if (result.ok) { readyToCalibrate = true; status.textContent = "Camera is ready. Center your face and hold still, then begin calibration."; badge.textContent = "Camera active"; button.textContent = "Begin 9-point calibration"; button.disabled = false; }
+    else { status.textContent = `Camera check could not continue: ${result.error}`; badge.textContent = "Camera is off"; button.textContent = "Try camera check again"; button.disabled = false; }
+    }).catch((error) => { status.textContent = `Camera check could not continue: ${errorMessage(error)}`; badge.textContent = "Camera is off"; button.disabled = false; });
   });
 } else {
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
