@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildHeatmap, gazeSamplesForSnapshot, parseCollectorArtifact } from "./collectorArtifact";
+import { buildHeatmap, domProposalStates, gazeSamplesForSnapshot, parseCollectorArtifact } from "./collectorArtifact";
 
 describe("parseCollectorArtifact", () => {
   const artifact = {
@@ -36,4 +36,9 @@ describe("parseCollectorArtifact", () => {
     const parsed = parseCollectorArtifact({ ...artifact, gazeSamples: [{ x: 1.4, y: 0.2 }] });
     expect(parsed.gazeSamples).toEqual([]);
   });
+});
+
+it("reads DOM proposals only from recorded screen-state events", () => {
+  const artifact = parseCollectorArtifact({ schemaVersion: "1.0", sessionId: "session", startedAt: "2026-01-01T00:00:00Z", captureSnapshots: false, snapshots: [], gazeSamples: [], privacy: { rawCameraVideo: false, eventCollection: true, visibleTabSnapshots: false }, events: [{ type: "page-open", url: "https://example.com", at: "2026-01-01T00:00:00Z", detail: { value: { trigger: "page-open", proposals: [{ label: "Buy", tag: "button", x: .1, y: .2, width: .2, height: .1 }] } } }] });
+  expect(domProposalStates(artifact)[0].proposals[0].label).toBe("Buy");
 });

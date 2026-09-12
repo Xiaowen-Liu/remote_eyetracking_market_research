@@ -57,6 +57,31 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .drilldown-note .secondary-button { width: auto; margin: 0 0 0 auto; }
 .drilldown-copy { color: #67736b; font-size: 12px; }
 .raw-sample-table { max-height: 430px; overflow: auto; }
+.dom-proposals-panel { padding: 28px 30px; background: #fff; border: 1px solid #d9ded8; border-radius: 12px; }
+.dom-proposals-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
+.dom-proposals-header h2 { margin: 5px 0 7px; font: 500 28px/1.2 Georgia, serif; }
+.dom-proposals-header p:not(.eyebrow) { margin: 0; color: #68746c; font-size: 12px; }
+.dom-proposals-header .primary-button { width: auto; }
+.proposal-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin: 22px 0; padding: 12px; background: #f5f7f2; border-radius: 8px; }
+.proposal-toolbar label { display: flex; align-items: center; gap: 8px; margin-right: auto; color: #59675f; font-size: 11px; font-weight: 800; }
+.proposal-toolbar select { min-width: 250px; padding: 7px; border: 1px solid #ccd4cc; border-radius: 6px; }
+.proposal-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); gap: 20px; }
+.proposal-grid h3 { margin: 0 0 12px; font: 500 21px/1.2 Georgia, serif; }
+.proposal-preview { position: relative; overflow: hidden; border: 1px solid #d7ddd6; border-radius: 8px; }
+.proposal-preview img { display: block; width: 100%; }
+.proposal-preview button { position: absolute; overflow: hidden; min-width: 24px; min-height: 24px; padding: 2px; color: #fff; background: #527d2c55; border: 2px solid #507e2c; font-size: 10px; font-weight: 800; }
+.proposal-preview button.selected { z-index: 2; background: #b14d2c66; border-color: #a33e21; }
+.proposal-inspector { padding: 16px; background: #f4f7ef; border-radius: 8px; }
+.proposal-inspector h3 { margin: 5px 0; }
+.proposal-inspector span, .proposal-inspector p { color: #667269; font-size: 11px; }
+.proposal-list { display: grid; gap: 7px; max-height: 420px; overflow: auto; margin: 12px 0 0; padding: 0; list-style: none; }
+.proposal-list li button { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 9px; width: 100%; padding: 10px; text-align: left; background: #fff; border: 1px solid #dde2dc; border-radius: 7px; }
+.proposal-list li.selected button { border-color: #789b54; box-shadow: 0 0 0 2px #e5eedb; }
+.proposal-list b { display: grid; place-items: center; width: 22px; height: 22px; color: #fff; background: #506449; border-radius: 999px; font-size: 10px; }
+.proposal-list span { display: grid; min-width: 0; gap: 3px; }
+.proposal-list strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.proposal-list small { color: #758078; font-size: 9px; }
+.proposal-list em { color: #567635; font-size: 9px; font-style: normal; font-weight: 800; text-transform: uppercase; }
 main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .breadcrumbs { color: #69736d; display: flex; gap: 9px; align-items: center; font-size: 13px; margin-bottom: 34px; }
 .breadcrumbs strong { color: #35423b; font-weight: 600; }
