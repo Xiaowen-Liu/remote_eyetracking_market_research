@@ -22,7 +22,7 @@ function cameraCanvas(root: HTMLDivElement) {
   let canvas = root.querySelector<HTMLIFrameElement>("[data-webgaze-camera-canvas]");
   if (canvas) return canvas;
   root.dataset.mode = "camera-runtime";
-  canvas = document.createElement("iframe"); canvas.dataset.webgazeCameraCanvas = ""; canvas.title = "WebGaze camera check"; canvas.src = chrome.runtime.getURL("camera.html");
+  canvas = document.createElement("iframe"); canvas.dataset.webgazeCameraCanvas = ""; canvas.title = "WebGaze camera check"; canvas.allow = "camera"; canvas.src = chrome.runtime.getURL("camera.html");
   root.append(canvas);
   return canvas;
 }
