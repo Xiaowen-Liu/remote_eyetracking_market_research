@@ -703,6 +703,8 @@ function ResultsDashboard({
   const [busy, setBusy] = useState(true);
   const [collectorArtifact, setCollectorArtifact] = useState<CollectorArtifact | null>(null);
   const [selectedSnapshot, setSelectedSnapshot] = useState(0);
+  const [workspaceView, setWorkspaceView] = useState<"analysis" | "sessions">("analysis");
+  const [analysisView, setAnalysisView] = useState<"replay" | "metrics" | "dom">("replay");
 
   useEffect(() => {
     void loadJobs();
@@ -833,23 +835,35 @@ function ResultsDashboard({
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="WebGaze Research home"><span className="brand-mark">◉</span>WebGaze Research</a>
+        <a className="brand" href="/" aria-label="WebGaze Research home"><span className="brand-mark">EA</span>Eyetracking Analysis</a>
+        <div className="study-identity"><span>Study</span><strong>{study.title}</strong></div>
         <span className="environment">Independent demo</span>
       </header>
+      <nav className="workspace-tabs" aria-label="Dashboard sections">
+        <button type="button" onClick={onBack}>Setup</button>
+        <button type="button" className={workspaceView === "analysis" ? "active" : ""} onClick={() => setWorkspaceView("analysis")}>Analysis</button>
+        <button type="button" className={workspaceView === "sessions" ? "active" : ""} onClick={() => setWorkspaceView("sessions")}>Sessions</button>
+      </nav>
       <main>
-        <button className="project-nav-button" type="button" onClick={onBack}>← Back to study</button>
         <section className="page-heading results-heading">
           <div>
-            <p className="eyebrow">Research results</p>
-            <h1>{study.title}</h1>
-            <p>Task-level metrics are versioned outputs from submitted participant sessions.</p>
+            <p className="eyebrow">{workspaceView === "analysis" ? "Analysis workspace" : "Session archive"}</p>
+            <h1>{workspaceView === "analysis" ? "Research results" : "Saved sessions"}</h1>
+            <p>{workspaceView === "analysis" ? "Replay a participant journey, inspect task metrics, and review captured page context." : "Archive is separate from analysis so selection and management do not compete with visualization."}</p>
           </div>
           <span className={`status ${selectedJob?.status ?? "draft"}`}>{selectedJob ? selectedJob.status : "No sessions"}</span>
         </section>
         {notice && <div className={`notice ${notice.kind}`} role="alert">{notice.text}</div>}
         {busy && <div className="loading" role="status">Loading results…</div>}
-        {!busy && !latest && <section className="empty-results"><h2>No submitted sessions yet</h2><p>Load a clearly labelled synthetic result set to explore the dashboard before camera-based collection is enabled.</p><button className="primary-button" type="button" onClick={() => void loadSyntheticResults()}>Load synthetic demo results</button></section>}
-        {!busy && latest && <section className="results-grid">
+        {!busy && workspaceView === "sessions" && <section className="session-archive-panel">
+          <div className="session-archive-header"><div><p className="eyebrow">Session archive</p><h2>Saved sessions</h2></div><span className="context-chip">{sessions.length} visible sessions</span></div>
+          {sessions.length === 0 ? <p className="archive-empty">No sessions are stored for this study yet.</p> : <div className="session-table-wrap"><table className="session-table"><thead><tr><th>Session</th><th>Tasks</th><th>Samples</th><th>Quality</th><th>Status</th><th>Actions</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.id}><td><strong>{session.participant_alias}</strong><small>{session.id}</small></td><td>{session.completed_task_count}</td><td>{session.gaze_sample_count.toLocaleString()}</td><td>{session.calibration_quality ?? "Not recorded"}</td><td>{session.lifecycle}</td><td><button type="button" className="text-button" onClick={() => { setWorkspaceView("analysis"); setAnalysisView("metrics"); }}>Open</button></td></tr>)}</tbody></table></div>}
+        </section>}
+        {!busy && workspaceView === "analysis" && <>
+        <section className="session-context" aria-label="Session context"><span>Session</span><select value={selectedJobId ?? ""} onChange={(event) => selectJob(event.target.value)} disabled={!jobs.length}><option value="">{jobs.length ? "Select a session" : "No visible sessions"}</option>{jobs.map((job, index) => <option key={job.id} value={job.id}>Session {jobs.length - index} · {job.status}</option>)}</select>{result && <><span className="context-chip">{String(result.diagnostics.sample_count)} samples</span><span className="context-chip">Calibration {String(result.quality.calibration_quality ?? "unavailable")}</span><span className="context-chip">{selectedJob?.status}</span></>}</section>
+        <nav className="analysis-tabs" aria-label="Analysis views"><button type="button" className={analysisView === "replay" ? "active" : ""} onClick={() => setAnalysisView("replay")}>Replay</button><button type="button" className={analysisView === "metrics" ? "active" : ""} onClick={() => setAnalysisView("metrics")}>AOI Metrics</button><button type="button" className={analysisView === "dom" ? "active" : ""} onClick={() => setAnalysisView("dom")}>DOM Proposals</button></nav>
+        {analysisView === "metrics" && !latest && <section className="empty-results"><h2>No submitted sessions yet</h2><p>Load a clearly labelled synthetic result set to explore the dashboard before camera-based collection is enabled.</p><button className="primary-button" type="button" onClick={() => void loadSyntheticResults()}>Load synthetic demo results</button></section>}
+        {analysisView === "metrics" && latest && <section className="results-grid">
           <aside className="publish-panel">
             <p className="eyebrow">Analysis session</p>
             <h2>{selectedJob?.algorithm_version}</h2>
@@ -878,7 +892,7 @@ function ResultsDashboard({
             {aggregateSessionCount > 0 && aggregateMetrics.length === 0 && <p className="aggregate-unavailable">Aggregate claims are unavailable: this demo currently contains synthetic or otherwise ineligible sessions only.</p>}
           </section>}
         </section>}
-        {!busy && <section className="collector-review" aria-label="Collector session review">
+        {analysisView === "replay" && <section className="collector-review" aria-label="Collector session review">
           <div className="collector-review-heading">
             <div><p className="eyebrow">Local collector review</p><h2>Open an extension session</h2><p>Use this for a private researcher-side review of the exported artifact. The JSON stays in this browser and is not submitted to the API.</p></div>
             <div className="collector-actions"><button className="secondary-button" type="button" onClick={loadSyntheticCollectorReplay}>Load synthetic replay</button><label className="secondary-button collector-import">Open collector JSON<input type="file" accept="application/json,.json" onChange={(event) => void importCollectorArtifact(event.target.files?.[0])} /></label></div>
@@ -889,6 +903,8 @@ function ResultsDashboard({
             <section className="collector-snapshot"><div className="snapshot-title"><h3>Visible-tab gaze replay</h3><span>{replaySamples.length} samples in this segment</span></div>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><div className="snapshot-stage"><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" />{replayHeatmap.map((cell) => <i className="replay-heat-cell" key={`${cell.x}-${cell.y}`} style={{ left: `${cell.x * 100}%`, top: `${cell.y * 100}%`, opacity: 0.18 + cell.intensity * 0.62, transform: `translate(-50%, -50%) scale(${0.72 + cell.intensity * 0.58})` }} title={`${cell.count} estimated samples`} />)}</div><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => setSelectedSnapshot((current) => current - 1)}>Previous</button><span>{selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => setSelectedSnapshot((current) => current + 1)}>Next</button></div></>}</section>
           </div>}
         </section>}
+        {analysisView === "dom" && <section className="empty-results dashboard-empty"><p className="eyebrow">Automatic AOI review</p><h2>DOM proposals</h2><p>{collectorArtifact ? "This replay session does not contain live DOM proposal AOIs. Replay screenshots are not used to reconstruct missing DOM proposals." : "Select or import a replay session to review live DOM proposal AOIs."}</p></section>}
+        </>}
       </main>
     </div>
   );
