@@ -31,8 +31,9 @@ calibration-dependent and is not a validated attention measurement.
    presents an overview and a separate introduction before each of three
    stages: three captures at each nine-point target; a closed
    boundary trace with two captures per corner, speed/rail validation,
-   120 ms passive samples, and one mid-edge anchor; then a five-second
-   center-gaze accuracy check. Camera video and face-position guidance appear
+   120 ms passive samples, and one mid-edge anchor; then a continuous
+   five-second center-gaze measurement that records the final accuracy without
+   pausing or resetting for blinks and outliers. Camera video and face-position guidance appear
    only during camera check; calibration and study tasks keep the local camera
    runtime active without displaying either element. The accuracy stage ends
    with an explicit percentage result and Recalibrate / OK decision; accepted
