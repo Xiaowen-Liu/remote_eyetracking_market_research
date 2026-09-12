@@ -56,6 +56,11 @@ function numberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function formatReplayTime(milliseconds: number) {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 function aggregateTaskMetrics(results: AnalysisResult[]): TaskAggregate[] {
   const buckets = new Map<number, {
     title: string;
@@ -705,10 +710,37 @@ function ResultsDashboard({
   const [selectedSnapshot, setSelectedSnapshot] = useState(0);
   const [workspaceView, setWorkspaceView] = useState<"analysis" | "sessions">("analysis");
   const [analysisView, setAnalysisView] = useState<"replay" | "metrics" | "dom">("replay");
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const [replaySpeed, setReplaySpeed] = useState(1);
+  const [replayTimeMs, setReplayTimeMs] = useState(0);
+  const [heatMode, setHeatMode] = useState<"buildup" | "whole">("buildup");
 
   useEffect(() => {
     void loadJobs();
   }, [study.id]);
+
+  useEffect(() => {
+    if (!replayPlaying || !collectorArtifact) return;
+    const started = Date.now();
+    const initial = replayTimeMs;
+    const duration = Math.max(0, Date.parse(collectorArtifact.endedAt ?? collectorArtifact.startedAt) - Date.parse(collectorArtifact.startedAt));
+    const timer = window.setInterval(() => {
+      const next = Math.min(duration, initial + (Date.now() - started) * replaySpeed);
+      setReplayTimeMs(next);
+      if (next >= duration) setReplayPlaying(false);
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, [replayPlaying, replaySpeed, collectorArtifact]);
+
+  useEffect(() => {
+    if (!collectorArtifact?.snapshots.length) return;
+    const absoluteTime = Date.parse(collectorArtifact.startedAt) + replayTimeMs;
+    let nextIndex = 0;
+    collectorArtifact.snapshots.forEach((snapshot, index) => {
+      if (Date.parse(snapshot.at) <= absoluteTime) nextIndex = index;
+    });
+    setSelectedSnapshot(nextIndex);
+  }, [collectorArtifact, replayTimeMs]);
 
   async function loadJobs() {
     setBusy(true);
@@ -787,6 +819,8 @@ function ResultsDashboard({
       const parsed = parseCollectorArtifact(JSON.parse(await file.text()));
       setCollectorArtifact(parsed);
       setSelectedSnapshot(0);
+      setReplayTimeMs(0);
+      setReplayPlaying(false);
       setNotice({ kind: "success", text: "Collector session opened locally. It has not been uploaded to this study." });
     } catch (error) {
       setCollectorArtifact(null);
@@ -798,6 +832,8 @@ function ResultsDashboard({
   function loadSyntheticCollectorReplay() {
     setCollectorArtifact(syntheticCollectorReplay);
     setSelectedSnapshot(0);
+    setReplayTimeMs(0);
+    setReplayPlaying(false);
     setNotice({ kind: "success", text: "Synthetic collector replay loaded. It is generated demo data, not a participant session or camera capture." });
   }
 
@@ -830,8 +866,11 @@ function ResultsDashboard({
   );
   const aggregateSessionCount = completedResults.length;
   const aggregateMetrics = aggregateTaskMetrics(aggregateEligibleResults);
+  const replayDurationMs = collectorArtifact ? Math.max(0, Date.parse(collectorArtifact.endedAt ?? collectorArtifact.startedAt) - Date.parse(collectorArtifact.startedAt)) : 0;
   const replaySamples = collectorArtifact ? gazeSamplesForSnapshot(collectorArtifact, selectedSnapshot) : [];
-  const replayHeatmap = buildHeatmap(replaySamples);
+  const replayCutoff = collectorArtifact ? Date.parse(collectorArtifact.startedAt) + replayTimeMs : 0;
+  const visibleReplaySamples = heatMode === "whole" ? (collectorArtifact?.gazeSamples ?? []) : replaySamples.filter((sample) => !sample.at || Date.parse(sample.at) <= replayCutoff);
+  const replayHeatmap = buildHeatmap(visibleReplaySamples);
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -900,7 +939,7 @@ function ResultsDashboard({
           {collectorArtifact && <div className="collector-artifact-grid">
             <aside className="collector-summary"><p className="eyebrow">{collectorArtifact.sessionId === syntheticCollectorReplay.sessionId ? "Synthetic replay fixture" : "Session artifact"}</p><strong>{collectorArtifact.sessionId}</strong><span>{collectorArtifact.gazeSamples?.length ?? 0} estimated samples</span><span>{collectorArtifact.events.length} timeline events</span><span>{collectorArtifact.snapshots.length} consented snapshots</span><small>Raw camera video: never exported</small></aside>
             <section className="collector-timeline"><h3>Timeline</h3>{collectorArtifact.events.length === 0 && <p>No page events were captured.</p>}<ol>{collectorArtifact.events.slice(0, 12).map((event, index) => <li key={`${event.at}-${index}`}><strong>{event.type.replaceAll("-", " ")}</strong><span>{new Date(event.at).toLocaleTimeString()} · {event.url}</span></li>)}</ol></section>
-            <section className="collector-snapshot"><div className="snapshot-title"><h3>Visible-tab gaze replay</h3><span>{replaySamples.length} samples in this segment</span></div>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><div className="snapshot-stage"><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" />{replayHeatmap.map((cell) => <i className="replay-heat-cell" key={`${cell.x}-${cell.y}`} style={{ left: `${cell.x * 100}%`, top: `${cell.y * 100}%`, opacity: 0.18 + cell.intensity * 0.62, transform: `translate(-50%, -50%) scale(${0.72 + cell.intensity * 0.58})` }} title={`${cell.count} estimated samples`} />)}</div><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => setSelectedSnapshot((current) => current - 1)}>Previous</button><span>{selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => setSelectedSnapshot((current) => current + 1)}>Next</button></div></>}</section>
+            <section className="collector-snapshot"><div className="snapshot-title"><h3>Replay canvas</h3><span>{visibleReplaySamples.length} visible samples</span></div>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><div className="snapshot-stage"><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" />{replayHeatmap.map((cell) => <i className="replay-heat-cell" key={`${cell.x}-${cell.y}`} style={{ left: `${cell.x * 100}%`, top: `${cell.y * 100}%`, opacity: 0.18 + cell.intensity * 0.62, transform: `translate(-50%, -50%) scale(${0.72 + cell.intensity * 0.58})` }} title={`${cell.count} estimated samples`} />)}<button className="replay-stage-control" type="button" aria-label={replayPlaying ? "Pause replay" : "Play replay"} onClick={() => setReplayPlaying((current) => !current)}>{replayPlaying ? "Ⅱ" : "▶"}</button></div><div className="replay-toolbar"><button className="secondary-button" type="button" onClick={() => setReplayPlaying((current) => !current)}>{replayPlaying ? "Pause" : "Play"}</button><strong>{formatReplayTime(replayTimeMs)} / {formatReplayTime(replayDurationMs)}</strong><label>Speed<select value={replaySpeed} onChange={(event) => setReplaySpeed(Number(event.target.value))}>{[.5, 1, 1.5, 2, 4, 8].map((speed) => <option key={speed} value={speed}>{speed}x</option>)}</select></label><label>Heat<select value={heatMode} onChange={(event) => setHeatMode(event.target.value as "buildup" | "whole")}><option value="buildup">Replay buildup</option><option value="whole">Whole session</option></select></label></div><input className="replay-scrubber" aria-label="Replay timeline" type="range" min="0" max={Math.max(1, replayDurationMs)} step="50" value={replayTimeMs} onChange={(event) => { setReplayPlaying(false); setReplayTimeMs(Number(event.target.value)); }} /><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => { const next = Math.max(0, selectedSnapshot - 1); setReplayTimeMs(Math.max(0, Date.parse(collectorArtifact.snapshots[next].at) - Date.parse(collectorArtifact.startedAt))); }}>Previous screen</button><span>Screen {selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => { const next = Math.min(collectorArtifact.snapshots.length - 1, selectedSnapshot + 1); setReplayTimeMs(Math.max(0, Date.parse(collectorArtifact.snapshots[next].at) - Date.parse(collectorArtifact.startedAt))); }}>Next screen</button></div></>}</section>
           </div>}
         </section>}
         {analysisView === "dom" && <section className="empty-results dashboard-empty"><p className="eyebrow">Automatic AOI review</p><h2>DOM proposals</h2><p>{collectorArtifact ? "This replay session does not contain live DOM proposal AOIs. Replay screenshots are not used to reconstruct missing DOM proposals." : "Select or import a replay session to review live DOM proposal AOIs."}</p></section>}

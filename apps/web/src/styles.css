@@ -108,6 +108,13 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .snapshot-stage { position: relative; overflow: hidden; width: 100%; background: #f2f3ef; border: 1px solid #d8ded7; border-radius: 7px; }
 .collector-snapshot img { display: block; width: 100%; max-height: 310px; margin: 0; object-fit: contain; object-position: center; }
 .replay-heat-cell { position: absolute; width: 44px; height: 44px; pointer-events: none; border-radius: 50%; background: radial-gradient(circle, #e44822 0 14%, #ef8f28 35%, #f4d45488 58%, transparent 72%); filter: blur(2px); }
+.replay-stage-control { position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 58px; height: 58px; padding: 0 0 0 3px; color: #fff; background: #17221dcc; border: 1px solid #ffffff80; border-radius: 999px; box-shadow: 0 8px 24px #17221d40; transform: translate(-50%, -50%); font-size: 20px; }
+.replay-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.replay-toolbar .secondary-button { width: auto; margin: 0; padding: 7px 12px; }
+.replay-toolbar strong { margin-right: auto; color: #445249; font-size: 12px; font-variant-numeric: tabular-nums; }
+.replay-toolbar label { display: flex; align-items: center; gap: 6px; color: #6b766f; font-size: 11px; font-weight: 700; }
+.replay-toolbar select { padding: 6px 8px; color: #344139; background: #fff; border: 1px solid #ccd4cd; border-radius: 6px; }
+.replay-scrubber { width: 100%; margin: 13px 0 2px; accent-color: #668f32; cursor: pointer; }
 .snapshot-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: #68736c; font-size: 12px; }
 .snapshot-controls .secondary-button { width: auto; margin: 0; padding: 7px 10px; font-size: 12px; }
 .metric-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
