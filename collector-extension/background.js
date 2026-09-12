@@ -5,12 +5,22 @@ const key = "webgaze.experimental.collector.session";
 const read = async () => (await chrome.storage.session.get(key))[key] ?? null;
 const write = (session) => chrome.storage.session.set({ [key]: session });
 let operations = Promise.resolve();
+const requestTimeoutMs = 12_000;
 
 async function request(session, path, init = {}) {
-  const response = await fetch(apiUrl(session.apiBase, path), { ...init, headers: { "Content-Type": "application/json", ...init.headers } });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
-  return body;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    const response = await fetch(apiUrl(session.apiBase, path), { ...init, signal: controller.signal, headers: { "Content-Type": "application/json", ...init.headers } });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+    return body;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw new Error("Study API request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 async function participantRequest(session, path, init = {}) { return request(session, path, { ...init, headers: { Authorization: `Bearer ${session.accessToken}`, ...init.headers } }); }
 async function activeTab() { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); if (!tab?.id) throw new Error("Open the study target page before continuing"); return tab; }

@@ -230,6 +230,7 @@ function startBoundaryCalibration(root: HTMLDivElement) {
   cleanupBoundaryCalibration();
   calibrationStage = "boundary"; boundaryMode = "corner"; boundaryCornerIndex = 0; boundaryCornerClicks = 0;
   boundaryRoot = root;
+  root.dataset.mode = "calibration";
   root.dataset.calibrationStep = "boundary";
   root.querySelector("[data-webgaze-phase]")!.textContent = "Step 2 of 3";
   root.querySelector("[data-webgaze-title]")!.textContent = "Boundary calibration";
@@ -416,7 +417,9 @@ function startAccuracyCheck(root: HTMLDivElement) {
   cleanupBoundaryCalibration();
   const next = fitGazeModel(calibrationSamples);
   if (!next) { retryCalibration(root); setCalibrationStatus(root, "Calibration did not fit. Please try again."); return; }
-  model = next; calibrationStage = "accuracy"; accuracyAccumulatedMs = 0; accuracyLastFrameAt = null; accuracyErrors = []; root.dataset.calibrationStep = "accuracy";
+  model = next; calibrationStage = "accuracy"; accuracyAccumulatedMs = 0; accuracyLastFrameAt = null; accuracyErrors = [];
+  root.dataset.mode = "calibration";
+  root.dataset.calibrationStep = "accuracy";
   root.querySelector("[data-webgaze-phase]")!.textContent = "Step 3 of 3";
   root.querySelector("[data-webgaze-title]")!.textContent = "Accuracy check";
   setCalibrationStatus(root, "Keep your eyes on the center dot until the measurement finishes.");
@@ -468,7 +471,11 @@ async function submitCalibration(root: HTMLDivElement, rms: number, observedSamp
   secondary.disabled = true;
   root.querySelector<HTMLElement>("[data-webgaze-status]")!.textContent = "Saving calibration quality…";
   try {
-    const response = await chrome.runtime.sendMessage({ type: "CALIBRATION_COMPLETED", calibration: { attempt: 1, startedAt: calibrationStartedAt ?? new Date().toISOString(), completedAt: new Date().toISOString(), observedSampleCount, errorPx: rms * Math.hypot(innerWidth, innerHeight), qualityGrade: rms <= .08 ? "strong" : "variable", rms } });
+    const response = await Promise.race([
+      chrome.runtime.sendMessage({ type: "CALIBRATION_COMPLETED", calibration: { attempt: 1, startedAt: calibrationStartedAt ?? new Date().toISOString(), completedAt: new Date().toISOString(), observedSampleCount, errorPx: rms * Math.hypot(innerWidth, innerHeight), qualityGrade: rms <= .08 ? "strong" : "variable", rms } }),
+      new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("The study API did not respond in time")), 15_000)),
+    ]);
+    if (!response?.ok) throw new Error(response?.error ?? "The study API did not accept the calibration");
     root.querySelector("[data-webgaze-phase]")!.textContent = response?.accepted ? "Ready" : "Calibration";
     root.dataset.mode = response?.accepted ? "ready" : "calibration-intro";
     root.querySelector("[data-webgaze-status]")!.textContent = response?.accepted ? `Calibration accepted · ${(rms * 100).toFixed(1)}% RMS. Return to the extension to start Task 1.` : "Calibration was not accepted. Recalibrate and try again.";
@@ -481,11 +488,12 @@ async function submitCalibration(root: HTMLDivElement, rms: number, observedSamp
       primary.disabled = false;
       secondary.disabled = false;
     }
-  } catch {
+  } catch (error) {
     calibrationStage = "result";
     primary.disabled = false;
     secondary.disabled = false;
-    root.querySelector("[data-webgaze-status]")!.textContent = "Could not save calibration. Check the extension popup and retry.";
+    const message = error instanceof Error ? error.message : "Unknown save error";
+    root.querySelector("[data-webgaze-status]")!.textContent = `Could not save calibration: ${message}. Try OK again or recalibrate.`;
   }
 }
 
