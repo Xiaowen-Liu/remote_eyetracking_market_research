@@ -37,6 +37,10 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .session-table td:first-child { display: grid; gap: 3px; color: #26362d; }
 .session-table td small { color: #879088; font-size: 10px; }
 .archive-empty { color: #68746c; }
+.archive-actions, .row-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.archive-actions .secondary-button { width: auto; margin: 0; padding: 7px 9px; font-size: 10px; }
+.row-actions .text-button { padding: 3px 4px; }
+.hidden-session { opacity: .52; background: #f5f6f3; }
 .dashboard-empty { max-width: none; }
 .aoi-metrics-panel { padding: 28px 30px; background: #fff; border: 1px solid #d9ded8; border-radius: 12px; }
 .aoi-metrics-heading { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
@@ -174,6 +178,16 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .aoi-editor input { padding: 8px 9px; border: 1px solid #c8d1c8; border-radius: 6px; }
 .aoi-editor strong { align-self: center; color: #59675e; font-size: 12px; }
 .aoi-editor .primary-button, .aoi-editor .secondary-button { width: auto; margin: 0; padding: 8px 11px; font-size: 11px; }
+.heatmap-editor { display: grid; gap: 13px; margin-top: 14px; padding: 16px; background: #f7f8f4; border: 1px solid #dfe4dc; border-radius: 9px; }
+.heatmap-editor h4 { margin: 4px 0; font: 500 19px/1.2 Georgia, serif; }
+.heatmap-editor p:not(.eyebrow) { margin: 0; color: #69756d; font-size: 11px; }
+.heat-segments { display: flex; gap: 4px; min-height: 54px; }
+.heat-segments button { display: grid; align-content: center; min-width: 66px; padding: 7px 9px; color: #55645b; background: #e7eee0; border: 1px solid #cdd9c2; border-radius: 6px; text-align: left; }
+.heat-segments button.selected { color: #fff; background: #466c33; border-color: #466c33; }
+.heat-segments strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.heat-segments span { margin-top: 3px; font-size: 9px; white-space: nowrap; }
+.heatmap-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.heatmap-actions .primary-button, .heatmap-actions .secondary-button { width: auto; margin: 0; padding: 8px 10px; font-size: 10px; }
 .snapshot-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: #68736c; font-size: 12px; }
 .snapshot-controls .secondary-button { width: auto; margin: 0; padding: 7px 10px; font-size: 12px; }
 .metric-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }

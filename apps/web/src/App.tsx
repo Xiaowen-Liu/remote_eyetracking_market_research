@@ -45,6 +45,7 @@ const emptyDraft: StudyDraft = {
 
 type Notice = { kind: "success" | "error"; text: string } | null;
 type ReplayAoi = { id: string; label: string; x: number; y: number; width: number; height: number; source: "manual" };
+type SessionPreference = { name?: string; hidden?: boolean };
 
 type TaskAggregate = {
   position: number;
@@ -715,7 +716,7 @@ function ResultsDashboard({
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [replaySpeed, setReplaySpeed] = useState(1);
   const [replayTimeMs, setReplayTimeMs] = useState(0);
-  const [heatMode, setHeatMode] = useState<"buildup" | "whole">("buildup");
+  const [heatMode, setHeatMode] = useState<"selected" | "buildup" | "whole">("buildup");
   const [orderMode, setOrderMode] = useState<"off" | "scanpath" | "aoi">("off");
   const [drawingAoi, setDrawingAoi] = useState(false);
   const [aoiDraft, setAoiDraft] = useState<Omit<ReplayAoi, "id" | "label" | "source"> | null>(null);
@@ -725,10 +726,21 @@ function ResultsDashboard({
   const [aoiDetailView, setAoiDetailView] = useState<"summary" | "sessions" | "visits" | "samples">("summary");
   const [proposalStateIndex, setProposalStateIndex] = useState(0);
   const [selectedProposalIndex, setSelectedProposalIndex] = useState(0);
+  const [heatCuts, setHeatCuts] = useState<number[]>([]);
+  const [selectedHeatSegment, setSelectedHeatSegment] = useState(0);
+  const [heatNames, setHeatNames] = useState<Record<number, string>>({});
+  const [exportingHeatmap, setExportingHeatmap] = useState(false);
+  const [sessionPreferences, setSessionPreferences] = useState<Record<string, SessionPreference>>({});
+  const [showHiddenSessions, setShowHiddenSessions] = useState(false);
   const aoiDragStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     void loadJobs();
+  }, [study.id]);
+
+  useEffect(() => {
+    try { setSessionPreferences(JSON.parse(localStorage.getItem(`webgaze.sessions.${study.id}`) ?? "{}")); }
+    catch { setSessionPreferences({}); }
   }, [study.id]);
 
   useEffect(() => {
@@ -834,6 +846,15 @@ function ResultsDashboard({
     setResult(resultsByJob[jobId] ?? null);
   }
 
+  function restoreHeatPreferences(artifact: CollectorArtifact) {
+    try {
+      const stored = JSON.parse(localStorage.getItem(`webgaze.heat.${artifact.sessionId}`) ?? "{}");
+      setHeatCuts(Array.isArray(stored.cuts) ? stored.cuts.filter(Number.isFinite).sort((a: number, b: number) => a - b) : []);
+      setHeatNames(stored.names && typeof stored.names === "object" ? stored.names : {});
+    } catch { setHeatCuts([]); setHeatNames({}); }
+    setSelectedHeatSegment(0);
+  }
+
   async function importCollectorArtifact(file: File | undefined) {
     if (!file) return;
     try {
@@ -842,6 +863,7 @@ function ResultsDashboard({
       setSelectedSnapshot(0);
       setReplayTimeMs(0);
       setReplayPlaying(false);
+      restoreHeatPreferences(parsed);
       setNotice({ kind: "success", text: "Collector session opened locally. It has not been uploaded to this study." });
     } catch (error) {
       setCollectorArtifact(null);
@@ -855,6 +877,7 @@ function ResultsDashboard({
     setSelectedSnapshot(0);
     setReplayTimeMs(0);
     setReplayPlaying(false);
+    restoreHeatPreferences(syntheticCollectorReplay);
     setNotice({ kind: "success", text: "Synthetic collector replay loaded. It is generated demo data, not a participant session or camera capture." });
   }
 
@@ -909,6 +932,46 @@ function ResultsDashboard({
     setNotice({ kind: "success", text: `${label} was added to this study and is now available in AOI Metrics.` });
   }
 
+  function saveHeatPreferences(cuts: number[], names = heatNames) {
+    setHeatCuts(cuts);
+    setHeatNames(names);
+    if (collectorArtifact) localStorage.setItem(`webgaze.heat.${collectorArtifact.sessionId}`, JSON.stringify({ cuts, names }));
+  }
+
+  function saveSessionPreference(sessionId: string, preference: SessionPreference) {
+    const next = { ...sessionPreferences, [sessionId]: { ...sessionPreferences[sessionId], ...preference } };
+    setSessionPreferences(next);
+    localStorage.setItem(`webgaze.sessions.${study.id}`, JSON.stringify(next));
+  }
+
+  function downloadCollectorArtifact() {
+    if (!collectorArtifact) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(collectorArtifact, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a"); link.href = url; link.download = `webgaze-session-${collectorArtifact.sessionId}.json`; link.click(); URL.revokeObjectURL(url);
+  }
+
+  async function exportHeatmap() {
+    const snapshot = collectorArtifact?.snapshots[selectedSnapshot];
+    if (!snapshot) return;
+    setExportingHeatmap(true);
+    try {
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("Unable to prepare heatmap image.")); image.src = snapshot.dataUrl; });
+      const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d"); if (!context) throw new Error("Canvas heatmap export is unavailable here.");
+      context.drawImage(image, 0, 0);
+      for (const cell of replayHeatmap) {
+        const cx = cell.x * canvas.width, cy = cell.y * canvas.height, radius = Math.max(18, Math.min(canvas.width, canvas.height) * .055 * (.7 + cell.intensity));
+        const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        gradient.addColorStop(0, `rgba(220,55,25,${.35 + cell.intensity * .5})`); gradient.addColorStop(.45, "rgba(245,155,35,.42)"); gradient.addColorStop(1, "rgba(255,220,70,0)");
+        context.fillStyle = gradient; context.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+      }
+      const link = document.createElement("a"); link.download = `webgaze-heatmap-${collectorArtifact!.sessionId}.png`; link.href = canvas.toDataURL("image/png"); link.click();
+      setNotice({ kind: "success", text: "Heatmap exported for the selected replay range." });
+    } catch (error) { setNotice({ kind: "error", text: error instanceof Error ? error.message : "Unable to export heatmap." }); }
+    finally { setExportingHeatmap(false); }
+  }
+
   async function downloadExport(format: "json" | "csv") {
     const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? latest;
     if (!selectedJob) return;
@@ -939,9 +1002,12 @@ function ResultsDashboard({
   const aggregateSessionCount = completedResults.length;
   const aggregateMetrics = aggregateTaskMetrics(aggregateEligibleResults);
   const replayDurationMs = collectorArtifact ? Math.max(0, Date.parse(collectorArtifact.endedAt ?? collectorArtifact.startedAt) - Date.parse(collectorArtifact.startedAt)) : 0;
+  const heatBoundaries = [0, ...heatCuts.filter((cut) => cut > 0 && cut < replayDurationMs), replayDurationMs];
+  const heatSegments = heatBoundaries.slice(0, -1).map((start, index) => ({ start, end: heatBoundaries[index + 1], name: heatNames[index] || `Heatmap ${index + 1}` }));
+  const activeHeatSegment = heatSegments[Math.min(selectedHeatSegment, Math.max(0, heatSegments.length - 1))] ?? { start: 0, end: replayDurationMs, name: "Heatmap 1" };
   const replaySamples = collectorArtifact ? gazeSamplesForSnapshot(collectorArtifact, selectedSnapshot) : [];
   const replayCutoff = collectorArtifact ? Date.parse(collectorArtifact.startedAt) + replayTimeMs : 0;
-  const visibleReplaySamples = heatMode === "whole" ? (collectorArtifact?.gazeSamples ?? []) : replaySamples.filter((sample) => !sample.at || Date.parse(sample.at) <= replayCutoff);
+  const visibleReplaySamples = heatMode === "whole" ? (collectorArtifact?.gazeSamples ?? []) : heatMode === "selected" && collectorArtifact ? (collectorArtifact.gazeSamples ?? []).filter((sample) => { const time = sample.at ? Date.parse(sample.at) - Date.parse(collectorArtifact.startedAt) : 0; return time >= activeHeatSegment.start && time <= activeHeatSegment.end; }) : replaySamples.filter((sample) => !sample.at || Date.parse(sample.at) <= replayCutoff);
   const replayHeatmap = buildHeatmap(visibleReplaySamples);
   const scanpathNodes = visibleReplaySamples.filter((_, index) => index % Math.max(1, Math.floor(visibleReplaySamples.length / 12)) === 0).slice(-12);
   const aoiOrder = replayAois.filter((aoi) => visibleReplaySamples.some((sample) => sample.x >= aoi.x && sample.x <= aoi.x + aoi.width && sample.y >= aoi.y && sample.y <= aoi.y + aoi.height));
@@ -952,6 +1018,9 @@ function ResultsDashboard({
   const selectedProposal = proposalState?.proposals[selectedProposalIndex] ?? null;
   const newProposals = proposalState?.proposals.filter((proposal) => !replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === proposal.label.toLocaleLowerCase())) ?? [];
   const proposalSnapshotIndex = collectorArtifact && proposalState ? collectorArtifact.snapshots.reduce((best, snapshot, index) => Math.abs(Date.parse(snapshot.at) - Date.parse(proposalState.at)) < Math.abs(Date.parse(collectorArtifact.snapshots[best]?.at ?? collectorArtifact.startedAt) - Date.parse(proposalState.at)) ? index : best, 0) : 0;
+  const visibleSessionCount = sessions.filter((session) => !sessionPreferences[session.id]?.hidden).length;
+  const hiddenSessionCount = sessions.length - visibleSessionCount;
+  const archivedSessions = sessions.filter((session) => showHiddenSessions || !sessionPreferences[session.id]?.hidden);
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -976,8 +1045,8 @@ function ResultsDashboard({
         {notice && <div className={`notice ${notice.kind}`} role="alert">{notice.text}</div>}
         {busy && <div className="loading" role="status">Loading results…</div>}
         {!busy && workspaceView === "sessions" && <section className="session-archive-panel">
-          <div className="session-archive-header"><div><p className="eyebrow">Session archive</p><h2>Saved sessions</h2></div><span className="context-chip">{sessions.length} visible sessions</span></div>
-          {sessions.length === 0 ? <p className="archive-empty">No sessions are stored for this study yet.</p> : <div className="session-table-wrap"><table className="session-table"><thead><tr><th>Session</th><th>Tasks</th><th>Samples</th><th>Quality</th><th>Status</th><th>Actions</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.id}><td><strong>{session.participant_alias}</strong><small>{session.id}</small></td><td>{session.completed_task_count}</td><td>{session.gaze_sample_count.toLocaleString()}</td><td>{session.calibration_quality ?? "Not recorded"}</td><td>{session.lifecycle}</td><td><button type="button" className="text-button" onClick={() => { setWorkspaceView("analysis"); setAnalysisView("metrics"); }}>Open</button></td></tr>)}</tbody></table></div>}
+          <div className="session-archive-header"><div><p className="eyebrow">Session archive</p><h2>Saved sessions</h2></div><div className="archive-actions"><span className="context-chip">{visibleSessionCount} visible</span><span className="context-chip">{hiddenSessionCount} hidden</span><button className="secondary-button" type="button" disabled={!hiddenSessionCount} onClick={() => setShowHiddenSessions((current) => !current)}>{showHiddenSessions ? "Hide Hidden Sessions" : "Show Hidden Sessions"}</button>{collectorArtifact && <button className="secondary-button" type="button" onClick={downloadCollectorArtifact}>Download opened JSON</button>}</div></div>
+          {sessions.length === 0 ? <p className="archive-empty">No sessions are stored for this study yet.</p> : archivedSessions.length === 0 ? <p className="archive-empty">No visible sessions. Hidden sessions stay out of analysis until you show and unhide them.</p> : <div className="session-table-wrap"><table className="session-table"><thead><tr><th>Session</th><th>Tasks</th><th>Samples</th><th>Quality</th><th>Status</th><th>Actions</th></tr></thead><tbody>{archivedSessions.map((session) => { const preference = sessionPreferences[session.id] ?? {}; return <tr className={preference.hidden ? "hidden-session" : ""} key={session.id}><td><strong>{preference.name || session.participant_alias}</strong><small>{session.id}</small></td><td>{session.completed_task_count}</td><td>{session.gaze_sample_count.toLocaleString()}</td><td>{session.calibration_quality ?? "Not recorded"}</td><td>{preference.hidden ? "Hidden" : session.lifecycle}</td><td><div className="row-actions">{!preference.hidden && <button type="button" className="text-button" onClick={() => { setWorkspaceView("analysis"); setAnalysisView("metrics"); }}>Open</button>}<button type="button" className="text-button" onClick={() => { const name = window.prompt("Rename session. Leave blank to restore the default page title.", preference.name || session.participant_alias); if (name !== null) saveSessionPreference(session.id, { name: name.trim() || undefined }); }}>Rename</button><button type="button" className="text-button" onClick={() => { saveSessionPreference(session.id, { hidden: !preference.hidden }); if (!preference.hidden) setShowHiddenSessions(true); }}>{preference.hidden ? "Unhide" : "Hide"}</button>{collectorArtifact?.sessionId === session.id && <button type="button" className="text-button" onClick={downloadCollectorArtifact}>Download</button>}</div></td></tr>; })}</tbody></table></div>}
         </section>}
         {!busy && workspaceView === "analysis" && <>
         <section className="session-context" aria-label="Session context"><span>Session</span><select value={selectedJobId ?? ""} onChange={(event) => selectJob(event.target.value)} disabled={!jobs.length}><option value="">{jobs.length ? "Select a session" : "No visible sessions"}</option>{jobs.map((job, index) => <option key={job.id} value={job.id}>Session {jobs.length - index} · {job.status}</option>)}</select>{result && <><span className="context-chip">{String(result.diagnostics.sample_count)} samples</span><span className="context-chip">Calibration {String(result.quality.calibration_quality ?? "unavailable")}</span><span className="context-chip">{selectedJob?.status}</span></>}</section>
@@ -1022,7 +1091,7 @@ function ResultsDashboard({
           {collectorArtifact && <div className="collector-artifact-grid">
             <aside className="collector-summary"><p className="eyebrow">{collectorArtifact.sessionId === syntheticCollectorReplay.sessionId ? "Synthetic replay fixture" : "Session artifact"}</p><strong>{collectorArtifact.sessionId}</strong><span>{collectorArtifact.gazeSamples?.length ?? 0} estimated samples</span><span>{collectorArtifact.events.length} timeline events</span><span>{collectorArtifact.snapshots.length} consented snapshots</span><small>Raw camera video: never exported</small></aside>
             <section className="collector-timeline"><h3>Timeline</h3>{collectorArtifact.events.length === 0 && <p>No page events were captured.</p>}<ol>{collectorArtifact.events.slice(0, 12).map((event, index) => <li key={`${event.at}-${index}`}><strong>{event.type.replaceAll("-", " ")}</strong><span>{new Date(event.at).toLocaleTimeString()} · {event.url}</span></li>)}</ol></section>
-            <section className="collector-snapshot"><div className="snapshot-title"><h3>Replay canvas</h3><span>{visibleReplaySamples.length} visible samples</span></div>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><div className={`snapshot-stage ${drawingAoi ? "drawing-aoi" : ""}`} onPointerDown={beginAoiDraw} onPointerMove={updateAoiDraw} onPointerUp={finishAoiDraw}><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" draggable="false" />{replayHeatmap.map((cell) => <i className="replay-heat-cell" key={`${cell.x}-${cell.y}`} style={{ left: `${cell.x * 100}%`, top: `${cell.y * 100}%`, opacity: 0.18 + cell.intensity * 0.62, transform: `translate(-50%, -50%) scale(${0.72 + cell.intensity * 0.58})` }} title={`${cell.count} estimated samples`} />)}{replayAois.map((aoi) => <i className="saved-aoi" key={aoi.id} style={{ left: `${aoi.x * 100}%`, top: `${aoi.y * 100}%`, width: `${aoi.width * 100}%`, height: `${aoi.height * 100}%` }}><span>{aoi.label}</span></i>)}{aoiDraft && <i className="aoi-draft" style={{ left: `${aoiDraft.x * 100}%`, top: `${aoiDraft.y * 100}%`, width: `${aoiDraft.width * 100}%`, height: `${aoiDraft.height * 100}%` }} />}{orderMode === "scanpath" && scanpathNodes.map((sample, index) => <i className="scanpath-node" key={`${sample.at}-${index}`} style={{ left: `${sample.x * 100}%`, top: `${sample.y * 100}%` }}>{index + 1}</i>)}{orderMode === "aoi" && aoiOrder.map((aoi, index) => <i className="aoi-order-node" key={aoi.id} style={{ left: `${(aoi.x + aoi.width / 2) * 100}%`, top: `${(aoi.y + aoi.height / 2) * 100}%` }}>{index + 1}</i>)}{!drawingAoi && <button className="replay-stage-control" type="button" aria-label={replayPlaying ? "Pause replay" : "Play replay"} onClick={() => setReplayPlaying((current) => !current)}>{replayPlaying ? "Ⅱ" : "▶"}</button>}</div><div className="replay-analysis-tools"><button className="secondary-button" type="button" onClick={() => setOrderMode((current) => current === "off" ? "scanpath" : current === "scanpath" ? "aoi" : "off")}>{orderMode === "off" ? "Show scanpath order" : orderMode === "scanpath" ? "Scanpath order on" : "AOI order on"}</button><button className={`secondary-button ${drawingAoi ? "active-tool" : ""}`} type="button" onClick={() => { setDrawingAoi((current) => !current); setAoiDraft(null); }}>{drawingAoi ? "Drawing AOI" : "Draw AOI"}</button><span>{drawingAoi ? "Drag directly on the replay screenshot to add a viewport AOI." : orderMode === "scanpath" ? "Numbered nodes show raw gaze samples by screen position, without AOIs." : orderMode === "aoi" ? "Numbered nodes show AOIs reached in this replay." : "Inspect gaze buildup or define an area of interest."}</span></div>{aoiDraft && <div className="aoi-editor"><label>Label<input value={aoiLabel} onChange={(event) => setAoiLabel(event.target.value)} /></label><strong>{Math.round(aoiDraft.width * 100)}% × {Math.round(aoiDraft.height * 100)}%</strong><button className="primary-button" type="button" disabled={aoiDraft.width < .01 || aoiDraft.height < .01} onClick={saveAoi}>Save AOI</button><button className="secondary-button" type="button" onClick={() => { setAoiDraft(null); setDrawingAoi(false); }}>Cancel</button></div>}<div className="replay-toolbar"><button className="secondary-button" type="button" onClick={() => setReplayPlaying((current) => !current)}>{replayPlaying ? "Pause" : "Play"}</button><strong>{formatReplayTime(replayTimeMs)} / {formatReplayTime(replayDurationMs)}</strong><label>Speed<select value={replaySpeed} onChange={(event) => setReplaySpeed(Number(event.target.value))}>{[.5, 1, 1.5, 2, 4, 8].map((speed) => <option key={speed} value={speed}>{speed}x</option>)}</select></label><label>Heat<select value={heatMode} onChange={(event) => setHeatMode(event.target.value as "buildup" | "whole")}><option value="buildup">Replay buildup</option><option value="whole">Whole session</option></select></label></div><input className="replay-scrubber" aria-label="Replay timeline" type="range" min="0" max={Math.max(1, replayDurationMs)} step="50" value={replayTimeMs} onChange={(event) => { setReplayPlaying(false); setReplayTimeMs(Number(event.target.value)); }} /><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => { const next = Math.max(0, selectedSnapshot - 1); setReplayTimeMs(Math.max(0, Date.parse(collectorArtifact.snapshots[next].at) - Date.parse(collectorArtifact.startedAt))); }}>Previous screen</button><span>Screen {selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => { const next = Math.min(collectorArtifact.snapshots.length - 1, selectedSnapshot + 1); setReplayTimeMs(Math.max(0, Date.parse(collectorArtifact.snapshots[next].at) - Date.parse(collectorArtifact.startedAt))); }}>Next screen</button></div></>}</section>
+            <section className="collector-snapshot"><div className="snapshot-title"><h3>Replay canvas</h3><span>{visibleReplaySamples.length} visible samples</span></div>{collectorArtifact.snapshots.length === 0 ? <p>No snapshots were selected for this session.</p> : <><div className={`snapshot-stage ${drawingAoi ? "drawing-aoi" : ""}`} onPointerDown={beginAoiDraw} onPointerMove={updateAoiDraw} onPointerUp={finishAoiDraw}><img src={collectorArtifact.snapshots[selectedSnapshot]?.dataUrl} alt="Consent-selected visible browser tab snapshot" draggable="false" />{replayHeatmap.map((cell) => <i className="replay-heat-cell" key={`${cell.x}-${cell.y}`} style={{ left: `${cell.x * 100}%`, top: `${cell.y * 100}%`, opacity: 0.18 + cell.intensity * 0.62, transform: `translate(-50%, -50%) scale(${0.72 + cell.intensity * 0.58})` }} title={`${cell.count} estimated samples`} />)}{replayAois.map((aoi) => <i className="saved-aoi" key={aoi.id} style={{ left: `${aoi.x * 100}%`, top: `${aoi.y * 100}%`, width: `${aoi.width * 100}%`, height: `${aoi.height * 100}%` }}><span>{aoi.label}</span></i>)}{aoiDraft && <i className="aoi-draft" style={{ left: `${aoiDraft.x * 100}%`, top: `${aoiDraft.y * 100}%`, width: `${aoiDraft.width * 100}%`, height: `${aoiDraft.height * 100}%` }} />}{orderMode === "scanpath" && scanpathNodes.map((sample, index) => <i className="scanpath-node" key={`${sample.at}-${index}`} style={{ left: `${sample.x * 100}%`, top: `${sample.y * 100}%` }}>{index + 1}</i>)}{orderMode === "aoi" && aoiOrder.map((aoi, index) => <i className="aoi-order-node" key={aoi.id} style={{ left: `${(aoi.x + aoi.width / 2) * 100}%`, top: `${(aoi.y + aoi.height / 2) * 100}%` }}>{index + 1}</i>)}{!drawingAoi && <button className="replay-stage-control" type="button" aria-label={replayPlaying ? "Pause replay" : "Play replay"} onClick={() => setReplayPlaying((current) => !current)}>{replayPlaying ? "Ⅱ" : "▶"}</button>}</div><div className="replay-analysis-tools"><button className="secondary-button" type="button" onClick={() => setOrderMode((current) => current === "off" ? "scanpath" : current === "scanpath" ? "aoi" : "off")}>{orderMode === "off" ? "Show scanpath order" : orderMode === "scanpath" ? "Scanpath order on" : "AOI order on"}</button><button className={`secondary-button ${drawingAoi ? "active-tool" : ""}`} type="button" onClick={() => { setDrawingAoi((current) => !current); setAoiDraft(null); }}>{drawingAoi ? "Drawing AOI" : "Draw AOI"}</button><span>{drawingAoi ? "Drag directly on the replay screenshot to add a viewport AOI." : orderMode === "scanpath" ? "Numbered nodes show raw gaze samples by screen position, without AOIs." : orderMode === "aoi" ? "Numbered nodes show AOIs reached in this replay." : "Inspect gaze buildup or define an area of interest."}</span></div>{aoiDraft && <div className="aoi-editor"><label>Label<input value={aoiLabel} onChange={(event) => setAoiLabel(event.target.value)} /></label><strong>{Math.round(aoiDraft.width * 100)}% × {Math.round(aoiDraft.height * 100)}%</strong><button className="primary-button" type="button" disabled={aoiDraft.width < .01 || aoiDraft.height < .01} onClick={saveAoi}>Save AOI</button><button className="secondary-button" type="button" onClick={() => { setAoiDraft(null); setDrawingAoi(false); }}>Cancel</button></div>}<div className="replay-toolbar"><button className="secondary-button" type="button" onClick={() => setReplayPlaying((current) => !current)}>{replayPlaying ? "Pause" : "Play"}</button><strong>{formatReplayTime(replayTimeMs)} / {formatReplayTime(replayDurationMs)}</strong><label>Speed<select value={replaySpeed} onChange={(event) => setReplaySpeed(Number(event.target.value))}>{[.5, 1, 1.5, 2, 4, 8].map((speed) => <option key={speed} value={speed}>{speed}x</option>)}</select></label><label>Heat<select value={heatMode} onChange={(event) => setHeatMode(event.target.value as "selected" | "buildup" | "whole")}><option value="selected">Final selected heatmap</option><option value="buildup">Replay buildup</option><option value="whole">Whole session</option></select></label></div><input className="replay-scrubber" aria-label="Replay timeline" type="range" min="0" max={Math.max(1, replayDurationMs)} step="50" value={replayTimeMs} onChange={(event) => { setReplayPlaying(false); setReplayTimeMs(Number(event.target.value)); }} /><section className="heatmap-editor"><div><p className="eyebrow">Heatmap</p><h4>{heatSegments.length} heatmap{heatSegments.length === 1 ? "" : "s"} · {formatReplayTime(activeHeatSegment.start)} to {formatReplayTime(activeHeatSegment.end)}</h4><p>The session starts as one heatmap. Add a cut at the playhead only where you want a focused view.</p></div><div className="heat-segments">{heatSegments.map((segment, index) => <button type="button" className={selectedHeatSegment === index ? "selected" : ""} style={{ flexGrow: Math.max(1, segment.end - segment.start) }} onClick={() => setSelectedHeatSegment(index)} onDoubleClick={() => { const name = window.prompt("Name this heatmap", segment.name); if (name?.trim()) saveHeatPreferences(heatCuts, { ...heatNames, [index]: name.trim() }); }} key={index}><strong>{segment.name}</strong><span>{formatReplayTime(segment.start)}–{formatReplayTime(segment.end)}</span></button>)}</div><div className="heatmap-actions"><button className="secondary-button" type="button" disabled={replayTimeMs <= 0 || replayTimeMs >= replayDurationMs || heatCuts.some((cut) => Math.abs(cut - replayTimeMs) < 500)} onClick={() => { const next = [...heatCuts, replayTimeMs].sort((a, b) => a - b); saveHeatPreferences(next); setSelectedHeatSegment(next.findIndex((cut) => cut === replayTimeMs) + 1); }}>Add cut at playhead</button><button className="secondary-button" type="button" disabled={!heatCuts.length} onClick={() => { saveHeatPreferences([]); setSelectedHeatSegment(0); }}>Merge into whole session</button><button className="secondary-button" type="button" disabled={!heatCuts.length && !Object.keys(heatNames).length} onClick={() => { saveHeatPreferences([], {}); setSelectedHeatSegment(0); }}>Reset cuts</button><button className="primary-button" type="button" disabled={exportingHeatmap || !visibleReplaySamples.length} onClick={() => void exportHeatmap()}>{exportingHeatmap ? "Exporting…" : "Export heatmap"}</button></div></section><div className="snapshot-controls"><button className="secondary-button" type="button" disabled={selectedSnapshot === 0} onClick={() => { const next = Math.max(0, selectedSnapshot - 1); setReplayTimeMs(Math.max(0, Date.parse(collectorArtifact.snapshots[next].at) - Date.parse(collectorArtifact.startedAt))); }}>Previous screen</button><span>Screen {selectedSnapshot + 1} / {collectorArtifact.snapshots.length}</span><button className="secondary-button" type="button" disabled={selectedSnapshot === collectorArtifact.snapshots.length - 1} onClick={() => { const next = Math.min(collectorArtifact.snapshots.length - 1, selectedSnapshot + 1); setReplayTimeMs(Math.max(0, Date.parse(collectorArtifact.snapshots[next].at) - Date.parse(collectorArtifact.startedAt))); }}>Next screen</button></div></>}</section>
           </div>}
         </section>}
         {analysisView === "dom" && proposalStates.length === 0 && <section className="empty-results dashboard-empty"><p className="eyebrow">Automatic AOI review</p><h2>DOM proposals</h2><p>{collectorArtifact ? "This replay session does not contain live DOM proposal AOIs. Replay screenshots are not used to reconstruct missing DOM proposals." : "Select or import a replay session to review live DOM proposal AOIs."}</p></section>}
