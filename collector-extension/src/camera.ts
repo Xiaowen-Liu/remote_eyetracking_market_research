@@ -6,6 +6,10 @@ let video: HTMLVideoElement | null = null;
 let landmarker: FaceLandmarker | null = null;
 let stream: MediaStream | null = null;
 let frame: number | null = null;
+let lastLightCheckAt = 0;
+const lightCanvas = document.createElement("canvas");
+lightCanvas.width = 64;
+lightCanvas.height = 48;
 const embedded = window.top !== window;
 
 function feature(landmarks: NormalizedLandmark[]): Point | null {
@@ -26,6 +30,37 @@ function faceFrame(landmarks: NormalizedLandmark[]): FaceFrame {
   return { detected: true, centered, inBounds, size };
 }
 
+function updateEmbeddedDiagnostics(value: FaceFrame) {
+  if (!embedded) return;
+  const detection = document.querySelector<HTMLElement>("#detection");
+  const distance = document.querySelector<HTMLElement>("#distance");
+  const framing = document.querySelector<HTMLElement>("#framing");
+  if (!detection || !distance || !framing) return;
+  detection.textContent = value.detected ? "✓ Face found" : "○ Looking for a face";
+  detection.dataset.passed = String(value.detected);
+  const distanceOkay = value.detected && value.size >= .17 && value.size <= .78;
+  distance.textContent = !value.detected ? "○ Distance unavailable" : distanceOkay ? "✓ Distance looks good" : value.size < .17 ? "○ Move closer to the screen" : "○ Move farther from the screen";
+  distance.dataset.passed = String(distanceOkay);
+  framing.textContent = !value.detected ? "○ Framing unavailable" : value.centered ? "✓ Face is centered" : "○ Center your face in the frame";
+  framing.dataset.passed = String(value.centered);
+}
+
+function updateLighting() {
+  if (!embedded || !video || performance.now() - lastLightCheckAt < 500) return;
+  lastLightCheckAt = performance.now();
+  const output = document.querySelector<HTMLElement>("#lighting");
+  const context = lightCanvas.getContext("2d", { willReadFrequently: true });
+  if (!output || !context || !video.videoWidth) return;
+  context.drawImage(video, 0, 0, lightCanvas.width, lightCanvas.height);
+  const pixels = context.getImageData(0, 0, lightCanvas.width, lightCanvas.height).data;
+  let luminance = 0;
+  for (let index = 0; index < pixels.length; index += 4) luminance += .2126 * pixels[index] + .7152 * pixels[index + 1] + .0722 * pixels[index + 2];
+  const average = luminance / (pixels.length / 4);
+  const acceptable = average >= 55 && average <= 225;
+  output.textContent = acceptable ? `✓ Lighting looks usable (${average.toFixed(0)}/255)` : average < 55 ? `○ Add more light to your face (${average.toFixed(0)}/255)` : `○ Reduce bright backlighting (${average.toFixed(0)}/255)`;
+  output.dataset.passed = String(acceptable);
+}
+
 function errorMessage(error: unknown) {
   if (error && typeof error === "object" && "message" in error) return String((error as { message?: unknown }).message ?? error);
   if (error && typeof error === "object" && "type" in error) return `MediaPipe runtime load error (${String((error as { type?: unknown }).type ?? "unknown")})`;
@@ -36,7 +71,10 @@ function detect() {
   if (!video || !landmarker) return;
   const landmarks = landmarker.detectForVideo(video, performance.now()).faceLandmarks[0] ?? [];
   const value = feature(landmarks);
-  const message = { type: "CAMERA_FEATURE", source: "webgaze-camera-runtime", feature: value, face: faceFrame(landmarks), at: new Date().toISOString(), video: { width: video.videoWidth, height: video.videoHeight } };
+  const currentFace = faceFrame(landmarks);
+  updateEmbeddedDiagnostics(currentFace);
+  updateLighting();
+  const message = { type: "CAMERA_FEATURE", source: "webgaze-camera-runtime", feature: value, face: currentFace, at: new Date().toISOString(), video: { width: video.videoWidth, height: video.videoHeight } };
   if (embedded) window.parent.postMessage(message, "*"); else void chrome.runtime.sendMessage({ type: "OFFSCREEN_CAMERA_FEATURE", ...message });
   frame = requestAnimationFrame(detect);
 }
@@ -65,14 +103,14 @@ async function start() {
 function stop() { if (frame) cancelAnimationFrame(frame); frame = null; landmarker?.close(); landmarker = null; stream?.getTracks().forEach((track) => track.stop()); stream = null; video = null; }
 
 if (embedded) {
-  document.documentElement.innerHTML = `<head><style>html,body{height:100%;margin:0}body{align-items:center;background:#fff;color:#142018;display:flex;font:15px/1.45 system-ui,sans-serif;justify-content:center}.card{max-width:520px;padding:32px;text-align:center}.eyebrow{color:#4e812f;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{font:500 54px/.98 Georgia,serif;letter-spacing:-.05em;margin:10px 0 16px}p{color:#58665b}.preview{align-items:center;background:#eef3ec;border:1px solid #d9e1d6;border-radius:12px;display:flex;justify-content:center;margin:22px auto 14px;max-width:420px;overflow:hidden;position:relative;aspect-ratio:16/10}.preview video{height:100%;object-fit:cover;transform:scaleX(-1);width:100%}.badge{background:#ffffffdd;border:1px solid #dbe3d8;border-radius:99px;bottom:12px;color:#40533f;font-size:12px;left:50%;padding:5px 9px;position:absolute;transform:translateX(-50%);white-space:nowrap}button{background:#1d3727;border:0;border-radius:7px;color:white;cursor:pointer;font:700 15px system-ui;padding:12px 22px}.privacy{font-size:12px;margin:18px auto 0;max-width:450px}body.compact{background:#eef3ec;display:block;overflow:hidden}body.compact .card{height:100%;max-width:none;padding:0}body.compact .card>:not(.preview){display:none}body.compact .preview{border:0;border-radius:0;height:100%;margin:0;max-width:none;width:100%}body.compact .badge{bottom:8px;font-size:10px;padding:3px 7px}</style></head><body><main class="card"><div class="eyebrow">Experimental participant session</div><h1>Check your camera</h1><p id="status">Start the camera check to request permission from this visible extension canvas.</p><div class="preview"><video id="preview" autoplay muted playsinline></video><span class="badge" id="badge">Camera is off</span></div><button id="start">Start camera check</button><p class="privacy">Camera frames and face landmarks stay inside this extension canvas. The study receives only consented coordinate estimates during an active task.</p></main></body>`;
+  document.documentElement.innerHTML = `<head><style>html,body{height:100%;margin:0}body{align-items:center;background:#f6f8f5;color:#142018;display:flex;font:15px/1.45 system-ui,sans-serif;justify-content:center}.card{background:#fff;border:1px solid #dbe2e8;border-radius:24px;box-shadow:0 28px 70px #17231c2b;box-sizing:border-box;max-width:900px;padding:42px;text-align:center;width:calc(100% - 56px)}.eyebrow{color:#4e812f;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{border-bottom:1px solid #9da8b4;font-size:42px;letter-spacing:-.04em;margin:8px 0 20px;padding-bottom:14px}p{color:#58665b}.camera-grid{display:grid;gap:18px;grid-template-columns:minmax(300px,1.2fr) minmax(260px,.8fr);margin:22px 0}.preview{align-items:center;background:#eef3ec;border:1px solid #d9e1d6;border-radius:12px;display:flex;justify-content:center;overflow:hidden;position:relative;aspect-ratio:16/10}.preview video{height:100%;object-fit:cover;transform:scaleX(-1);width:100%}.badge{background:#ffffffdd;border:1px solid #dbe3d8;border-radius:99px;bottom:12px;color:#40533f;font-size:12px;left:50%;padding:5px 9px;position:absolute;transform:translateX(-50%);white-space:nowrap}.diagnostics{display:grid;gap:10px}.diagnostics div{align-items:center;background:#f7f9f6;border:1px solid #dce5da;border-radius:10px;color:#6c746d;display:flex;font-weight:650;padding:14px;text-align:left}.diagnostics div[data-passed="true"]{background:#effaf1;border-color:#9fdfaa;color:#176b33}button{background:#102038;border:0;border-radius:99px;color:white;cursor:pointer;font:700 16px system-ui;padding:13px 26px}.privacy{font-size:12px;margin:18px auto 0;max-width:580px}body.compact{background:#eef3ec;display:block;overflow:hidden}body.compact .card{border:0;border-radius:0;box-shadow:none;height:100%;max-width:none;padding:0;width:100%}body.compact .card>:not(.camera-grid){display:none}body.compact .camera-grid{display:block;height:100%;margin:0}body.compact .preview{border:0;border-radius:0;height:100%;margin:0;width:100%}body.compact .diagnostics,body.compact .badge{display:none}@media(max-width:720px){.card{padding:24px;width:calc(100% - 28px)}.camera-grid{grid-template-columns:1fr}h1{font-size:32px}}</style></head><body><main class="card"><div class="eyebrow">Experimental participant session</div><h1>Camera check</h1><p id="status">Before calibration, make sure your camera setup looks good.</p><div class="camera-grid"><div class="preview"><video id="preview" autoplay muted playsinline></video><span class="badge" id="badge">Camera is off</span></div><div class="diagnostics"><div id="detection" data-passed="false">○ Camera not started</div><div id="distance" data-passed="false">○ Distance unavailable</div><div id="framing" data-passed="false">○ Framing unavailable</div><div id="lighting" data-passed="false">○ Lighting unavailable</div></div></div><button id="start">Start camera check</button><p class="privacy">Camera frames and face landmarks stay inside this extension canvas. Only consented coordinate estimates are sent during an active task.</p></main></body>`;
   let readyToCalibrate = false;
   document.querySelector<HTMLButtonElement>("#start")!.addEventListener("click", () => {
     const status = document.querySelector<HTMLElement>("#status")!, badge = document.querySelector<HTMLElement>("#badge")!, button = document.querySelector<HTMLButtonElement>("#start")!;
     if (readyToCalibrate) { document.body.classList.add("compact"); window.parent.postMessage({ type: "CAMERA_BEGIN_CALIBRATION", source: "webgaze-camera-runtime" }, "*"); return; }
     status.textContent = "Requesting camera permission…"; badge.textContent = "Waiting for permission"; button.disabled = true;
     void start().then((result) => {
-    if (result.ok) { readyToCalibrate = true; status.textContent = "Camera is ready. Center your face and hold still, then begin calibration."; badge.textContent = "Camera active"; button.textContent = "Begin 9-point calibration"; button.disabled = false; }
+    if (result.ok) { readyToCalibrate = true; status.textContent = "Review detection, distance, and framing, then continue."; badge.textContent = "Camera active"; button.textContent = "Yes, continue"; button.disabled = false; }
     else { status.textContent = `Camera check could not continue: ${result.error}`; badge.textContent = "Camera is off"; button.textContent = "Try camera check again"; button.disabled = false; }
     }).catch((error) => { status.textContent = `Camera check could not continue: ${errorMessage(error)}`; badge.textContent = "Camera is off"; button.disabled = false; });
   });

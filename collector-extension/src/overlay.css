@@ -25,6 +25,17 @@
 #webgaze-collector-overlay [data-webgaze-calibration-status]{color:#334d37;font-size:12px;font-weight:650;text-align:center}
 #webgaze-collector-overlay[data-mode="calibration"] [data-webgaze-target]{align-items:center;box-sizing:border-box;color:#fff;display:flex;font-size:10px;font-style:normal;font-weight:800;height:44px;justify-content:center;width:44px}
 #webgaze-collector-overlay [data-webgaze-boundary-guide]{border-top:2px dashed #74a95d;box-sizing:border-box;height:1px;pointer-events:none;position:fixed;transform-origin:left center;z-index:2}
+#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-panel]{background:#f5f7f4ee}
+#webgaze-collector-overlay[data-mode="calibration-intro"] .webgaze-panel-head{display:none}
+#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-stage]{padding:32px}
+#webgaze-collector-overlay[data-mode="calibration-intro"] .webgaze-intro{background:#fff;border:1px solid #dbe2e8;border-radius:24px;box-shadow:0 28px 70px #17231c2b;box-sizing:border-box;max-width:940px;padding:48px 54px;width:min(940px,calc(100vw - 64px))}
+#webgaze-collector-overlay[data-mode="calibration-intro"] .webgaze-eyebrow,#webgaze-collector-overlay[data-mode="calibration-intro"] .webgaze-preview,#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-checks],#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-privacy],#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-enable]{display:none}
+#webgaze-collector-overlay[data-mode="calibration-intro"] h1{border-bottom:1px solid #9da8b4;font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.03em;line-height:1.1;margin:0 0 24px;padding-bottom:14px}
+#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-status]{color:#45546b;font-size:18px;max-width:760px;min-height:0}
+#webgaze-collector-overlay[data-mode="calibration-intro"] button{display:inline-block;margin:12px 6px 0;width:auto}
+#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-secondary]{background:#e5eaf0;border-color:#e5eaf0;color:#102038}
+#webgaze-collector-overlay[data-mode="calibration-intro"] button:disabled{cursor:not-allowed;opacity:.45}
+#webgaze-collector-overlay[data-mode="calibration"][data-calibration-step="accuracy"] [data-webgaze-target]{background:#ffe24a;border-color:#18221c;box-shadow:0 0 0 7px #9bd8ff99,0 8px 26px #20362022;height:54px;width:54px}
 /* Keep the granted camera runtime mounted and processing, but never expose its
    preview once the participant leaves camera check. */
 #webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-camera-canvas],
@@ -32,3 +43,4 @@
 #webgaze-collector-overlay[data-mode="ready"] [data-webgaze-camera-canvas],
 #webgaze-collector-overlay[data-mode="task"] [data-webgaze-camera-canvas]{border:0;box-shadow:none;height:1px;inset:0 auto auto 0;opacity:0;pointer-events:none;width:1px}
 @media(max-width:760px){#webgaze-collector-overlay[data-mode="calibration"] [data-webgaze-progress]{bottom:12px;width:min(420px,calc(100vw - 48px))}}
+@media(max-width:760px){#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-stage]{padding:16px}#webgaze-collector-overlay[data-mode="calibration-intro"] .webgaze-intro{padding:28px 22px;width:calc(100vw - 32px)}#webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-status]{font-size:15px}}

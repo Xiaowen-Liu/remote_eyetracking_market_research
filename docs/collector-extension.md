@@ -26,13 +26,17 @@ calibration-dependent and is not a validated attention measurement.
    participant link, and explicitly accept the displayed consent text.
 6. The extension creates the anonymous participant session, opens the first
    task URL, and shows the in-page camera control. Start the camera, grant
-   browser permission, pass the local camera check, then complete the
-   three-step calibration: three captures at each nine-point target; a closed
+   browser permission, review the local detection/distance/framing/lighting
+   checks, then choose a saved local model or a new calibration. A new run
+   presents an overview and a separate introduction before each of three
+   stages: three captures at each nine-point target; a closed
    boundary trace with two captures per corner, speed/rail validation,
    120 ms passive samples, and one mid-edge anchor; then a five-second
    center-gaze accuracy check. Camera video and face-position guidance appear
    only during camera check; calibration and study tasks keep the local camera
-   runtime active without displaying either element.
+   runtime active without displaying either element. The accuracy stage ends
+   with an explicit percentage result and Recalibrate / OK decision; accepted
+   models are stored locally for the later saved-model path.
 7. When the server accepts calibration quality, return to the popup, start each
    task, and complete it from the popup. Finish by submitting the session.
 
