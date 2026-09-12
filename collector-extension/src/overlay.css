@@ -1,8 +1,19 @@
-#webgaze-collector-overlay { position: fixed; z-index: 2147483647; inset: 0; pointer-events: none; font: 12px system-ui, sans-serif; }
-#webgaze-collector-overlay [data-webgaze-status] { position: fixed; left: 16px; bottom: 16px; padding: 8px 10px; color: #eff8e8; background: #183022; border-radius: 8px; box-shadow: 0 4px 20px #0004; }
-#webgaze-collector-overlay button { position: fixed; left: 16px; bottom: 52px; pointer-events: auto; padding: 9px 12px; color: #17301e; background: #b8e96a; border: 0; border-radius: 8px; font-weight: 700; cursor: pointer; }
-#webgaze-collector-overlay [data-webgaze-calibrate] { bottom: 52px; }
-#webgaze-collector-overlay [data-webgaze-target] { position: fixed; width: 24px; height: 24px; transform: translate(-50%, -50%); pointer-events: auto; border: 5px solid #fff; border-radius: 50%; background: #77a82c; box-shadow: 0 0 0 5px #77a82c88; }
-#webgaze-collector-overlay [data-webgaze-dot], .webgaze-heat-point { position: fixed; transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%; }
-#webgaze-collector-overlay [data-webgaze-dot] { width: 14px; height: 14px; background: #ff5e4a; border: 3px solid #fff; box-shadow: 0 0 0 3px #ff5e4a66; }
-.webgaze-heat-point { width: 38px; height: 38px; background: #ff914766; filter: blur(6px); }
+#webgaze-collector-overlay { position: fixed; z-index: 2147483647; inset: 0; pointer-events: none; color: #edf5ec; font: 13px/1.4 system-ui, sans-serif; }
+#webgaze-collector-overlay [data-webgaze-panel] { position: fixed; left: 20px; bottom: 20px; width: 306px; padding: 14px; pointer-events: auto; border: 1px solid #617b67; border-radius: 12px; background: #14251a; box-shadow: 0 16px 44px #0008; }
+#webgaze-collector-overlay .webgaze-panel-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 10px; }
+#webgaze-collector-overlay .webgaze-panel-head span { color: #c9f284; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+#webgaze-collector-overlay .webgaze-panel-head strong { border: 1px solid #708a73; border-radius: 99px; color: #d9e8d8; font-size: 11px; padding: 3px 7px; }
+#webgaze-collector-overlay [data-webgaze-status] { margin: 0 0 10px; min-height: 36px; }
+#webgaze-collector-overlay .webgaze-preview { aspect-ratio: 16 / 9; background: #0b120d; border: 1px solid #405442; border-radius: 8px; overflow: hidden; position: relative; }
+#webgaze-collector-overlay [data-webgaze-video] { height: 100%; object-fit: cover; transform: scaleX(-1); width: 100%; }
+#webgaze-collector-overlay [data-webgaze-face] { background: #132619dd; bottom: 7px; border-radius: 4px; font-size: 11px; left: 7px; padding: 3px 6px; position: absolute; }
+#webgaze-collector-overlay [data-webgaze-checks] { display: grid; gap: 4px; list-style: none; margin: 10px 0; padding: 0; }
+#webgaze-collector-overlay [data-webgaze-checks] li { color: #bdcbbb; } #webgaze-collector-overlay [data-webgaze-checks] .passed { color: #c9f284; }
+#webgaze-collector-overlay [data-webgaze-privacy] { color: #a9b8aa; font-size: 11px; margin: 8px 0; }
+#webgaze-collector-overlay button { background: #c9f284; border: 0; border-radius: 7px; color: #152417; cursor: pointer; font: inherit; font-weight: 800; margin-top: 5px; padding: 9px 11px; width: 100%; }
+#webgaze-collector-overlay [data-webgaze-progress] { display: grid; gap: 5px; margin-top: 10px; } #webgaze-collector-overlay [data-webgaze-progress] span { color: #c9d6c9; font-size: 11px; }
+#webgaze-collector-overlay [data-webgaze-progress] i { background: #3e5442; border-radius: 99px; height: 5px; overflow: hidden; } #webgaze-collector-overlay [data-webgaze-progress] b { background: #c9f284; display: block; height: 100%; transition: width .2s ease; }
+#webgaze-collector-overlay [data-webgaze-target] { background: #b8ed65; border: 5px solid #fff; border-radius: 50%; box-shadow: 0 0 0 6px #b8ed6580, 0 0 28px #b8ed65; height: 22px; pointer-events: auto; position: fixed; transform: translate(-50%, -50%); width: 22px; }
+#webgaze-collector-overlay [data-webgaze-dot], .webgaze-heat-point { border-radius: 50%; pointer-events: none; position: fixed; transform: translate(-50%, -50%); }
+#webgaze-collector-overlay [data-webgaze-dot] { background: #ff5e4a; border: 3px solid #fff; box-shadow: 0 0 0 3px #ff5e4a66; height: 10px; width: 10px; }
+.webgaze-heat-point { background: #ff914766; filter: blur(6px); height: 38px; width: 38px; }
