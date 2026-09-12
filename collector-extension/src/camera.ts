@@ -1,6 +1,7 @@
 import { FaceLandmarker, FilesetResolver, type NormalizedLandmark } from "@mediapipe/tasks-vision";
 
 type Point = readonly [number, number];
+type FaceFrame = { detected: boolean; centered: boolean; inBounds: boolean; size: number };
 let video: HTMLVideoElement | null = null;
 let landmarker: FaceLandmarker | null = null;
 let stream: MediaStream | null = null;
@@ -14,6 +15,17 @@ function feature(landmarks: NormalizedLandmark[]): Point | null {
   return [((leftIris.x - (leftOuter.x + leftInner.x) / 2) / leftWidth + (rightIris.x - (rightOuter.x + rightInner.x) / 2) / rightWidth) / 2, ((leftIris.y - (leftOuter.y + leftInner.y) / 2) / leftWidth + (rightIris.y - (rightOuter.y + rightInner.y) / 2) / rightWidth) / 2];
 }
 
+function faceFrame(landmarks: NormalizedLandmark[]): FaceFrame {
+  if (!landmarks.length) return { detected: false, centered: false, inBounds: false, size: 0 };
+  const xs = landmarks.map((landmark) => landmark.x), ys = landmarks.map((landmark) => landmark.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const width = maxX - minX, height = maxY - minY, size = Math.max(width, height);
+  const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
+  const centered = Math.abs(centerX - .5) < .18 && Math.abs(centerY - .5) < .2;
+  const inBounds = centered && minX > .035 && maxX < .965 && minY > .035 && maxY < .965 && size > .17 && size < .78;
+  return { detected: true, centered, inBounds, size };
+}
+
 function errorMessage(error: unknown) {
   if (error && typeof error === "object" && "message" in error) return String((error as { message?: unknown }).message ?? error);
   if (error && typeof error === "object" && "type" in error) return `MediaPipe runtime load error (${String((error as { type?: unknown }).type ?? "unknown")})`;
@@ -22,8 +34,9 @@ function errorMessage(error: unknown) {
 
 function detect() {
   if (!video || !landmarker) return;
-  const value = feature(landmarker.detectForVideo(video, performance.now()).faceLandmarks[0] ?? []);
-  const message = { type: "CAMERA_FEATURE", source: "webgaze-camera-runtime", feature: value, at: new Date().toISOString(), video: { width: video.videoWidth, height: video.videoHeight } };
+  const landmarks = landmarker.detectForVideo(video, performance.now()).faceLandmarks[0] ?? [];
+  const value = feature(landmarks);
+  const message = { type: "CAMERA_FEATURE", source: "webgaze-camera-runtime", feature: value, face: faceFrame(landmarks), at: new Date().toISOString(), video: { width: video.videoWidth, height: video.videoHeight } };
   if (embedded) window.parent.postMessage(message, "*"); else void chrome.runtime.sendMessage({ type: "OFFSCREEN_CAMERA_FEATURE", ...message });
   frame = requestAnimationFrame(detect);
 }
