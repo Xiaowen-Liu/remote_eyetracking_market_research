@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:web": "vite --config apps/web/vite.config.ts",
-    "build:collector": "vite build --config collector-extension/vite.config.ts",
+    "build:collector": "vite build --config collector-extension/vite.config.ts && WEBGAZE_CAMERA_RUNTIME=1 vite build --config collector-extension/vite.config.ts",
     "build:web": "tsc -p apps/web/tsconfig.json && vite build --config apps/web/vite.config.ts",
     "db:migrate": "cd apps/api && ../../.venv/bin/alembic upgrade head",
     "db:seed": ".venv/bin/python -m webgaze_api.seed",

@@ -1,4 +1,3 @@
-import { FaceLandmarker, FilesetResolver, type NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { calibrationError, fitGazeModel, predictGaze, type CalibrationSample, type GazeModel } from "../../apps/web/src/gazeMath";
 
 type Point = readonly [number, number];
@@ -7,10 +6,8 @@ const targets: Point[] = [[.12, .14], [.5, .14], [.88, .14], [.12, .5], [.5, .5]
 const sampleIntervalMs = 100;
 const checkWindowSize = 18;
 
-let landmarker: FaceLandmarker | null = null;
-let video: HTMLVideoElement | null = null;
-let frame: number | null = null;
 let enabled = false;
+let cameraReady = false;
 let collecting = false;
 let samples: CapturedSample[] = [];
 let lastSampleAt = 0;
@@ -20,13 +17,6 @@ let calibrationIndex = 0;
 let calibrationSamples: CalibrationSample[] = [];
 let model: GazeModel | null = null;
 let calibrationStartedAt: string | null = null;
-
-function feature(landmarks: NormalizedLandmark[]): Point | null {
-  const leftIris = landmarks[468], rightIris = landmarks[473], leftOuter = landmarks[33], leftInner = landmarks[133], rightOuter = landmarks[263], rightInner = landmarks[362];
-  if (![leftIris, rightIris, leftOuter, leftInner, rightOuter, rightInner].every(Boolean)) return null;
-  const leftWidth = Math.abs(leftOuter.x - leftInner.x) || .001, rightWidth = Math.abs(rightOuter.x - rightInner.x) || .001;
-  return [((leftIris.x - (leftOuter.x + leftInner.x) / 2) / leftWidth + (rightIris.x - (rightOuter.x + rightInner.x) / 2) / rightWidth) / 2, ((leftIris.y - (leftOuter.y + leftInner.y) / 2) / leftWidth + (rightIris.y - (rightOuter.y + rightInner.y) / 2) / rightWidth) / 2];
-}
 
 function meanPoint(points: Point[]): Point | null {
   if (!points.length) return null;
@@ -51,7 +41,7 @@ function overlay() {
         <p class="webgaze-eyebrow">Experimental participant session</p>
         <h1 data-webgaze-title>Check your camera</h1>
         <p data-webgaze-status>Camera is off. Start the local camera check to continue.</p>
-        <div class="webgaze-preview"><video data-webgaze-video muted playsinline></video><span data-webgaze-face>Waiting for camera</span></div>
+        <div class="webgaze-preview"><span data-webgaze-face>Waiting for camera</span></div>
         <ul data-webgaze-checks><li data-check="camera">○ Camera permission</li><li data-check="face">○ Face landmarks</li><li data-check="steady">○ Hold still briefly</li></ul>
         <p data-webgaze-privacy>Camera frames and face landmarks remain in this browser tab. During an active task, the study API receives consented coordinate estimates, time, scroll position, and viewport context.</p>
         <button type="button" data-webgaze-enable>Start camera check</button><button type="button" data-webgaze-begin hidden>Begin 9-point calibration</button><button type="button" data-webgaze-calibrate hidden>Record point</button>
@@ -73,7 +63,7 @@ function setCheck(root: HTMLDivElement, name: "camera" | "face" | "steady", pass
 }
 
 function updateCameraCheck(root: HTMLDivElement) {
-  const hasCamera = Boolean(video?.videoWidth && video.videoHeight);
+  const hasCamera = cameraReady;
   const hasFace = Boolean(latestFeature);
   const stable = featureWindow.length >= checkWindowSize && motion(featureWindow) < .03;
   setCheck(root, "camera", hasCamera, hasCamera ? "Camera ready" : "Camera permission");
@@ -126,21 +116,10 @@ function recordCalibration(root: HTMLDivElement) {
 
 async function startCamera(root: HTMLDivElement) {
   try {
-    root.querySelector("[data-webgaze-status]")!.textContent = "Requesting camera permission…";
-    video = root.querySelector<HTMLVideoElement>("[data-webgaze-video]")!; video.muted = true; video.defaultMuted = true; video.autoplay = true; video.playsInline = true;
-    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
-    await new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(() => reject(new Error("Camera stream started but no video frames arrived")), 8000);
-      video!.onloadedmetadata = () => { window.clearTimeout(timeout); resolve(); };
-    });
-    // Popup-to-content messaging does not always preserve a user activation. A muted
-    // preview can still provide frames, so do not treat a browser autoplay rejection
-    // as a camera-permission failure.
-    await video.play().catch(() => undefined);
-    root.querySelector("[data-webgaze-status]")!.textContent = "Loading on-device landmark model…";
-    const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm");
-    landmarker = await FaceLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task" }, runningMode: "VIDEO", numFaces: 1, minFaceDetectionConfidence: .6, minFacePresenceConfidence: .6, minTrackingConfidence: .6 });
-    enabled = true; collecting = false; featureWindow = []; root.querySelector<HTMLButtonElement>("[data-webgaze-enable]")!.remove(); root.querySelector("[data-webgaze-status]")!.textContent = "Complete the camera check: center your face and hold still."; tick(root);
+    root.querySelector("[data-webgaze-status]")!.textContent = "Requesting camera permission from the secure extension runtime…";
+    const response = await chrome.runtime.sendMessage({ type: "START_CAMERA" });
+    if (!response?.ok) throw new Error(response?.error ?? "Extension camera runtime could not start");
+    cameraReady = true; enabled = true; collecting = false; featureWindow = []; root.querySelector<HTMLButtonElement>("[data-webgaze-enable]")!.remove(); root.querySelector("[data-webgaze-status]")!.textContent = "Camera is active. Center your face and hold still while on-device landmarks load."; updateCameraCheck(root);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown startup error";
     root.querySelector("[data-webgaze-status]")!.textContent = `Camera check could not continue: ${message}`;
@@ -148,9 +127,9 @@ async function startCamera(root: HTMLDivElement) {
   }
 }
 
-function tick(root: HTMLDivElement) {
-  if (!enabled || !video || !landmarker) return;
-  latestFeature = feature(landmarker.detectForVideo(video, performance.now()).faceLandmarks[0] ?? []);
+function processFeature(root: HTMLDivElement, value: Point | null) {
+  if (!enabled) return;
+  latestFeature = value;
   if (latestFeature) featureWindow = [...featureWindow.slice(-(checkWindowSize - 1)), latestFeature]; else featureWindow = [];
   updateCameraCheck(root);
   if (latestFeature && model) {
@@ -159,14 +138,14 @@ function tick(root: HTMLDivElement) {
     if (collecting) { const heat = document.createElement("i"); heat.className = "webgaze-heat-point"; heat.style.left = `${x * 100}%`; heat.style.top = `${y * 100}%`; root.querySelector("[data-webgaze-heat]")!.append(heat); if (root.querySelectorAll(".webgaze-heat-point").length > 90) heat.parentElement!.firstElementChild?.remove(); }
     const now = performance.now(); if (collecting && now - lastSampleAt >= sampleIntervalMs) { lastSampleAt = now; samples.push({ x, y, at: new Date().toISOString(), url: location.href, viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } }); if (samples.length >= 10) { chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; } }
   }
-  frame = requestAnimationFrame(() => tick(root));
 }
 
-function retryCalibration(root: HTMLDivElement) { model = null; collecting = false; calibrationIndex = 0; calibrationSamples = []; calibrationStartedAt = new Date().toISOString(); root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration"; showTarget(root); }
-function stop() { enabled = false; collecting = false; model = null; calibrationIndex = 0; calibrationSamples = []; lastSampleAt = 0; if (frame) cancelAnimationFrame(frame); landmarker?.close(); video?.srcObject && (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop()); document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
+function retryCalibration(root: HTMLDivElement) { model = null; collecting = false; calibrationIndex = 0; calibrationSamples = []; calibrationStartedAt = new Date().toISOString(); root.dataset.mode = "calibration"; root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration"; showTarget(root); }
+function stop() { enabled = false; cameraReady = false; collecting = false; model = null; calibrationIndex = 0; calibrationSamples = []; lastSampleAt = 0; void chrome.runtime.sendMessage({ type: "OFFSCREEN_STOP_CAMERA" }); document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.type === "COLLECTOR_ARM") overlay();
+  if (message.type === "CAMERA_FEATURE") { processFeature(overlay(), message.feature ?? null); }
   if (message.type === "COLLECTOR_START_TASK") { collecting = true; const root = overlay(); root.dataset.mode = "task"; root.querySelector("[data-webgaze-phase]")!.textContent = "Collecting"; root.querySelector("[data-webgaze-status]")!.textContent = `Collecting coordinate estimates for ${message.taskTitle ?? "current task"}.`; }
   if (message.type === "COLLECTOR_DRAIN_SAMPLES") { const drained = samples; samples = []; collecting = false; const root = document.querySelector<HTMLDivElement>("#webgaze-collector-overlay"); if (root) { root.querySelector("[data-webgaze-phase]")!.textContent = "Ready"; root.querySelector("[data-webgaze-status]")!.textContent = "Task saved. Return to the extension for the next task."; } respond({ samples: drained }); }
   if (message.type === "COLLECTOR_RETRY_CALIBRATION") retryCalibration(overlay());
