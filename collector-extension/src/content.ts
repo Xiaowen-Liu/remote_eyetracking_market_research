@@ -148,7 +148,7 @@ function showCalibrationInstructions(root: HTMLDivElement) {
 function beginCalibration(root: HTMLDivElement) {
   calibrationStage = "points";
   calibrationStartedAt = new Date().toISOString(); calibrationIndex = 0; calibrationRepeat = 0; boundaryIndex = 0; calibrationSamples = []; featureWindow = []; lastCalibrationFeatureFrame = featureFrameCount; model = null; collecting = false; accuracyStartedAt = null; accuracyErrors = [];
-  root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration";
+  root.querySelector("[data-webgaze-phase]")!.textContent = "Step 1 of 3";
   // Keep the extension-origin iframe alive while it becomes visually transparent.
   // It owns the granted camera stream and continues emitting local face features.
   root.querySelector<HTMLIFrameElement>("[data-webgaze-camera-canvas]")?.setAttribute("aria-hidden", "true");
@@ -268,7 +268,13 @@ window.addEventListener("message", (event) => {
   const canvas = root?.querySelector<HTMLIFrameElement>("[data-webgaze-camera-canvas]");
   const message = event.data;
   if (!root || !canvas || event.source !== canvas.contentWindow || message?.source !== "webgaze-camera-runtime") return;
-  if (message.type === "CAMERA_READY") { cameraReady = true; enabled = true; collecting = false; calibrationStage = "camera"; featureWindow = []; return; }
+  if (message.type === "CAMERA_READY") {
+    cameraReady = true; enabled = true;
+    // Runtime readiness may be reported again after an iframe lifecycle event.
+    // It is a health signal, never permission to reset an in-progress study.
+    if (calibrationStage === "camera") featureWindow = [];
+    return;
+  }
   if (message.type === "CAMERA_FEATURE") processFeature(root, message.feature ?? null, message.face);
   if (message.type === "CAMERA_BEGIN_CALIBRATION") showCalibrationInstructions(root);
   if (message.type === "CAMERA_STOPPED") { enabled = false; cameraReady = false; calibrationStage = "camera"; root.querySelector<HTMLIFrameElement>("[data-webgaze-camera-canvas]")?.remove(); root.dataset.mode = "camera"; cameraCanvas(root); }
