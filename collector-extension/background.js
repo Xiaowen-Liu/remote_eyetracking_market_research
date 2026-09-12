@@ -5,20 +5,6 @@ const key = "webgaze.experimental.collector.session";
 const read = async () => (await chrome.storage.session.get(key))[key] ?? null;
 const write = (session) => chrome.storage.session.set({ [key]: session });
 let operations = Promise.resolve();
-let cameraTabId = null;
-
-async function ensureCameraRuntime() {
-  const url = chrome.runtime.getURL("offscreen.html");
-  const contexts = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"], documentUrls: [url] });
-  if (!contexts.length) await chrome.offscreen.createDocument({ url: "offscreen.html", reasons: ["USER_MEDIA"], justification: "Run consented, on-device webcam gaze estimation for the active study participant." });
-}
-async function startCamera(tabId) {
-  cameraTabId = tabId;
-  await ensureCameraRuntime();
-  const result = await chrome.runtime.sendMessage({ type: "OFFSCREEN_START_CAMERA" });
-  if (!result?.ok) throw new Error(result?.error ?? "Extension camera runtime could not start");
-  return result;
-}
 
 async function request(session, path, init = {}) {
   const response = await fetch(apiUrl(session.apiBase, path), { ...init, headers: { "Content-Type": "application/json", ...init.headers } });
@@ -64,17 +50,11 @@ async function finishTask(session) {
 async function submitStudy(session) { if (session.taskRun || session.completedTasks !== session.protocol.tasks.length) throw new Error("Complete every task before submitting"); const submitted = await participantRequest(session, `/participant-sessions/${session.sessionId}/submit`, { method: "POST" }); const next = { ...session, phase: "submitted", submitted, lastError: null }; await write(next); return next; }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message.type === "OFFSCREEN_CAMERA_FEATURE") {
-    if (cameraTabId) void chrome.tabs.sendMessage(cameraTabId, { type: "CAMERA_FEATURE", feature: message.feature, at: message.at, video: message.video }).catch(() => undefined);
-    return;
-  }
-  if (message.type === "OFFSCREEN_START_CAMERA" || message.type === "OFFSCREEN_STOP_CAMERA") return;
   operations = operations.then(async () => {
     let session = await read();
     if (message.type === "STUDY_STATUS") { respond({ ok: true, state: studyState(session) }); return; }
     if (message.type === "CONNECT_STUDY") { const token = participantToken(message.participantLink ?? ""); if (!token) throw new Error("Paste a valid participant link or capability token"); const apiBase = message.apiBase?.trim() || defaultApiBase; const protocol = await request({ apiBase }, `/participate/${token}`); if (!protocol.collection_policy?.webcam_gaze_enabled) throw new Error("This study has not enabled experimental webcam gaze collection"); session = { ...newSession({ sessionId: crypto.randomUUID(), captureSnapshots: Boolean(message.captureSnapshots) }), apiBase, participantToken: token, protocol, phase: "consent", completedTasks: 0, pendingBatches: [], nextSequence: 0, lastError: null }; await write(session); respond({ ok: true, state: studyState(session) }); return; }
     if (!session) throw new Error("Connect a published study first");
-    if (message.type === "START_CAMERA") { if (!sender.tab?.id) throw new Error("Open the study target page before starting the camera"); await startCamera(sender.tab.id); respond({ ok: true }); return; }
     if (message.type === "ACCEPT_CONSENT") { session = await startStudy(session); respond({ ok: true, state: studyState(session) }); return; }
     if (message.type === "START_STUDY_TASK") { if (session.phase !== "ready") throw new Error("Finish accepted calibration before starting a task"); session = await startTask(session); respond({ ok: true, state: studyState(session) }); return; }
     if (message.type === "COMPLETE_STUDY_TASK") { session = await finishTask(session); respond({ ok: true, state: studyState(session) }); return; }
