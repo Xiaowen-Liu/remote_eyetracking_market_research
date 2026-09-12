@@ -4,5 +4,11 @@ let scrollTimer;
 addEventListener("scroll", () => { clearTimeout(scrollTimer); scrollTimer = setTimeout(() => send("scroll-settled", { x: scrollX, y: scrollY }), 250); }, { passive: true });
 addEventListener("popstate", () => send("history-navigation"));
 addEventListener("hashchange", () => send("hash-navigation"));
-new MutationObserver((entries) => { if (entries.some((entry) => entry.addedNodes.length || entry.removedNodes.length)) send("dom-change", { count: entries.length }); }).observe(document.documentElement, { childList: true, subtree: true });
+let mutationTimer;
+new MutationObserver((entries) => {
+  const pageEntries = entries.filter((entry) => !entry.target.closest?.("#webgaze-collector-overlay"));
+  if (!pageEntries.some((entry) => entry.addedNodes.length || entry.removedNodes.length)) return;
+  clearTimeout(mutationTimer);
+  mutationTimer = setTimeout(() => send("dom-change", { count: pageEntries.length }), 250);
+}).observe(document.documentElement, { childList: true, subtree: true });
 send("page-open");

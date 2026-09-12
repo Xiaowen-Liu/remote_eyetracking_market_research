@@ -46,6 +46,24 @@ let boundaryLastPassiveAt = 0;
 let boundaryLastPointer: (PixelPoint & { at: number; speed: number }) | null = null;
 let boundaryTimer: number | null = null;
 let boundaryRoot: HTMLDivElement | null = null;
+let sampleFlush = Promise.resolve();
+
+function clampCoordinate(value: number) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function flushSamples() {
+  if (!samples.length) return sampleFlush;
+  const batch = samples;
+  samples = [];
+  sampleFlush = sampleFlush.then(async () => {
+    const response = await chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples: batch });
+    if (!response?.ok) throw new Error(response?.error ?? "Gaze batch was not acknowledged");
+  }).catch(() => {
+    samples = [...batch, ...samples];
+  });
+  return sampleFlush;
+}
 
 function cameraCanvas(root: HTMLDivElement) {
   let canvas = root.querySelector<HTMLIFrameElement>("[data-webgaze-camera-canvas]");
@@ -526,20 +544,21 @@ function processFeature(root: HTMLDivElement, value: Point | null, frameData?: F
   const predicted = latestFeature && model ? predictGaze(model, latestFeature) : null;
   if (calibrationStage === "accuracy" && model) updateAccuracyCheck(root, predicted);
   if (predicted) {
-    const [x, y] = predicted;
+    const x = clampCoordinate(predicted[0]);
+    const y = clampCoordinate(predicted[1]);
     const point = root.querySelector<HTMLElement>("[data-webgaze-dot]")!; point.style.left = `${x * 100}%`; point.style.top = `${y * 100}%`;
     if (collecting) { const heat = document.createElement("i"); heat.className = "webgaze-heat-point"; heat.style.left = `${x * 100}%`; heat.style.top = `${y * 100}%`; root.querySelector("[data-webgaze-heat]")!.append(heat); if (root.querySelectorAll(".webgaze-heat-point").length > 90) heat.parentElement!.firstElementChild?.remove(); }
-    const now = performance.now(); if (collecting && now - lastSampleAt >= sampleIntervalMs) { lastSampleAt = now; samples.push({ x, y, at: new Date().toISOString(), url: location.href, viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } }); if (samples.length >= 10) { chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; } }
+    const now = performance.now(); if (collecting && now - lastSampleAt >= sampleIntervalMs) { lastSampleAt = now; samples.push({ x, y, at: new Date().toISOString(), url: location.href, viewport: { width: innerWidth, height: innerHeight }, scroll: { x: scrollX, y: scrollY } }); if (samples.length >= 10) void flushSamples(); }
   }
 }
 
 function retryCalibration(root: HTMLDivElement) { cleanupBoundaryCalibration(); calibrationStage = "points"; model = null; collecting = false; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; calibrationStartedAt = new Date().toISOString(); accuracyAccumulatedMs = 0; accuracyLastFrameAt = null; accuracyErrors = []; root.dataset.mode = "calibration"; root.dataset.calibrationStep = "points"; root.querySelector("[data-webgaze-phase]")!.textContent = "Calibration"; root.querySelector("[data-webgaze-title]")!.textContent = "Point calibration"; setCalibrationStatus(root, `Calibration needs another attempt. Click each point ${samplesPerTarget} times.`); showPointTarget(root); }
-function stop() { cleanupBoundaryCalibration(); enabled = false; cameraReady = false; collecting = false; model = null; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; lastSampleAt = 0; document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }); samples = []; }
+function stop() { cleanupBoundaryCalibration(); enabled = false; cameraReady = false; collecting = false; model = null; calibrationIndex = 0; calibrationRepeat = 0; calibrationSamples = []; lastSampleAt = 0; document.querySelector("#webgaze-collector-overlay")?.remove(); if (samples.length) void flushSamples(); }
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.type === "COLLECTOR_ARM") overlay();
   if (message.type === "COLLECTOR_START_TASK") { collecting = true; const root = overlay(); root.dataset.mode = "task"; root.querySelector("[data-webgaze-phase]")!.textContent = "Collecting"; root.querySelector("[data-webgaze-status]")!.textContent = `Collecting coordinate estimates for ${message.taskTitle ?? "current task"}.`; }
-  if (message.type === "COLLECTOR_DRAIN_SAMPLES") { const drained = samples; samples = []; collecting = false; const root = document.querySelector<HTMLDivElement>("#webgaze-collector-overlay"); if (root) { root.querySelector("[data-webgaze-phase]")!.textContent = "Ready"; root.querySelector("[data-webgaze-status]")!.textContent = "Task saved. Return to the extension for the next task."; } respond({ samples: drained }); }
+  if (message.type === "COLLECTOR_DRAIN_SAMPLES") { collecting = false; void sampleFlush.then(() => { const drained = samples; samples = []; const root = document.querySelector<HTMLDivElement>("#webgaze-collector-overlay"); if (root) { root.querySelector("[data-webgaze-phase]")!.textContent = "Ready"; root.querySelector("[data-webgaze-status]")!.textContent = "Task saved. Return to the extension for the next task."; } respond({ samples: drained }); }); return true; }
   if (message.type === "COLLECTOR_RETRY_CALIBRATION") retryCalibration(overlay());
   if (message.type === "COLLECTOR_STOP") stop();
 });
