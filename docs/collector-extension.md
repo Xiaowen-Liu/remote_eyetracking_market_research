@@ -25,9 +25,10 @@ calibration-dependent and is not a validated attention measurement.
 5. Open the target page for the study, open the extension popup, paste that
    participant link, and explicitly accept the displayed consent text.
 6. The extension creates the anonymous participant session, opens the first
-   task URL, and shows the in-page camera control. Click **Enable camera
-   locally**, grant the browser camera permission, and complete nine-point
-   calibration.
+   task URL, and shows the in-page camera control. Start the camera, grant
+   browser permission, pass the local camera check, then complete the
+   three-step calibration: three captures at each nine-point target, the
+   boundary path, and a five-second center-gaze accuracy check.
 7. When the server accepts calibration quality, return to the popup, start each
    task, and complete it from the popup. Finish by submitting the session.
 

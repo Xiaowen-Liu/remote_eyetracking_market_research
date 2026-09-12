@@ -45,6 +45,9 @@ async function start() {
   if (stream && landmarker) return { ok: true };
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+      if (embedded) window.parent.postMessage({ type: "CAMERA_STOPPED", source: "webgaze-camera-runtime" }, "*");
+    }, { once: true });
     video = embedded ? document.querySelector<HTMLVideoElement>("#preview")! : document.createElement("video"); video.autoplay = true; video.muted = true; video.playsInline = true; video.srcObject = stream;
     await new Promise<void>((resolve, reject) => { const timeout = window.setTimeout(() => reject(new Error("Camera stream started but no video frames arrived")), 8000); video!.onloadedmetadata = () => { window.clearTimeout(timeout); resolve(); }; });
     await video.play().catch(() => undefined);
