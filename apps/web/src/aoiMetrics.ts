@@ -15,6 +15,26 @@ export type AoiMetric = {
   samples: CollectorGazeSample[];
 };
 
+export type SessionAoiMetric = AoiMetric & {
+  sessionId: string;
+  sessionStartedAt: string;
+  sessionEndedAt?: string;
+};
+
+export type AggregateAoiMetric = {
+  aoi: AoiRectangle;
+  applicableSessions: number;
+  noticedSessions: number;
+  exposureRate: number;
+  averageDwellMs: number;
+  averageDwellProportion: number;
+  medianTtffMs: number | null;
+  medianFirstMeaningfulLatencyMs: number | null;
+  averageFirstMeaningfulDurationMs: number | null;
+  revisitRate: number;
+  sessionMetrics: SessionAoiMetric[];
+};
+
 const meaningfulVisitMs = 300;
 const visitGapMs = 350;
 
@@ -55,6 +75,51 @@ export function calculateAoiMetrics(aois: AoiRectangle[], samples: CollectorGaze
       revisitCount: Math.max(0, visits.length - 1),
       visits,
       samples: matching.map(({ sample }) => sample),
+    };
+  });
+}
+
+function average(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function median(values: number[]) {
+  if (!values.length) return null;
+  const ordered = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(ordered.length / 2);
+  return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
+}
+
+export function aggregateAoiMetrics(
+  aois: AoiRectangle[],
+  sessions: Array<{ sessionId: string; startedAt: string; endedAt?: string; samples: CollectorGazeSample[] }>,
+  isApplicable: (aoi: AoiRectangle, sessionId: string) => boolean = () => true,
+): AggregateAoiMetric[] {
+  return aois.map((aoi) => {
+    const sessionMetrics = sessions
+      .filter((session) => isApplicable(aoi, session.sessionId))
+      .map((session) => ({
+        ...calculateAoiMetrics([aoi], session.samples, session.startedAt)[0],
+        sessionId: session.sessionId,
+        sessionStartedAt: session.startedAt,
+        sessionEndedAt: session.endedAt,
+      }));
+    const noticed = sessionMetrics.filter((metric) => metric.sampleCount > 0);
+    const ttff = noticed.flatMap((metric) => metric.ttffMs == null ? [] : [metric.ttffMs]);
+    const latency = noticed.flatMap((metric) => metric.firstMeaningfulLatencyMs == null ? [] : [metric.firstMeaningfulLatencyMs]);
+    const duration = noticed.flatMap((metric) => metric.firstMeaningfulDurationMs == null ? [] : [metric.firstMeaningfulDurationMs]);
+    return {
+      aoi,
+      applicableSessions: sessionMetrics.length,
+      noticedSessions: noticed.length,
+      exposureRate: sessionMetrics.length ? noticed.length / sessionMetrics.length : 0,
+      averageDwellMs: average(noticed.map((metric) => metric.dwellMs)),
+      averageDwellProportion: average(noticed.map((metric) => metric.dwellProportion)),
+      medianTtffMs: median(ttff),
+      medianFirstMeaningfulLatencyMs: median(latency),
+      averageFirstMeaningfulDurationMs: duration.length ? average(duration) : null,
+      revisitRate: sessionMetrics.length ? sessionMetrics.filter((metric) => metric.revisitCount > 0).length / sessionMetrics.length : 0,
+      sessionMetrics,
     };
   });
 }
