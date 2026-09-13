@@ -8,6 +8,8 @@ dist/
 __pycache__/
 *.py[cod]
 coverage/
+playwright-report/
+test-results/
 *.log
 *.webm
 *.mp4

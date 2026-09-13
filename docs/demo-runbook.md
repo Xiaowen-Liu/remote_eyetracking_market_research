@@ -40,6 +40,14 @@ select **Load synthetic replay** in the same Results section. It uses a
 prominently labelled, in-repository fixture to demonstrate the replay UI; it
 does not represent a participant session or camera capture.
 
+## Automated browser check
+
+Run `npm run test:e2e` to build and load the unpacked MV3 extension in
+Playwright's Chromium. The suite verifies capability-link connection, authorized
+consent, navigation to the target page, content-overlay arming, and researcher
+import/replay of a privacy-preserving extension artifact. A real camera and gaze
+accuracy still require the manual extension walkthrough above.
+
 ## Talking points
 
 - Published versions are immutable, so protocol edits do not rewrite a participant's historical session.

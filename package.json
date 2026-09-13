@@ -15,12 +15,14 @@
     "test:extension": "node --test test/session.test.js test/collector-artifact.test.js test/study-session.test.js test/boundary-calibration.test.js",
     "test:web": "vitest run --config apps/web/vite.config.ts",
     "test:api": ".venv/bin/pytest apps/api/tests -q --cov=webgaze_api --cov-report=term-missing",
+    "test:e2e": "npm run build:collector && playwright test",
     "test": "npm run test:extension && npm run test:web && npm run test:api"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",

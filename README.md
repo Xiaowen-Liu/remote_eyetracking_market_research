@@ -118,12 +118,17 @@ uploaded by that review UI.
 
 ```bash
 npm test
+npm run test:e2e
 npm run build:web
 npm run generate:contract
 .venv/bin/ruff check apps/api
 ```
 
-CI runs the same suite, verifies that generated API contracts are committed, and applies/reverses/reapplies the production migration path against PostgreSQL.
+CI runs the same suite, exercises the unpacked MV3 extension and researcher
+artifact replay in headless Chromium, verifies that generated API contracts are
+committed, and applies/reverses/reapplies the production migration path against
+PostgreSQL. Camera hardware, permission prompts, and gaze accuracy remain a
+documented manual smoke test because CI has no representative participant setup.
 
 ## Deployment
 
