@@ -18,6 +18,17 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .study-identity { display: grid; justify-items: center; gap: 2px; max-width: 420px; }
 .study-identity span { color: #91a096; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .study-identity strong { overflow: hidden; max-width: 100%; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-actions { position: relative; justify-self: end; }
+.workspace-actions > summary { display: grid; place-items: center; width: 38px; height: 38px; color: #dfe8e1; border: 1px solid #45534b; border-radius: 999px; cursor: pointer; list-style: none; font-weight: 800; letter-spacing: .08em; }
+.workspace-actions > summary::-webkit-details-marker { display: none; }
+.workspace-actions[open] > summary { color: #17221d; background: #b8e96a; border-color: #b8e96a; }
+.workspace-actions-menu { position: absolute; top: 46px; right: 0; display: grid; gap: 6px; width: min(280px, 82vw); padding: 12px; color: #26352d; background: #fff; border: 1px solid #d7ddd6; border-radius: 10px; box-shadow: 0 18px 50px #07110b40; }
+.workspace-actions-menu strong { padding: 4px 7px 8px; color: #738078; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.workspace-actions-menu button, .workspace-action-import { width: 100%; padding: 9px 10px; color: #26352d; background: #f7f9f5; border: 1px solid #dce2db; border-radius: 7px; text-align: left; font-size: 12px; font-weight: 750; }
+.workspace-actions-menu button:hover:not(:disabled), .workspace-action-import:hover { background: #edf3e7; border-color: #bcccae; }
+.workspace-action-import { position: relative; cursor: pointer; }
+.workspace-action-import input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.workspace-actions-menu small { padding: 7px; color: #748078; font-size: 10px; line-height: 1.4; }
 .workspace-tabs { position: sticky; z-index: 19; top: 64px; display: flex; gap: 28px; padding: 0 4vw; background: #fff; border-bottom: 1px solid #d9ded8; }
 .workspace-tabs button, .analysis-tabs button { padding: 15px 2px 12px; color: #667169; background: transparent; border: 0; border-bottom: 3px solid transparent; font-weight: 750; }
 .workspace-tabs button.active, .analysis-tabs button.active { color: #24372c; border-bottom-color: #6d9636; }
@@ -159,6 +170,11 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .collector-summary .eyebrow { color: #68746c; }
 .collector-summary strong { overflow-wrap: anywhere; font-size: 13px; }
 .collector-summary span, .collector-summary small { color: #647069; font-size: 12px; line-height: 1.4; }
+.collector-summary .health-grade { width: fit-content; margin-top: 3px; padding: 5px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; text-transform: uppercase; cursor: help; }
+.health-grade.good { color: #28560d; background: #dff0c8; }
+.health-grade.usable { color: #475e17; background: #edf0c8; }
+.health-grade.directional { color: #75470c; background: #f8e4b9; }
+.health-grade.invalid { color: #7f2f24; background: #f7d9d2; }
 .collector-summary small { margin-top: 7px; padding-top: 10px; border-top: 1px solid #dce4d6; }
 .collector-timeline { min-width: 0; }
 .collector-timeline > p, .collector-snapshot > p { margin: 0; color: #68746c; font-size: 13px; line-height: 1.45; }
