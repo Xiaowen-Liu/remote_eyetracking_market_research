@@ -15,6 +15,7 @@ import { ExperimentalEyeTracking } from "./ExperimentalEyeTracking";
 import { buildHeatmap, domProposalStates, gazeSamplesForSnapshot, parseCollectorArtifact, type CollectorArtifact } from "./collectorArtifact";
 import { syntheticCollectorReplay } from "./demoCollectorArtifact";
 import { AOI_MEANINGFUL_VISIT_MS, calculateAoiMetrics } from "./aoiMetrics";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 const emptyDraft: StudyDraft = {
   title: "Accessible checkout attention study",
@@ -44,7 +45,7 @@ const emptyDraft: StudyDraft = {
 };
 
 type Notice = { kind: "success" | "error"; text: string } | null;
-type ReplayAoi = { id: string; label: string; x: number; y: number; width: number; height: number; source: "manual" };
+type ReplayAoi = { id: string; label: string; x: number; y: number; width: number; height: number; source: "manual" | "dom" };
 type SessionPreference = { name?: string; hidden?: boolean };
 
 type TaskAggregate = {
@@ -710,6 +711,7 @@ function ResultsDashboard({
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(true);
   const [collectorArtifact, setCollectorArtifact] = useState<CollectorArtifact | null>(null);
+  const [collectorArtifacts, setCollectorArtifacts] = useState<CollectorArtifact[]>([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState(0);
   const [workspaceView, setWorkspaceView] = useState<"analysis" | "sessions">("analysis");
   const [analysisView, setAnalysisView] = useState<"replay" | "metrics" | "dom">("replay");
@@ -855,18 +857,28 @@ function ResultsDashboard({
     setSelectedHeatSegment(0);
   }
 
-  async function importCollectorArtifact(file: File | undefined) {
-    if (!file) return;
+  async function importCollectorArtifacts(files: FileList | null) {
+    if (!files?.length) return;
     try {
-      const parsed = parseCollectorArtifact(JSON.parse(await file.text()));
+      const imported: CollectorArtifact[] = [];
+      for (const file of Array.from(files)) {
+        if (file.name.toLowerCase().endsWith(".zip")) {
+          const entries = unzipSync(new Uint8Array(await file.arrayBuffer()));
+          for (const [name, bytes] of Object.entries(entries)) if (name.toLowerCase().endsWith(".json")) imported.push(parseCollectorArtifact(JSON.parse(strFromU8(bytes))));
+        } else imported.push(parseCollectorArtifact(JSON.parse(await file.text())));
+      }
+      const merged = new Map(collectorArtifacts.map((artifact) => [artifact.sessionId, artifact]));
+      imported.forEach((artifact) => merged.set(artifact.sessionId, artifact));
+      const next = [...merged.values()].sort((a, b) => Date.parse(b.endedAt ?? b.startedAt) - Date.parse(a.endedAt ?? a.startedAt));
+      const parsed = imported.at(-1)!;
+      setCollectorArtifacts(next);
       setCollectorArtifact(parsed);
       setSelectedSnapshot(0);
       setReplayTimeMs(0);
       setReplayPlaying(false);
       restoreHeatPreferences(parsed);
-      setNotice({ kind: "success", text: "Collector session opened locally. It has not been uploaded to this study." });
+      setNotice({ kind: "success", text: `${imported.length} collector session${imported.length === 1 ? "" : "s"} imported locally and merged by session ID.` });
     } catch (error) {
-      setCollectorArtifact(null);
       const text = error instanceof Error ? error.message : "Could not read collector export.";
       setNotice({ kind: "error", text });
     }
@@ -874,6 +886,7 @@ function ResultsDashboard({
 
   function loadSyntheticCollectorReplay() {
     setCollectorArtifact(syntheticCollectorReplay);
+    setCollectorArtifacts((current) => [...new Map([...current, syntheticCollectorReplay].map((artifact) => [artifact.sessionId, artifact])).values()]);
     setSelectedSnapshot(0);
     setReplayTimeMs(0);
     setReplayPlaying(false);
@@ -928,7 +941,7 @@ function ResultsDashboard({
 
   function addProposal(label: string, proposal: { x: number; y: number; width: number; height: number }) {
     if (replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === label.toLocaleLowerCase())) return;
-    persistAois([...replayAois, { ...proposal, id: crypto.randomUUID(), label, source: "manual" }]);
+    persistAois([...replayAois, { ...proposal, id: crypto.randomUUID(), label, source: "dom" }]);
     setNotice({ kind: "success", text: `${label} was added to this study and is now available in AOI Metrics.` });
   }
 
@@ -944,10 +957,29 @@ function ResultsDashboard({
     localStorage.setItem(`webgaze.sessions.${study.id}`, JSON.stringify(next));
   }
 
+  function updateAoi(id: string, updates: Partial<ReplayAoi>) {
+    persistAois(replayAois.map((aoi) => aoi.id === id ? { ...aoi, ...updates } : aoi));
+  }
+
+  function removeAoi(id: string) {
+    persistAois(replayAois.filter((aoi) => aoi.id !== id));
+    if (selectedAoiId === id) setSelectedAoiId(null);
+    setNotice({ kind: "success", text: "AOI removed. Raw session data was not changed." });
+  }
+
   function downloadCollectorArtifact() {
     if (!collectorArtifact) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(collectorArtifact, null, 2)], { type: "application/json" }));
     const link = document.createElement("a"); link.href = url; link.download = `webgaze-session-${collectorArtifact.sessionId}.json`; link.click(); URL.revokeObjectURL(url);
+  }
+
+  function exportAnalysisBundle() {
+    const sessions = collectorArtifacts.length ? collectorArtifacts : collectorArtifact ? [collectorArtifact] : [];
+    const files: Record<string, Uint8Array> = {};
+    sessions.forEach((artifact) => { files[`sessions/${artifact.sessionId}.json`] = strToU8(JSON.stringify(artifact, null, 2)); });
+    files["analysis-workspace.json"] = strToU8(JSON.stringify({ study: { id: study.id, title: study.title }, aois: replayAois, heatPreferences: collectorArtifact ? { sessionId: collectorArtifact.sessionId, cuts: heatCuts, names: heatNames } : null, exportedAt: new Date().toISOString() }, null, 2));
+    const url = URL.createObjectURL(new Blob([zipSync(files)], { type: "application/zip" }));
+    const link = document.createElement("a"); link.href = url; link.download = `webgaze-analysis-${study.id}.zip`; link.click(); URL.revokeObjectURL(url);
   }
 
   async function exportHeatmap() {
@@ -1051,6 +1083,7 @@ function ResultsDashboard({
         {!busy && workspaceView === "analysis" && <>
         <section className="session-context" aria-label="Session context"><span>Session</span><select value={selectedJobId ?? ""} onChange={(event) => selectJob(event.target.value)} disabled={!jobs.length}><option value="">{jobs.length ? "Select a session" : "No visible sessions"}</option>{jobs.map((job, index) => <option key={job.id} value={job.id}>Session {jobs.length - index} · {job.status}</option>)}</select>{result && <><span className="context-chip">{String(result.diagnostics.sample_count)} samples</span><span className="context-chip">Calibration {String(result.quality.calibration_quality ?? "unavailable")}</span><span className="context-chip">{selectedJob?.status}</span></>}</section>
         <nav className="analysis-tabs" aria-label="Analysis views"><button type="button" className={analysisView === "replay" ? "active" : ""} onClick={() => setAnalysisView("replay")}>Replay</button><button type="button" className={analysisView === "metrics" ? "active" : ""} onClick={() => setAnalysisView("metrics")}>AOI Metrics</button><button type="button" className={analysisView === "dom" ? "active" : ""} onClick={() => setAnalysisView("dom")}>DOM Proposals</button></nav>
+        {analysisView === "metrics" && replayAois.length > 0 && <details className="aoi-management"><summary>Areas of Interest · {replayAois.length}</summary><p>Rename or fine-tune saved regions. Coordinate changes immediately recompute historical metrics.</p><div className="aoi-management-list">{replayAois.map((aoi, index) => <article key={aoi.id}><div className="aoi-management-title"><strong>AOI {index + 1}</strong><button className="text-button danger" type="button" onClick={() => removeAoi(aoi.id)}>Remove</button></div><label>Label<input value={aoi.label} onChange={(event) => updateAoi(aoi.id, { label: event.target.value })} /></label><span>Source: {aoi.source === "dom" ? "added from DOM proposal" : "manual AOI rectangle"}</span><details><summary>Advanced coordinates</summary><div className="coordinate-grid">{(["x", "y", "width", "height"] as const).map((field) => <label key={field}>{field}<input type="number" min="0" max="1" step="0.01" value={aoi[field]} onChange={(event) => updateAoi(aoi.id, { [field]: Number(event.target.value) || 0 })} /></label>)}</div></details></article>)}</div></details>}
         {analysisView === "metrics" && (!collectorArtifact || replayAois.length === 0) && <section className="empty-results dashboard-empty"><h2>AOI Performance Table</h2><p>{!collectorArtifact ? "Open a collector JSON in Replay to compute AOI metrics from its raw gaze samples." : "No AOIs yet. Draw one on the Replay canvas and return here; historical samples will be recomputed immediately."}</p></section>}
         {analysisView === "metrics" && collectorArtifact && replayAois.length > 0 && <section className="aoi-metrics-panel"><div className="aoi-metrics-heading"><div><p className="eyebrow">AOI metrics</p><h2>AOI Performance Table</h2><p>Metrics are recomputed from saved raw gaze samples using the current study AOIs. Meaningful visits require {AOI_MEANINGFUL_VISIT_MS}ms.</p></div><span className="context-chip">1 visible session</span></div><div className="session-table-wrap"><table className="session-table aoi-table"><thead><tr><th>Area of interest</th><th>Exposure</th><th>Dwell</th><th>Proportion</th><th>TTFF</th><th>Meaningful latency</th><th>Revisit</th></tr></thead><tbody>{aoiMetrics.map((metric) => <tr key={metric.aoi.id}><td><button className="aoi-name-button" type="button" onClick={() => { setSelectedAoiId(metric.aoi.id); setAoiDetailView("summary"); }}>{metric.aoi.label}</button></td><td>{metric.sampleCount ? "100%" : "0%"}</td><td>{formatReplayTime(metric.dwellMs)}</td><td>{Math.round(metric.dwellProportion * 100)}%</td><td>{metric.ttffMs == null ? "—" : formatReplayTime(metric.ttffMs)}</td><td>{metric.firstMeaningfulLatencyMs == null ? "—" : formatReplayTime(metric.firstMeaningfulLatencyMs)}</td><td>{metric.revisitCount ? "100%" : "0%"}</td></tr>)}</tbody></table></div>{selectedAoiMetric && <section className="aoi-drilldown"><div><p className="eyebrow">AOI drill-down</p><h3>{selectedAoiMetric.aoi.label}</h3><p>Move from aggregated metrics into per-session visits and underlying sample records.</p></div><nav className="drilldown-tabs">{(["summary", "sessions", "visits", "samples"] as const).map((view) => <button type="button" className={aoiDetailView === view ? "active" : ""} onClick={() => setAoiDetailView(view)} key={view}>{view}</button>)}</nav>{aoiDetailView === "summary" && <div className="aoi-summary-grid"><article><strong>Applicable sessions</strong><b>1</b><span>included in this AOI</span></article><article><strong>Sessions noticed</strong><b>{selectedAoiMetric.sampleCount ? 1 : 0}</b><span>had dwell above zero</span></article><article><strong>Total visits</strong><b>{selectedAoiMetric.visits.length}</b><span>initial visits plus revisits</span></article><article><strong>Raw samples</strong><b>{selectedAoiMetric.sampleCount}</b><span>inside this rectangle</span></article></div>}{aoiDetailView === "sessions" && <div className="drilldown-note"><strong>{collectorArtifact.sessionId}</strong><span>{selectedAoiMetric.sampleCount} samples · {formatReplayTime(selectedAoiMetric.dwellMs)} dwell</span><button type="button" className="secondary-button" onClick={() => setAnalysisView("replay")}>Open in Replay</button></div>}{aoiDetailView === "visits" && <div className="session-table-wrap"><table className="session-table"><thead><tr><th>Start</th><th>Duration</th><th>Samples</th><th>Meaningful</th></tr></thead><tbody>{selectedAoiMetric.visits.map((visit, index) => <tr key={visit.startedAt}><td>Visit {index + 1} · {new Date(visit.startedAt).toLocaleTimeString()}</td><td>{formatReplayTime(visit.durationMs)}</td><td>{visit.samples.length}</td><td>{visit.meaningful ? "Yes" : "No"}</td></tr>)}</tbody></table>{selectedAoiMetric.visits.length === 0 && <p>This AOI was not visited in the selected session.</p>}</div>}{aoiDetailView === "samples" && <><p className="drilldown-copy">{selectedAoiMetric.samples.length} matching rows. {selectedAoiMetric.samples.length > 250 && "Showing the first 250 matching raw rows to keep the dashboard readable."}</p><div className="session-table-wrap raw-sample-table"><table className="session-table"><thead><tr><th>Time</th><th>Viewport x/y</th><th>Scroll x/y</th></tr></thead><tbody>{selectedAoiMetric.samples.slice(0, 250).map((sample, index) => <tr key={`${sample.at}-${index}`}><td>{sample.at ? new Date(sample.at).toLocaleTimeString() : "—"}</td><td>{sample.x.toFixed(3)}, {sample.y.toFixed(3)}</td><td>{sample.scroll?.x ?? 0}, {sample.scroll?.y ?? 0}</td></tr>)}</tbody></table></div></>}</section>}</section>}
         {analysisView === "metrics" && !latest && <section className="empty-results"><h2>No server analysis yet</h2><p>Local AOI metrics remain available above. Submit a participant session to produce an immutable server analysis.</p><button className="primary-button" type="button" onClick={() => void loadSyntheticResults()}>Load synthetic demo results</button></section>}
@@ -1086,7 +1119,7 @@ function ResultsDashboard({
         {analysisView === "replay" && <section className="collector-review" aria-label="Collector session review">
           <div className="collector-review-heading">
             <div><p className="eyebrow">Local collector review</p><h2>Open an extension session</h2><p>Use this for a private researcher-side review of the exported artifact. The JSON stays in this browser and is not submitted to the API.</p></div>
-            <div className="collector-actions"><button className="secondary-button" type="button" onClick={loadSyntheticCollectorReplay}>Load synthetic replay</button><label className="secondary-button collector-import">Open collector JSON<input type="file" accept="application/json,.json" onChange={(event) => void importCollectorArtifact(event.target.files?.[0])} /></label></div>
+            <div className="collector-actions">{collectorArtifacts.length > 1 && <select aria-label="Replay session" value={collectorArtifact?.sessionId ?? ""} onChange={(event) => { const artifact = collectorArtifacts.find((item) => item.sessionId === event.target.value); if (artifact) { setCollectorArtifact(artifact); setReplayTimeMs(0); setSelectedSnapshot(0); restoreHeatPreferences(artifact); } }}>{collectorArtifacts.map((artifact) => <option value={artifact.sessionId} key={artifact.sessionId}>{artifact.sessionId.slice(0, 8)} · {(artifact.gazeSamples ?? []).length} samples</option>)}</select>}<button className="secondary-button" type="button" onClick={loadSyntheticCollectorReplay}>Load synthetic replay</button><label className="secondary-button collector-import">Import Sessions<input type="file" multiple accept="application/json,.json,.zip,application/zip" onChange={(event) => void importCollectorArtifacts(event.target.files)} /></label>{collectorArtifacts.length > 0 && <button className="secondary-button" type="button" onClick={exportAnalysisBundle}>Export Analysis Bundle</button>}</div>
           </div>
           {collectorArtifact && <div className="collector-artifact-grid">
             <aside className="collector-summary"><p className="eyebrow">{collectorArtifact.sessionId === syntheticCollectorReplay.sessionId ? "Synthetic replay fixture" : "Session artifact"}</p><strong>{collectorArtifact.sessionId}</strong><span>{collectorArtifact.gazeSamples?.length ?? 0} estimated samples</span><span>{collectorArtifact.events.length} timeline events</span><span>{collectorArtifact.snapshots.length} consented snapshots</span><small>Raw camera video: never exported</small></aside>
@@ -1095,7 +1128,7 @@ function ResultsDashboard({
           </div>}
         </section>}
         {analysisView === "dom" && proposalStates.length === 0 && <section className="empty-results dashboard-empty"><p className="eyebrow">Automatic AOI review</p><h2>DOM proposals</h2><p>{collectorArtifact ? "This replay session does not contain live DOM proposal AOIs. Replay screenshots are not used to reconstruct missing DOM proposals." : "Select or import a replay session to review live DOM proposal AOIs."}</p></section>}
-        {analysisView === "dom" && proposalState && collectorArtifact && <section className="dom-proposals-panel"><div className="dom-proposals-header"><div><p className="eyebrow">Automatic AOI review</p><h2>DOM Proposals</h2><p>Review regions captured from the live DOM at recording time.</p></div><button className="primary-button" type="button" disabled={!newProposals.length} onClick={() => { const additions = newProposals.map((proposal) => ({ ...proposal, id: crypto.randomUUID(), source: "manual" as const })); persistAois([...replayAois, ...additions]); setNotice({ kind: "success", text: `${additions.length} DOM proposals were added to this study.` }); }}>{newProposals.length ? `Add ${newProposals.length} New` : "All Added"}</button></div><div className="proposal-toolbar"><label>Screen state<select value={proposalStateIndex} onChange={(event) => { setProposalStateIndex(Number(event.target.value)); setSelectedProposalIndex(0); }}>{proposalStates.map((state, index) => <option value={index} key={`${state.at}-${index}`}>{new Date(state.at).toLocaleTimeString()} · {state.trigger} · {state.proposals.length}</option>)}</select></label><span className="context-chip">{proposalState.proposals.length} on screen</span><span className="context-chip">{newProposals.length} new</span><span className="context-chip">{proposalState.proposals.length - newProposals.length} added</span></div><div className="proposal-grid"><section><div className="snapshot-title"><h3>Screen Preview</h3><span>{new Date(proposalState.at).toLocaleTimeString()} · {proposalState.trigger}</span></div>{collectorArtifact.snapshots[proposalSnapshotIndex] ? <div className="proposal-preview"><img src={collectorArtifact.snapshots[proposalSnapshotIndex].dataUrl} alt="Recorded page state" />{proposalState.proposals.map((proposal, index) => <button type="button" key={`${proposal.label}-${index}`} className={selectedProposalIndex === index ? "selected" : ""} aria-label={`Select ${proposal.label}`} onClick={() => setSelectedProposalIndex(index)} style={{ left: `${Math.max(0, proposal.x) * 100}%`, top: `${Math.max(0, proposal.y) * 100}%`, width: `${Math.min(1, proposal.width) * 100}%`, height: `${Math.min(1, proposal.height) * 100}%` }}>{selectedProposalIndex === index ? "Selected" : index + 1}</button>)}</div> : <p>This screen state has DOM proposals, but no matching screenshot preview was saved.</p>}</section><aside><div className="proposal-inspector"><p className="eyebrow">Selected candidate</p><h3>{selectedProposal?.label ?? "No proposal selected"}</h3>{selectedProposal && <><span>{selectedProposal.tag}{selectedProposal.role ? ` · ${selectedProposal.role}` : ""}</span><p>{Math.round(selectedProposal.width * 100)}% × {Math.round(selectedProposal.height * 100)}% of viewport</p><button className="primary-button" type="button" disabled={replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === selectedProposal.label.toLocaleLowerCase())} onClick={() => addProposal(selectedProposal.label, selectedProposal)}>{replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === selectedProposal.label.toLocaleLowerCase()) ? "Added" : "Add to Study"}</button></>}</div><ol className="proposal-list">{proposalState.proposals.map((proposal, index) => { const added = replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === proposal.label.toLocaleLowerCase()); return <li className={selectedProposalIndex === index ? "selected" : ""} key={`${proposal.label}-${index}`}><button type="button" onClick={() => setSelectedProposalIndex(index)}><b>{index + 1}</b><span><strong>{proposal.label}</strong><small>{proposal.tag} · {Math.round(proposal.width * proposal.height * 100)}% viewport</small></span><em>{added ? "Added" : "Review"}</em></button></li>; })}</ol></aside></div></section>}
+        {analysisView === "dom" && proposalState && collectorArtifact && <section className="dom-proposals-panel"><div className="dom-proposals-header"><div><p className="eyebrow">Automatic AOI review</p><h2>DOM Proposals</h2><p>Review regions captured from the live DOM at recording time.</p></div><button className="primary-button" type="button" disabled={!newProposals.length} onClick={() => { const additions = newProposals.map((proposal) => ({ ...proposal, id: crypto.randomUUID(), source: "dom" as const })); persistAois([...replayAois, ...additions]); setNotice({ kind: "success", text: `${additions.length} DOM proposals were added to this study.` }); }}>{newProposals.length ? `Add ${newProposals.length} New` : "All Added"}</button></div><div className="proposal-toolbar"><label>Screen state<select value={proposalStateIndex} onChange={(event) => { setProposalStateIndex(Number(event.target.value)); setSelectedProposalIndex(0); }}>{proposalStates.map((state, index) => <option value={index} key={`${state.at}-${index}`}>{new Date(state.at).toLocaleTimeString()} · {state.trigger} · {state.proposals.length}</option>)}</select></label><span className="context-chip">{proposalState.proposals.length} on screen</span><span className="context-chip">{newProposals.length} new</span><span className="context-chip">{proposalState.proposals.length - newProposals.length} added</span></div><div className="proposal-grid"><section><div className="snapshot-title"><h3>Screen Preview</h3><span>{new Date(proposalState.at).toLocaleTimeString()} · {proposalState.trigger}</span></div>{collectorArtifact.snapshots[proposalSnapshotIndex] ? <div className="proposal-preview"><img src={collectorArtifact.snapshots[proposalSnapshotIndex].dataUrl} alt="Recorded page state" />{proposalState.proposals.map((proposal, index) => <button type="button" key={`${proposal.label}-${index}`} className={selectedProposalIndex === index ? "selected" : ""} aria-label={`Select ${proposal.label}`} onClick={() => setSelectedProposalIndex(index)} style={{ left: `${Math.max(0, proposal.x) * 100}%`, top: `${Math.max(0, proposal.y) * 100}%`, width: `${Math.min(1, proposal.width) * 100}%`, height: `${Math.min(1, proposal.height) * 100}%` }}>{selectedProposalIndex === index ? "Selected" : index + 1}</button>)}</div> : <p>This screen state has DOM proposals, but no matching screenshot preview was saved.</p>}</section><aside><div className="proposal-inspector"><p className="eyebrow">Selected candidate</p><h3>{selectedProposal?.label ?? "No proposal selected"}</h3>{selectedProposal && <><span>{selectedProposal.tag}{selectedProposal.role ? ` · ${selectedProposal.role}` : ""}</span><p>{Math.round(selectedProposal.width * 100)}% × {Math.round(selectedProposal.height * 100)}% of viewport</p><button className="primary-button" type="button" disabled={replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === selectedProposal.label.toLocaleLowerCase())} onClick={() => addProposal(selectedProposal.label, selectedProposal)}>{replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === selectedProposal.label.toLocaleLowerCase()) ? "Added" : "Add to Study"}</button></>}</div><ol className="proposal-list">{proposalState.proposals.map((proposal, index) => { const added = replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === proposal.label.toLocaleLowerCase()); return <li className={selectedProposalIndex === index ? "selected" : ""} key={`${proposal.label}-${index}`}><button type="button" onClick={() => setSelectedProposalIndex(index)}><b>{index + 1}</b><span><strong>{proposal.label}</strong><small>{proposal.tag} · {Math.round(proposal.width * proposal.height * 100)}% viewport</small></span><em>{added ? "Added" : "Review"}</em></button></li>; })}</ol></aside></div></section>}
         </>}
       </main>
     </div>
