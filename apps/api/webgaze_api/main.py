@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .errors import install_error_handlers
-from .routers import analysis, health, participants, projects, studies
+from .routers import analysis, auth, health, participants, projects, studies
 
 
 def create_app() -> FastAPI:
@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
     )
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(auth.router, prefix="/api/v1")
     app.include_router(projects.router, prefix="/api/v1")
     app.include_router(studies.router, prefix="/api/v1")
     app.include_router(participants.router, prefix="/api/v1")

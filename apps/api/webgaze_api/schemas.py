@@ -34,6 +34,24 @@ class HealthResponse(ApiModel):
     service: Literal["webgaze-api"] = "webgaze-api"
 
 
+class ResearcherResponse(ApiModel):
+    id: UUID
+    email: str
+    display_name: str
+
+
+class ResearcherLogin(ApiModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=12, max_length=256)
+
+
+class ResearcherSessionResponse(ApiModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_at: datetime
+    researcher: ResearcherResponse
+
+
 class ProjectCreate(ApiModel):
     name: str = Field(min_length=1, max_length=160)
     research_question: str | None = Field(default=None, max_length=4000)

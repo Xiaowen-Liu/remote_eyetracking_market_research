@@ -3,8 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import { ApiClientError } from "./api";
 
 const apiMocks = vi.hoisted(() => ({
+  loginResearcher: vi.fn(),
+  getCurrentResearcher: vi.fn(),
+  logoutResearcher: vi.fn(),
   listProjects: vi.fn(),
   createProject: vi.fn(),
   listStudies: vi.fn(),
@@ -15,14 +19,26 @@ const apiMocks = vi.hoisted(() => ({
   publish: vi.fn(),
 }));
 
+const authMocks = vi.hoisted(() => ({
+  hasResearcherToken: vi.fn(),
+  saveResearcherToken: vi.fn(),
+}));
+
 vi.mock("./api", () => ({
   api: apiMocks,
-  ApiClientError: class ApiClientError extends Error {},
+  ApiClientError: class ApiClientError extends Error {
+    constructor(message: string, readonly code: string) {
+      super(message);
+    }
+  },
+  hasResearcherToken: authMocks.hasResearcherToken,
+  saveResearcherToken: authMocks.saveResearcherToken,
 }));
 
 describe("Study Builder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authMocks.hasResearcherToken.mockReturnValue(false);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -45,6 +61,40 @@ describe("Study Builder", () => {
     apiMocks.getParticipantLink.mockResolvedValue({
       participant_url: "/participate/demo-link",
     });
+  });
+
+  it("signs a researcher in when the API requires authentication", async () => {
+    const user = userEvent.setup();
+    const required = new ApiClientError(
+      "Researcher authentication is required.",
+      "RESEARCHER_AUTH_REQUIRED",
+    );
+    apiMocks.listProjects.mockRejectedValueOnce(required);
+    apiMocks.loginResearcher.mockResolvedValue({
+      access_token: "researcher-session-token",
+      token_type: "bearer",
+      expires_at: "2026-09-08T12:00:00Z",
+      researcher: {
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "researcher@example.com",
+        display_name: "Demo Researcher",
+      },
+    });
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Sign in to your studies" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Email"), "researcher@example.com");
+    await user.type(screen.getByLabelText("Password"), "a-secure-demo-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => {
+      expect(apiMocks.loginResearcher).toHaveBeenCalledWith(
+        "researcher@example.com",
+        "a-secure-demo-password",
+      );
+      expect(authMocks.saveResearcherToken).toHaveBeenCalledWith("researcher-session-token");
+    });
+    expect(await screen.findByText("Checkout UX research")).toBeInTheDocument();
   });
 
   it("adds tasks while preserving contiguous task numbering", async () => {

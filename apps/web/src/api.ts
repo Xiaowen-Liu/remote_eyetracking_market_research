@@ -16,8 +16,12 @@ export type SessionSubmit = components["schemas"]["SessionSubmitResponse"];
 export type AnalysisJob = components["schemas"]["AnalysisJobResponse"];
 export type AnalysisResult = components["schemas"]["AnalysisResultResponse"];
 export type ParticipantSessionSummary = components["schemas"]["ParticipantSessionSummary"];
+export type Researcher = components["schemas"]["ResearcherResponse"];
+export type ResearcherSession = components["schemas"]["ResearcherSessionResponse"];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const RESEARCHER_TOKEN_KEY = "webgaze.researcher.access-token";
+let memoryResearcherToken: string | null = null;
 
 export class ApiClientError extends Error {
   constructor(message: string, readonly code: string) {
@@ -40,8 +44,45 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.status === 204 ? (undefined as T) : response.json();
 }
 
-async function download(path: string): Promise<Blob> {
-  const response = await fetch(`${API_BASE}/api/v1${path}`);
+function researcherToken(): string | null {
+  if (memoryResearcherToken) return memoryResearcherToken;
+  try {
+    return window.localStorage.getItem(RESEARCHER_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveResearcherToken(token: string | null) {
+  memoryResearcherToken = token;
+  try {
+    if (token) window.localStorage.setItem(RESEARCHER_TOKEN_KEY, token);
+    else window.localStorage.removeItem(RESEARCHER_TOKEN_KEY);
+  } catch {
+    // The in-memory copy keeps the current tab usable when persistent storage is disabled.
+  }
+}
+
+export function hasResearcherToken(): boolean {
+  return Boolean(researcherToken());
+}
+
+function researcherRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = researcherToken();
+  return request(path, {
+    ...init,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  });
+}
+
+async function researcherDownload(path: string): Promise<Blob> {
+  const token = researcherToken();
+  const response = await fetch(`${API_BASE}/api/v1${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new ApiClientError(
@@ -57,9 +98,16 @@ function participantHeaders(accessToken: string) {
 }
 
 export const api = {
-  listProjects: () => request<{ items: Project[]; total: number }>("/projects"),
+  loginResearcher: (email: string, password: string) =>
+    request<ResearcherSession>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  getCurrentResearcher: () => researcherRequest<Researcher>("/auth/me"),
+  logoutResearcher: () => researcherRequest<void>("/auth/logout", { method: "POST" }),
+  listProjects: () => researcherRequest<{ items: Project[]; total: number }>("/projects"),
   createProject: (name: string, researchQuestion?: string) =>
-    request<Project>("/projects", {
+    researcherRequest<Project>("/projects", {
       method: "POST",
       body: JSON.stringify({
         name,
@@ -67,22 +115,22 @@ export const api = {
       }),
     }),
   listStudies: (projectId: string) =>
-    request<{ items: StudySummary[]; total: number }>(`/projects/${projectId}/studies`),
-  getDraft: (studyId: string) => request<StudyDraftResponse>(`/studies/${studyId}/draft`),
+    researcherRequest<{ items: StudySummary[]; total: number }>(`/projects/${projectId}/studies`),
+  getDraft: (studyId: string) => researcherRequest<StudyDraftResponse>(`/studies/${studyId}/draft`),
   getParticipantLink: (studyId: string) =>
-    request<ParticipantLink>(`/studies/${studyId}/participant-link`),
+    researcherRequest<ParticipantLink>(`/studies/${studyId}/participant-link`),
   createStudy: (projectId: string, draft: StudyDraft) =>
-    request<StudyDraftResponse>(`/projects/${projectId}/studies`, {
+    researcherRequest<StudyDraftResponse>(`/projects/${projectId}/studies`, {
       method: "POST",
       body: JSON.stringify(draft),
     }),
   replaceDraft: (studyId: string, draft: StudyDraft) =>
-    request<StudyDraftResponse>(`/studies/${studyId}/draft`, {
+    researcherRequest<StudyDraftResponse>(`/studies/${studyId}/draft`, {
       method: "PUT",
       body: JSON.stringify(draft),
     }),
   publish: (studyId: string) =>
-    request<PublishResponse>(`/studies/${studyId}/publish`, {
+    researcherRequest<PublishResponse>(`/studies/${studyId}/publish`, {
       method: "POST",
       headers: { "Idempotency-Key": crypto.randomUUID() },
     }),
@@ -148,14 +196,14 @@ export const api = {
       headers: participantHeaders(accessToken),
     }),
   listStudyAnalysisJobs: (studyId: string) =>
-    request<{ items: AnalysisJob[]; total: number }>(`/studies/${studyId}/analysis-jobs`),
+    researcherRequest<{ items: AnalysisJob[]; total: number }>(`/studies/${studyId}/analysis-jobs`),
   listStudyParticipantSessions: (studyId: string) =>
-    request<{ items: ParticipantSessionSummary[]; total: number }>(`/studies/${studyId}/participant-sessions`),
+    researcherRequest<{ items: ParticipantSessionSummary[]; total: number }>(`/studies/${studyId}/participant-sessions`),
   runAnalysisJob: (jobId: string) =>
-    request<AnalysisResult>(`/analysis-jobs/${jobId}/run`, { method: "POST" }),
-  getAnalysisResult: (jobId: string) => request<AnalysisResult>(`/analysis-jobs/${jobId}/result`),
+    researcherRequest<AnalysisResult>(`/analysis-jobs/${jobId}/run`, { method: "POST" }),
+  getAnalysisResult: (jobId: string) => researcherRequest<AnalysisResult>(`/analysis-jobs/${jobId}/result`),
   createSyntheticStudyResults: (studyId: string) =>
-    request<AnalysisResult>(`/studies/${studyId}/synthetic-results`, { method: "POST" }),
+    researcherRequest<AnalysisResult>(`/studies/${studyId}/synthetic-results`, { method: "POST" }),
   downloadAnalysisExport: (jobId: string, format: "json" | "csv") =>
-    download(`/analysis-jobs/${jobId}/export?format=${format}`),
+    researcherDownload(`/analysis-jobs/${jobId}/export?format=${format}`),
 };

@@ -14,6 +14,10 @@ WEBGAZE_ENVIRONMENT=production
 WEBGAZE_DATABASE_URL=${{Postgres.DATABASE_URL}}
 WEBGAZE_CORS_ORIGINS=["https://your-project.vercel.app"]
 WEBGAZE_SQL_ECHO=false
+WEBGAZE_RESEARCHER_AUTH_REQUIRED=true
+WEBGAZE_RESEARCHER_SESSION_HOURS=12
+WEBGAZE_DEMO_RESEARCHER_EMAIL=your-researcher@example.com
+WEBGAZE_DEMO_RESEARCHER_PASSWORD=<unique-secret-at-least-12-characters>
 ```
 
 Vercel:
@@ -31,6 +35,25 @@ VITE_API_URL=https://your-api.up.railway.app
 5. Smoke-test project creation, publishing, participant-link resolution, synthetic flow, results, and export.
 6. Confirm the UI labels synthetic data as synthetic.
 
+## Enabling researcher sign-in
+
+Enable authentication as a staged migration so the deployed workspace is never
+locked before an account exists:
+
+1. Deploy the API migration with `WEBGAZE_RESEARCHER_AUTH_REQUIRED=false`.
+2. Set a unique researcher email and password in Railway's service variables.
+3. Run `npm run db:seed` once against the Railway database. Re-running it rotates
+   the seeded researcher's password to the currently configured secret.
+4. Set `WEBGAZE_RESEARCHER_AUTH_REQUIRED=true` and redeploy the API.
+5. Open the Vercel app in a private browser window, sign in, verify project and
+   result access, then sign out and confirm the workspace is locked again.
+
+Do not place the researcher password in Vercel variables or commit it to Git. The
+web client sends it only to the API login endpoint and stores only the returned
+opaque session token.
+
 ## Non-goals for this public demo
 
-Do not connect real participant, camera, or sensitive study data without implementing researcher authentication, rate limits, abuse controls, retention jobs, monitoring, and an appropriate privacy/security review.
+Do not connect sensitive or consequential human-subject research data without
+per-project authorization, rate limits, abuse controls, retention jobs, monitoring,
+and an appropriate privacy/security review.
