@@ -17,3 +17,33 @@ test("collector snapshots retain viewport context when the policy is enabled", (
   assert.deepEqual(captured.snapshots[0].viewport, { width: 1280, height: 720 });
   assert.deepEqual(captured.snapshots[0].scroll, { x: 0, y: 240 });
 });
+
+test("collector export whitelists research data and excludes session credentials", () => {
+  const session = {
+    ...newSession({ sessionId: "session-3", captureSnapshots: false }),
+    apiBase: "https://api.example.test",
+    accessToken: "participant-access-secret",
+    participantToken: "participant-capability-secret",
+    protocol: { title: "Private protocol" },
+    pendingBatches: [{ sequence: 4 }],
+    lastError: "internal transport detail",
+    gazeSamples: [{ x: 0.4, y: 0.6, at: "2026-01-01T00:00:01Z" }],
+    calibration: {
+      attempt: 1,
+      observed_sample_count: 45,
+      error_px: 42,
+      quality_grade: "strong",
+      accepted: true,
+    },
+  };
+
+  const artifact = exportArtifact(session, "2026-01-01T00:00:02Z");
+  assert.equal(artifact.gazeSamples.length, 1);
+  assert.equal(artifact.calibration.quality_grade, "strong");
+  assert.equal("apiBase" in artifact, false);
+  assert.equal("accessToken" in artifact, false);
+  assert.equal("participantToken" in artifact, false);
+  assert.equal("protocol" in artifact, false);
+  assert.equal("pendingBatches" in artifact, false);
+  assert.equal("lastError" in artifact, false);
+});

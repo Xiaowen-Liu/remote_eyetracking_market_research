@@ -18,21 +18,19 @@ gaze estimation has laboratory-grade accuracy.
 - [x] IndexedDB session archive with rename, hide/unhide, download, and confirmed deletion
 - [x] Multi-file JSON/ZIP import, raw-session export, analysis-bundle export, and transparent session-health grading
 - [x] Headless Chromium journeys for extension consent/overlay arming and researcher artifact replay
+- [x] Extension lifecycle E2E across calibration acceptance, task execution, retry-safe ingestion, submission, and credential-free export
 - [x] Vercel web deployment, Railway API/PostgreSQL deployment, OpenAPI contract generation, and CI migration checks
 
 ## Next engineering milestones
 
-1. **Camera journey hardening** — expand the current browser automation across
-   calibration transitions, task recording, and export; keep real hardware,
-   permission prompts, and accuracy as a documented manual smoke test.
-2. **Researcher identity and authorization** — replace the temporary demo-owner
+1. **Researcher identity and authorization** — replace the temporary demo-owner
    seam with real authentication, per-project roles, and auditable access.
-3. **Retention enforcement** — turn each study's retention policy into a tested
+2. **Retention enforcement** — turn each study's retention policy into a tested
    deletion workflow for server telemetry, snapshots, exports, and audit-safe
    tombstones.
-4. **Operational hardening** — queue-backed analysis workers, rate limits,
+3. **Operational hardening** — queue-backed analysis workers, rate limits,
    structured observability, retry/dead-letter handling, and production alerts.
-5. **Accessibility and performance pass** — keyboard-complete replay controls,
+4. **Accessibility and performance pass** — keyboard-complete replay controls,
    reduced-motion behavior, screen-reader status announcements, large-session
    virtualization, and measurable performance budgets.
 

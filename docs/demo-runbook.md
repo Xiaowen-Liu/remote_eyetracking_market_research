@@ -44,9 +44,11 @@ does not represent a participant session or camera capture.
 
 Run `npm run test:e2e` to build and load the unpacked MV3 extension in
 Playwright's Chromium. The suite verifies capability-link connection, authorized
-consent, navigation to the target page, content-overlay arming, and researcher
-import/replay of a privacy-preserving extension artifact. A real camera and gaze
-accuracy still require the manual extension walkthrough above.
+consent, navigation to the target page, content-overlay arming, calibration
+acceptance, ordered task execution, failed-batch retry, submission,
+credential-free artifact export, and researcher import/replay. A real camera,
+browser permission prompt, and gaze accuracy still require the manual extension
+walkthrough above.
 
 ## Talking points
 
