@@ -48,6 +48,7 @@ flowchart LR
 | Frontend contracts | OpenAPI is generated from FastAPI and TypeScript types are generated in CI | Prevents silently drifting frontend/backend interfaces. |
 
 More detailed reasoning is in the [architecture notes](docs/architecture.md) and [ADRs](docs/adr).
+Current delivery status and remaining production gaps are tracked in the [roadmap](docs/roadmap.md).
 
 ## Features implemented
 
@@ -63,6 +64,7 @@ More detailed reasoning is in the [architecture notes](docs/architecture.md) and
 - Experimental webcam mode: on-device face/iris landmarks → nine-point and guided boundary calibration → center accuracy measurement → estimated coordinate batches after consent
 - Clean-room MV3 participant extension: consent-aware published-study session, explicit on-device camera calibration, arbitrary-page event timeline, idempotent coordinate ingestion, optional visible-tab snapshots, and local artifact review
 - Snapshot-linked gaze replay with URL/time/viewport context and bounded heatmap aggregation
+- Persistent local analysis workspace with ZIP import, raw-session and analysis-bundle export, session health, AOI drill-down, DOM proposals, and replay video
 
 ## Repository layout
 

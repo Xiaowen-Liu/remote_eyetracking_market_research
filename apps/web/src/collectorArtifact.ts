@@ -24,6 +24,14 @@ export type CollectorGazeSample = {
   scroll?: { x: number; y: number };
 };
 
+export type CollectorCalibration = {
+  attempt: number;
+  observed_sample_count: number;
+  error_px: number | null;
+  quality_grade: "strong" | "variable" | "failed";
+  accepted: boolean;
+};
+
 export type HeatCell = { x: number; y: number; count: number; intensity: number };
 export type DomProposal = { label: string; tag: string; role?: string | null; x: number; y: number; width: number; height: number };
 export type DomProposalState = { at: string; url: string; trigger: string; proposals: DomProposal[] };
@@ -37,6 +45,7 @@ export type CollectorArtifact = {
   events: CollectorEvent[];
   snapshots: CollectorSnapshot[];
   gazeSamples?: CollectorGazeSample[];
+  calibration?: CollectorCalibration;
   privacy: {
     rawCameraVideo: false;
     eventCollection: true;
@@ -72,6 +81,15 @@ export function parseCollectorArtifact(value: unknown): CollectorArtifact {
       Boolean(sample) && Number.isFinite(sample.x) && Number.isFinite(sample.y) && sample.x >= 0 && sample.x <= 1 && sample.y >= 0 && sample.y <= 1,
     )
     : [];
+  const rawCalibration = artifact.calibration as Partial<CollectorCalibration> | undefined;
+  const calibration = rawCalibration
+    && Number.isFinite(rawCalibration.attempt)
+    && Number.isFinite(rawCalibration.observed_sample_count)
+    && (rawCalibration.error_px === null || Number.isFinite(rawCalibration.error_px))
+    && ["strong", "variable", "failed"].includes(String(rawCalibration.quality_grade))
+    && typeof rawCalibration.accepted === "boolean"
+    ? rawCalibration as CollectorCalibration
+    : undefined;
   return {
     schemaVersion: "1.0",
     sessionId: artifact.sessionId,
@@ -81,6 +99,7 @@ export function parseCollectorArtifact(value: unknown): CollectorArtifact {
     events,
     snapshots,
     gazeSamples,
+    calibration,
     privacy: artifact.privacy,
   };
 }
