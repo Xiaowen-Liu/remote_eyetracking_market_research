@@ -13,5 +13,20 @@ export function addSnapshot(session, snapshot) {
 }
 
 export function exportArtifact(session, endedAt = new Date().toISOString()) {
-  return { ...session, endedAt, privacy: { rawCameraVideo: false, eventCollection: true, visibleTabSnapshots: session.captureSnapshots } };
+  return {
+    schemaVersion: session.schemaVersion ?? "1.0",
+    sessionId: session.sessionId,
+    startedAt: session.startedAt,
+    endedAt,
+    captureSnapshots: session.captureSnapshots === true,
+    events: session.events ?? [],
+    snapshots: session.snapshots ?? [],
+    gazeSamples: session.gazeSamples ?? [],
+    ...(session.calibration ? { calibration: session.calibration } : {}),
+    privacy: {
+      rawCameraVideo: false,
+      eventCollection: true,
+      visibleTabSnapshots: session.captureSnapshots === true,
+    },
+  };
 }
