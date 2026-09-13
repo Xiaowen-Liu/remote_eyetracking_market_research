@@ -17,13 +17,14 @@ gaze estimation has laboratory-grade accuracy.
 - [x] AOI aggregation and drill-down across visible sessions, plus recorded DOM proposals
 - [x] IndexedDB session archive with rename, hide/unhide, download, and confirmed deletion
 - [x] Multi-file JSON/ZIP import, raw-session export, analysis-bundle export, and transparent session-health grading
+- [x] Headless Chromium journeys for extension consent/overlay arming and researcher artifact replay
 - [x] Vercel web deployment, Railway API/PostgreSQL deployment, OpenAPI contract generation, and CI migration checks
 
 ## Next engineering milestones
 
-1. **Browser journey automation** — exercise the installed extension, permission
-   boundaries, calibration transitions, task recording, export, import, and
-   replay in a repeatable Chromium E2E suite.
+1. **Camera journey hardening** — expand the current browser automation across
+   calibration transitions, task recording, and export; keep real hardware,
+   permission prompts, and accuracy as a documented manual smoke test.
 2. **Researcher identity and authorization** — replace the temporary demo-owner
    seam with real authentication, per-project roles, and auditable access.
 3. **Retention enforcement** — turn each study's retention policy into a tested
