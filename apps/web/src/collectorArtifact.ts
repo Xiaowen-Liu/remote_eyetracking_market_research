@@ -25,6 +25,8 @@ export type CollectorGazeSample = {
 };
 
 export type HeatCell = { x: number; y: number; count: number; intensity: number };
+export type DomProposal = { label: string; tag: string; role?: string | null; x: number; y: number; width: number; height: number };
+export type DomProposalState = { at: string; url: string; trigger: string; proposals: DomProposal[] };
 
 export type CollectorArtifact = {
   schemaVersion: "1.0";
@@ -110,4 +112,18 @@ export function buildHeatmap(samples: CollectorGazeSample[], gridSize = 14): Hea
   }
   const maximum = Math.max(1, ...[...buckets.values()].map((bucket) => bucket.count));
   return [...buckets.values()].map((bucket) => ({ ...bucket, intensity: bucket.count / maximum }));
+}
+
+export function domProposalStates(artifact: CollectorArtifact): DomProposalState[] {
+  return artifact.events.flatMap((event) => {
+    const detail = event.detail as { value?: { trigger?: unknown; proposals?: unknown } } | undefined;
+    const value = detail?.value;
+    if (!value || !Array.isArray(value.proposals)) return [];
+    const proposals = value.proposals.filter((proposal): proposal is DomProposal => {
+      if (!proposal || typeof proposal !== "object") return false;
+      const candidate = proposal as Partial<DomProposal>;
+      return typeof candidate.label === "string" && typeof candidate.tag === "string" && [candidate.x, candidate.y, candidate.width, candidate.height].every((number) => typeof number === "number" && Number.isFinite(number));
+    });
+    return proposals.length ? [{ at: event.at, url: event.url, trigger: typeof value.trigger === "string" ? value.trigger : event.type, proposals }] : [];
+  });
 }

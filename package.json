@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "dev:web": "vite --config apps/web/vite.config.ts",
-    "build:collector": "vite build --config collector-extension/vite.config.ts",
+    "build:collector": "vite build --config collector-extension/vite.config.ts && WEBGAZE_CAMERA_RUNTIME=1 vite build --config collector-extension/vite.config.ts && mkdir -p collector-extension/wasm && cp node_modules/@mediapipe/tasks-vision/wasm/* collector-extension/wasm/",
     "build:web": "tsc -p apps/web/tsconfig.json && vite build --config apps/web/vite.config.ts",
     "db:migrate": "cd apps/api && ../../.venv/bin/alembic upgrade head",
     "db:seed": ".venv/bin/python -m webgaze_api.seed",
     "generate:openapi": ".venv/bin/python apps/api/scripts/export_openapi.py",
     "generate:types": "openapi-typescript packages/api-contract/openapi.json -o packages/api-contract/src/schema.d.ts",
     "generate:contract": "npm run generate:openapi && npm run generate:types",
-    "test:extension": "node --test test/session.test.js test/collector-artifact.test.js test/study-session.test.js",
+    "test:extension": "node --test test/session.test.js test/collector-artifact.test.js test/study-session.test.js test/boundary-calibration.test.js",
     "test:web": "vitest run --config apps/web/vite.config.ts",
     "test:api": ".venv/bin/pytest apps/api/tests -q --cov=webgaze_api --cov-report=term-missing",
     "test": "npm run test:extension && npm run test:web && npm run test:api"
@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
+    "fflate": "^0.8.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   }

@@ -38,6 +38,10 @@ export function gazeBatch(samples, sequence, id) {
   };
 }
 
+export function nextBatchSequence(acknowledgedSequence, pendingBatches = []) {
+  return acknowledgedSequence + pendingBatches.length;
+}
+
 export function calibrationPayload(result) {
   return {
     attempt: result.attempt,

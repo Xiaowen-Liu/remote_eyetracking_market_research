@@ -4,7 +4,7 @@ let state = null;
 function showStatus(message, error = false) { $("#status").textContent = message ?? ""; $("#status").classList.toggle("error", error); }
 function hidePanels() { panels.forEach((selector) => { $(selector).hidden = true; }); }
 function render(next) {
-  state = next; $("#connect-panel").hidden = Boolean(state?.connected); $("#study-panel").hidden = !state?.connected; if (!state?.connected) return;
+  state = next; $("#connect-panel").hidden = Boolean(state?.connected); $("#study-panel").hidden = !state?.connected; if (!state?.connected) { showStatus(state?.error, Boolean(state?.error)); return; }
   $("#study-title").textContent = state.title; $("#progress").textContent = `Completed tasks: ${state.completedTasks} of ${state.tasks.length}`; $("#consent-text").textContent = state.consentText; hidePanels();
   if (state.phase === "consent") $("#consent-panel").hidden = false;
   if (state.phase === "calibrating") $("#calibration-panel").hidden = false;

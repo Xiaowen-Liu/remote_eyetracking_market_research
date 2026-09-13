@@ -1,16 +1,26 @@
 import { addEvent, addSnapshot, exportArtifact, newSession } from "./core/session-artifact.js";
-import { apiUrl, calibrationPayload, defaultApiBase, gazeBatch, participantToken } from "./core/study-session.js";
+import { apiUrl, calibrationPayload, defaultApiBase, gazeBatch, nextBatchSequence, participantToken } from "./core/study-session.js";
 
 const key = "webgaze.experimental.collector.session";
 const read = async () => (await chrome.storage.session.get(key))[key] ?? null;
 const write = (session) => chrome.storage.session.set({ [key]: session });
 let operations = Promise.resolve();
+const requestTimeoutMs = 12_000;
 
 async function request(session, path, init = {}) {
-  const response = await fetch(apiUrl(session.apiBase, path), { ...init, headers: { "Content-Type": "application/json", ...init.headers } });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
-  return body;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    const response = await fetch(apiUrl(session.apiBase, path), { ...init, signal: controller.signal, headers: { "Content-Type": "application/json", ...init.headers } });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+    return body;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw new Error("Study API request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 async function participantRequest(session, path, init = {}) { return request(session, path, { ...init, headers: { Authorization: `Bearer ${session.accessToken}`, ...init.headers } }); }
 async function activeTab() { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); if (!tab?.id) throw new Error("Open the study target page before continuing"); return tab; }
@@ -22,9 +32,9 @@ async function navigateAndMessage(tabId, url, message) {
 function studyState(session) { const completed = session?.completedTasks ?? 0; const next = session?.protocol?.tasks?.[completed] ?? null; return { connected: Boolean(session?.protocol), phase: session?.phase ?? "idle", title: session?.protocol?.title ?? null, consentText: session?.protocol?.consent_text ?? null, tasks: session?.protocol?.tasks?.map(({ position, title }) => ({ position, title })) ?? [], nextTask: next ? { position: next.position, title: next.title, prompt: next.prompt } : null, completedTasks: completed, calibration: session?.calibration ?? null, error: session?.lastError ?? null }; }
 async function enqueueSamples(session, samples) {
   if (!session.taskRun || !samples.length) return session;
-  const batch = gazeBatch(samples, session.nextSequence ?? 0, crypto.randomUUID());
+  const batch = gazeBatch(samples, nextBatchSequence(session.nextSequence ?? 0, session.pendingBatches ?? []), crypto.randomUUID());
   session.pendingBatches = [...(session.pendingBatches ?? []), batch]; await write(session);
-  for (const pending of [...session.pendingBatches]) { await participantRequest(session, `/participant-sessions/${session.sessionId}/gaze-batches`, { method: "POST", body: JSON.stringify(pending) }); session.pendingBatches = session.pendingBatches.filter((item) => item.client_batch_id !== pending.client_batch_id); session.nextSequence = pending.sequence + 1; await write(session); }
+  for (const pending of [...session.pendingBatches]) { await participantRequest(session, `/participant-sessions/${session.sessionId}/gaze-batches`, { method: "POST", body: JSON.stringify(pending) }); session.pendingBatches = session.pendingBatches.filter((item) => item.client_batch_id !== pending.client_batch_id); session.nextSequence = Math.max(session.nextSequence ?? 0, pending.sequence + 1); await write(session); }
   return session;
 }
 async function startStudy(session) {
