@@ -16,6 +16,7 @@ const apiMocks = vi.hoisted(() => ({
   addProjectMember: vi.fn(),
   updateProjectMember: vi.fn(),
   removeProjectMember: vi.fn(),
+  transferProjectOwnership: vi.fn(),
   listProjectAuditEvents: vi.fn(),
   listStudies: vi.fn(),
   getDraft: vi.fn(),
@@ -229,6 +230,37 @@ describe("Study Builder", () => {
     expect(await screen.findByRole("heading", { name: "1 people" })).toBeInTheDocument();
     expect(screen.getByText("Project Owner")).toBeInTheDocument();
     expect(screen.getByText("Project created")).toBeInTheDocument();
+  });
+
+  it("requires the project name before transferring ownership", async () => {
+    const user = userEvent.setup();
+    apiMocks.listProjectMembers.mockResolvedValue({
+      items: [{
+        id: "00000000-0000-4000-8000-000000000031",
+        project_id: "00000000-0000-4000-8000-000000000010",
+        researcher: {
+          id: "00000000-0000-4000-8000-000000000002",
+          email: "editor@example.com",
+          display_name: "Study Editor",
+        },
+        role: "editor",
+        invited_by: "00000000-0000-4000-8000-000000000001",
+        created_at: "2026-09-07T00:00:00Z",
+        updated_at: "2026-09-07T00:00:00Z",
+      }],
+      total: 1,
+    });
+    render(<App />);
+
+    await screen.findByText("Checkout UX research");
+    await user.click(screen.getByRole("button", { name: "Projects" }));
+    await user.click(screen.getByRole("button", { name: "Team & access" }));
+    await user.click(await screen.findByRole("button", { name: "Make owner" }));
+
+    const transfer = screen.getByRole("button", { name: "Transfer ownership" });
+    expect(transfer).toBeDisabled();
+    await user.type(screen.getByLabelText(/Type Checkout UX research/), "Checkout UX research");
+    expect(transfer).toBeEnabled();
   });
 
   it("keeps viewer access read-only", async () => {

@@ -19,6 +19,7 @@ from ..schemas import (
     ProjectMembershipListResponse,
     ProjectMembershipResponse,
     ProjectMembershipUpdate,
+    ProjectOwnershipTransfer,
     ProjectResponse,
     ProjectUpdate,
 )
@@ -365,6 +366,73 @@ def remove_project_member(
     db.delete(membership)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{project_id}/transfer-ownership",
+    response_model=ProjectResponse,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    operation_id="transferProjectOwnership",
+)
+def transfer_project_ownership(
+    project_id: uuid.UUID,
+    payload: ProjectOwnershipTransfer,
+    owner_id: CurrentOwnerId,
+    db: Session = DbSession,
+) -> ResearchProject:
+    project, _ = require_project_access(db, project_id, owner_id, ProjectRole.OWNER)
+    target = db.scalar(
+        select(ProjectMembership)
+        .where(
+            ProjectMembership.id == payload.membership_id,
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.researcher_id != owner_id,
+            ProjectMembership.role != ProjectRole.OWNER,
+        )
+        .with_for_update()
+    )
+    if not target:
+        raise ApiError(404, "PROJECT_MEMBER_NOT_FOUND", "Project member was not found")
+
+    previous_owner = db.scalar(
+        select(ProjectMembership)
+        .where(
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.researcher_id == owner_id,
+        )
+        .with_for_update()
+    )
+    if previous_owner:
+        previous_owner.role = payload.previous_owner_role
+    else:
+        db.add(
+            ProjectMembership(
+                project_id=project_id,
+                researcher_id=owner_id,
+                role=payload.previous_owner_role,
+                invited_by=owner_id,
+            )
+        )
+
+    previous_owner_id = project.owner_id
+    project.owner_id = target.researcher_id
+    target.role = ProjectRole.OWNER
+    add_audit_event(
+        db,
+        actor_id=owner_id,
+        project_id=project_id,
+        action="project.ownership_transferred",
+        resource_type="project",
+        resource_id=project_id,
+        metadata={
+            "from_researcher_id": str(previous_owner_id),
+            "to_researcher_id": str(target.researcher_id),
+            "previous_owner_role": payload.previous_owner_role.value,
+        },
+    )
+    db.commit()
+    db.refresh(project)
+    return project
 
 
 @router.get(

@@ -133,6 +133,17 @@ export const api = {
     }),
   removeProjectMember: (projectId: string, membershipId: string) =>
     researcherRequest<void>(`/projects/${projectId}/members/${membershipId}`, { method: "DELETE" }),
+  transferProjectOwnership: (
+    projectId: string,
+    membershipId: string,
+    previousOwnerRole: "editor" | "viewer",
+  ) => researcherRequest<Project>(`/projects/${projectId}/transfer-ownership`, {
+    method: "POST",
+    body: JSON.stringify({
+      membership_id: membershipId,
+      previous_owner_role: previousOwnerRole,
+    }),
+  }),
   listProjectAuditEvents: (projectId: string) =>
     researcherRequest<{ items: AuditEvent[]; total: number }>(`/projects/${projectId}/audit-events`),
   listStudies: (projectId: string) =>

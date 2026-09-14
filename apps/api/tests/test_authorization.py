@@ -224,3 +224,51 @@ def test_owner_can_change_and_remove_a_collaborator(client, db_session):
     assert client.get(
         f"/api/v1/projects/{project_id}", headers=viewer_headers
     ).status_code == 404
+
+
+def test_owner_can_transfer_ownership_atomically(client, db_session):
+    team = project_team(client, db_session)
+    project_id = team["project_id"]
+    owner_headers = team["owner"][1]
+    editor_headers = team["editor"][1]
+    viewer_headers = team["viewer"][1]
+
+    transfer = client.post(
+        f"/api/v1/projects/{project_id}/transfer-ownership",
+        headers=owner_headers,
+        json={
+            "membership_id": team["memberships"]["editor"]["id"],
+            "previous_owner_role": "viewer",
+        },
+    )
+    assert transfer.status_code == 200
+    assert transfer.json()["owner_id"] == str(team["editor"][0].id)
+
+    previous_owner_access = client.get(
+        f"/api/v1/projects/{project_id}/access", headers=owner_headers
+    ).json()
+    assert previous_owner_access["role"] == "viewer"
+    assert previous_owner_access["can_manage_members"] is False
+
+    new_owner_access = client.get(
+        f"/api/v1/projects/{project_id}/access", headers=editor_headers
+    ).json()
+    assert new_owner_access["role"] == "owner"
+    assert new_owner_access["can_manage_members"] is True
+    assert client.post(
+        f"/api/v1/projects/{project_id}/transfer-ownership",
+        headers=viewer_headers,
+        json={"membership_id": team["memberships"]["viewer"]["id"]},
+    ).status_code == 403
+
+    events = client.get(
+        f"/api/v1/projects/{project_id}/audit-events", headers=editor_headers
+    ).json()["items"]
+    transfer_event = next(
+        event for event in events if event["action"] == "project.ownership_transferred"
+    )
+    assert transfer_event["event_metadata"] == {
+        "from_researcher_id": str(team["owner"][0].id),
+        "to_researcher_id": str(team["editor"][0].id),
+        "previous_owner_role": "viewer",
+    }

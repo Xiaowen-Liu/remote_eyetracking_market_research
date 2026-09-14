@@ -23,17 +23,17 @@ gaze estimation has laboratory-grade accuracy.
 
 ## Next engineering milestones
 
-1. **Researcher identity and authorization** — salted password hashes,
+- [x] **Researcher identity and authorization** — salted password hashes,
    expiring/revocable opaque sessions, login UI, Owner/Editor/Viewer permissions,
    nested-resource authorization, project-scoped audit events, and an owner-facing
-   Team & access workspace are implemented. Owner transfer remains before this
-   milestone is production-complete.
-2. **Retention enforcement** — turn each study's retention policy into a tested
+   Team & access workspace are implemented. Ownership can be atomically transferred
+   to an existing collaborator with explicit confirmation and an audit event.
+1. **Retention enforcement** — turn each study's retention policy into a tested
    deletion workflow for server telemetry, snapshots, exports, and audit-safe
    tombstones.
-3. **Operational hardening** — queue-backed analysis workers, rate limits,
+2. **Operational hardening** — queue-backed analysis workers, rate limits,
    structured observability, retry/dead-letter handling, and production alerts.
-4. **Accessibility and performance pass** — keyboard-complete replay controls,
+3. **Accessibility and performance pass** — keyboard-complete replay controls,
    reduced-motion behavior, screen-reader status announcements, large-session
    virtualization, and measurable performance budgets.
 
