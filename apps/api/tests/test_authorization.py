@@ -65,6 +65,28 @@ def test_project_roles_enforce_read_edit_and_admin_boundaries(client, db_session
     viewer_headers = team["viewer"][1]
     outsider_headers = team["outsider"][1]
 
+    assert client.get(
+        f"/api/v1/projects/{project_id}/access", headers=owner_headers
+    ).json() == {
+        "project_id": project_id,
+        "role": "owner",
+        "can_edit": True,
+        "can_manage_members": True,
+        "can_delete": True,
+    }
+    assert client.get(
+        f"/api/v1/projects/{project_id}/access", headers=editor_headers
+    ).json()["can_edit"] is True
+    viewer_access = client.get(
+        f"/api/v1/projects/{project_id}/access", headers=viewer_headers
+    ).json()
+    assert viewer_access["role"] == "viewer"
+    assert viewer_access["can_edit"] is False
+    assert viewer_access["can_manage_members"] is False
+    assert client.get(
+        f"/api/v1/projects/{project_id}/access", headers=outsider_headers
+    ).status_code == 404
+
     assert client.get(f"/api/v1/projects/{project_id}", headers=viewer_headers).status_code == 200
     assert client.patch(
         f"/api/v1/projects/{project_id}",
