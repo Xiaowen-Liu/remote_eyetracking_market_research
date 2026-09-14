@@ -23,12 +23,11 @@ gaze estimation has laboratory-grade accuracy.
 
 ## Next engineering milestones
 
-1. **Researcher identity and authorization** — identity is in progress: salted
-   password hashes, expiring/revocable opaque sessions, a researcher login UI,
-   and a production-safe migration from the demo-owner seam are implemented.
-   Backend Owner/Editor/Viewer memberships, nested-resource authorization, and
-   project-scoped audit events are also implemented. A researcher-facing member
-   management UI and owner-transfer workflow remain.
+1. **Researcher identity and authorization** — salted password hashes,
+   expiring/revocable opaque sessions, login UI, Owner/Editor/Viewer permissions,
+   nested-resource authorization, project-scoped audit events, and an owner-facing
+   Team & access workspace are implemented. Owner transfer remains before this
+   milestone is production-complete.
 2. **Retention enforcement** — turn each study's retention policy into a tested
    deletion workflow for server telemetry, snapshots, exports, and audit-safe
    tombstones.
