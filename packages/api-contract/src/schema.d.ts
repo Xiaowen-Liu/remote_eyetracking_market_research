@@ -296,6 +296,23 @@ export interface paths {
         patch: operations["updateProject"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Project Access */
+        get: operations["getProjectAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/audit-events": {
         parameters: {
             query?: never;
@@ -983,6 +1000,21 @@ export interface components {
             items: components["schemas"]["ParticipantSessionSummary"][];
             /** Total */
             total: number;
+        };
+        /** ProjectAccessResponse */
+        ProjectAccessResponse: {
+            /** Can Delete */
+            can_delete: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Manage Members */
+            can_manage_members: boolean;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            role: components["schemas"]["ProjectRole"];
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -2397,6 +2429,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getProjectAccess: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAccessResponse"];
                 };
             };
             /** @description Not Found */

@@ -11,6 +11,12 @@ const apiMocks = vi.hoisted(() => ({
   logoutResearcher: vi.fn(),
   listProjects: vi.fn(),
   createProject: vi.fn(),
+  getProjectAccess: vi.fn(),
+  listProjectMembers: vi.fn(),
+  addProjectMember: vi.fn(),
+  updateProjectMember: vi.fn(),
+  removeProjectMember: vi.fn(),
+  listProjectAuditEvents: vi.fn(),
   listStudies: vi.fn(),
   getDraft: vi.fn(),
   getParticipantLink: vi.fn(),
@@ -58,6 +64,15 @@ describe("Study Builder", () => {
       total: 1,
     });
     apiMocks.listStudies.mockResolvedValue({ items: [], total: 0 });
+    apiMocks.getProjectAccess.mockResolvedValue({
+      project_id: "00000000-0000-4000-8000-000000000010",
+      role: "owner",
+      can_edit: true,
+      can_manage_members: true,
+      can_delete: true,
+    });
+    apiMocks.listProjectMembers.mockResolvedValue({ items: [], total: 0 });
+    apiMocks.listProjectAuditEvents.mockResolvedValue({ items: [], total: 0 });
     apiMocks.getParticipantLink.mockResolvedValue({
       participant_url: "/participate/demo-link",
     });
@@ -173,6 +188,62 @@ describe("Study Builder", () => {
         "Where do shoppers hesitate?",
       );
     });
+  });
+
+  it("lets an owner inspect project members and audit activity", async () => {
+    const user = userEvent.setup();
+    apiMocks.listProjectMembers.mockResolvedValue({
+      items: [{
+        id: "00000000-0000-4000-8000-000000000030",
+        project_id: "00000000-0000-4000-8000-000000000010",
+        researcher: {
+          id: "00000000-0000-4000-8000-000000000001",
+          email: "owner@example.com",
+          display_name: "Project Owner",
+        },
+        role: "owner",
+        invited_by: "00000000-0000-4000-8000-000000000001",
+        created_at: "2026-09-07T00:00:00Z",
+        updated_at: "2026-09-07T00:00:00Z",
+      }],
+      total: 1,
+    });
+    apiMocks.listProjectAuditEvents.mockResolvedValue({
+      items: [{
+        id: "00000000-0000-4000-8000-000000000040",
+        actor_id: "00000000-0000-4000-8000-000000000001",
+        action: "project.created",
+        resource_type: "project",
+        resource_id: "00000000-0000-4000-8000-000000000010",
+        occurred_at: "2026-09-07T00:00:00Z",
+        event_metadata: {},
+      }],
+      total: 1,
+    });
+    render(<App />);
+
+    await screen.findByText("Checkout UX research");
+    await user.click(screen.getByRole("button", { name: "Projects" }));
+    await user.click(screen.getByRole("button", { name: "Team & access" }));
+
+    expect(await screen.findByRole("heading", { name: "1 people" })).toBeInTheDocument();
+    expect(screen.getByText("Project Owner")).toBeInTheDocument();
+    expect(screen.getByText("Project created")).toBeInTheDocument();
+  });
+
+  it("keeps viewer access read-only", async () => {
+    apiMocks.getProjectAccess.mockResolvedValue({
+      project_id: "00000000-0000-4000-8000-000000000010",
+      role: "viewer",
+      can_edit: false,
+      can_manage_members: false,
+      can_delete: false,
+    });
+    render(<App />);
+
+    expect(await screen.findByText("Viewer access is read-only. An owner can change your project role.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Study title")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Publish study" })).not.toBeInTheDocument();
   });
 
   it("keeps a published version read-only until a revision is created", async () => {

@@ -12,6 +12,7 @@ from ..models import AuditEvent, ProjectMembership, ProjectRole, Researcher, Res
 from ..schemas import (
     AuditEventListResponse,
     ErrorResponse,
+    ProjectAccessResponse,
     ProjectCreate,
     ProjectListResponse,
     ProjectMembershipCreate,
@@ -134,6 +135,27 @@ def get_project(
 ) -> ResearchProject:
     project, _ = require_project_access(db, project_id, owner_id)
     return project
+
+
+@router.get(
+    "/{project_id}/access",
+    response_model=ProjectAccessResponse,
+    responses={404: {"model": ErrorResponse}},
+    operation_id="getProjectAccess",
+)
+def get_project_access(
+    project_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
+) -> ProjectAccessResponse:
+    project, role = require_project_access(db, project_id, owner_id)
+    can_edit = role in {ProjectRole.OWNER, ProjectRole.EDITOR}
+    is_owner = role == ProjectRole.OWNER
+    return ProjectAccessResponse(
+        project_id=project.id,
+        role=role,
+        can_edit=can_edit,
+        can_manage_members=is_owner,
+        can_delete=is_owner,
+    )
 
 
 @router.patch(

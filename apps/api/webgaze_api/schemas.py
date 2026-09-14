@@ -79,6 +79,14 @@ class ProjectListResponse(ApiModel):
     total: int
 
 
+class ProjectAccessResponse(ApiModel):
+    project_id: UUID
+    role: ProjectRole
+    can_edit: bool
+    can_manage_members: bool
+    can_delete: bool
+
+
 class ProjectMembershipCreate(ApiModel):
     email: str = Field(min_length=3, max_length=320)
     role: Literal[ProjectRole.EDITOR, ProjectRole.VIEWER]
