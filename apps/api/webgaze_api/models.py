@@ -32,6 +32,12 @@ class ProjectStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
+class ProjectRole(str, enum.Enum):
+    OWNER = "owner"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+
+
 class StudyLifecycle(str, enum.Enum):
     DRAFT = "draft"
     PUBLISHED = "published"
@@ -123,6 +129,31 @@ class ResearchProject(TimestampMixin, Base):
     studies: Mapped[list[Study]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+
+
+class ProjectMembership(TimestampMixin, Base):
+    __tablename__ = "project_memberships"
+    __table_args__ = (
+        UniqueConstraint("project_id", "researcher_id"),
+        CheckConstraint("role IN ('owner', 'editor', 'viewer')", name="project_role"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    researcher_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("researchers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[ProjectRole] = mapped_column(
+        Enum(
+            ProjectRole,
+            native_enum=False,
+            values_callable=lambda role_type: [role.value for role in role_type],
+        ),
+        nullable=False,
+    )
+    invited_by: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
 
 
 class Study(TimestampMixin, Base):
@@ -420,6 +451,7 @@ class AuditEvent(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
     action: Mapped[str] = mapped_column(String(80), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(80), nullable=False)
     resource_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)

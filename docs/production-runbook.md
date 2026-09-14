@@ -48,6 +48,11 @@ locked before an account exists:
 5. Open the Vercel app in a private browser window, sign in, verify project and
    result access, then sign out and confirm the workspace is locked again.
 
+After the project-membership migration, the seeded account is also backfilled as
+Owner of the seeded project. Editor and Viewer accounts must already exist before
+an Owner can add them through the membership API. Owner transfer is not supported;
+do not remove or deactivate the sole owning account.
+
 Do not place the researcher password in Vercel variables or commit it to Git. The
 web client sends it only to the API login endpoint and stores only the returned
 opaque session token.

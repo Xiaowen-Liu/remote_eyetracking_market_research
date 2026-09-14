@@ -4,7 +4,7 @@ from .auth import hash_password
 from .config import get_settings
 from .database import SessionLocal
 from .dependencies import DEMO_OWNER_ID
-from .models import Researcher, ResearchProject
+from .models import ProjectMembership, ProjectRole, Researcher, ResearchProject
 
 
 def seed_demo() -> None:
@@ -35,15 +35,31 @@ def seed_demo() -> None:
             select(ResearchProject).where(ResearchProject.owner_id == DEMO_OWNER_ID)
         )
         if not existing:
-            db.add(
-                ResearchProject(
+            existing = ResearchProject(
                     owner_id=DEMO_OWNER_ID,
                     name="Accessible checkout attention study",
                     research_question=(
                         "How do first-time users visually navigate pricing and checkout?"
                     ),
                 )
+            db.add(existing)
+            db.flush()
+        if settings.demo_researcher_password:
+            membership = db.scalar(
+                select(ProjectMembership).where(
+                    ProjectMembership.project_id == existing.id,
+                    ProjectMembership.researcher_id == DEMO_OWNER_ID,
+                )
             )
+            if not membership:
+                db.add(
+                    ProjectMembership(
+                        project_id=existing.id,
+                        researcher_id=DEMO_OWNER_ID,
+                        role=ProjectRole.OWNER,
+                        invited_by=DEMO_OWNER_ID,
+                    )
+                )
         db.commit()
 
 

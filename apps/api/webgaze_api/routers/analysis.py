@@ -17,6 +17,7 @@ from ..analysis import (
     result_for_job,
     run_analysis_job,
 )
+from ..authorization import require_study_access
 from ..database import get_db
 from ..dependencies import CurrentOwnerId
 from ..errors import ApiError
@@ -28,7 +29,7 @@ from ..models import (
     CalibrationResult,
     GazeSampleBatch,
     ParticipantSession,
-    ResearchProject,
+    ProjectRole,
     SessionEvent,
     SessionLifecycle,
     Study,
@@ -84,13 +85,7 @@ def task_rows(result: AnalysisResult) -> list[dict[str, object]]:
 def create_synthetic_study_results(
     study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> AnalysisResultResponse:
-    study = db.scalar(
-        select(Study)
-        .join(ResearchProject)
-        .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
-    )
-    if not study:
-        raise ApiError(404, "STUDY_NOT_FOUND", "Study was not found")
+    study, _ = require_study_access(db, study_id, owner_id, ProjectRole.EDITOR)
     if not study.current_published_version:
         raise ApiError(409, "STUDY_NOT_PUBLISHED", "Publish the study before loading demo results")
     version = db.scalar(
@@ -193,24 +188,16 @@ def create_synthetic_study_results(
 def list_study_analysis_jobs(
     study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> AnalysisJobListResponse:
+    require_study_access(db, study_id, owner_id)
     query = (
         select(AnalysisJob)
         .join(ParticipantSession, ParticipantSession.id == AnalysisJob.session_id)
         .join(StudyVersion, StudyVersion.id == ParticipantSession.study_version_id)
         .join(Study, Study.id == StudyVersion.study_id)
-        .join(ResearchProject, ResearchProject.id == Study.project_id)
-        .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
+        .where(Study.id == study_id)
         .order_by(AnalysisJob.queued_at.desc())
     )
     jobs = list(db.scalars(query))
-    if not jobs:
-        study_exists = db.scalar(
-            select(Study.id)
-            .join(ResearchProject)
-            .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
-        )
-        if not study_exists:
-            raise ApiError(404, "STUDY_NOT_FOUND", "Study was not found")
     return AnalysisJobListResponse(
         items=[analysis_job_payload(job) for job in jobs], total=len(jobs)
     )
@@ -225,13 +212,7 @@ def list_study_analysis_jobs(
 def list_study_participant_sessions(
     study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> ParticipantSessionSummaryListResponse:
-    study = db.scalar(
-        select(Study)
-        .join(ResearchProject)
-        .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
-    )
-    if not study:
-        raise ApiError(404, "STUDY_NOT_FOUND", "Study was not found")
+    study, _ = require_study_access(db, study_id, owner_id)
     sessions = list(
         db.scalars(
             select(ParticipantSession)
@@ -323,7 +304,7 @@ def get_analysis_job(
 def run_analysis(
     job_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> AnalysisResultResponse:
-    job = owned_analysis_job(db, job_id, owner_id)
+    job = owned_analysis_job(db, job_id, owner_id, ProjectRole.EDITOR)
     return analysis_result_payload(run_analysis_job(db, job))
 
 
@@ -361,6 +342,15 @@ def export_analysis_result(
     db.add(
         AuditEvent(
             actor_id=owner_id,
+            project_id=db.scalar(
+                select(Study.project_id)
+                .join(StudyVersion, StudyVersion.study_id == Study.id)
+                .join(
+                    ParticipantSession,
+                    ParticipantSession.study_version_id == StudyVersion.id,
+                )
+                .where(ParticipantSession.id == job.session_id)
+            ),
             action="analysis.exported",
             resource_type="analysis_result",
             resource_id=result.id,
