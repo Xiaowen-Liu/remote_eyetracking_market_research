@@ -72,6 +72,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login Researcher */
+        post: operations["loginResearcher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout Researcher */
+        post: operations["logoutResearcher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Current Researcher */
+        get: operations["getCurrentResearcher"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/participant-sessions/{session_id}/calibrations": {
         parameters: {
             query?: never;
@@ -949,6 +1000,42 @@ export interface components {
          * @enum {string}
          */
         QualityGrade: "strong" | "variable" | "limited" | "failed";
+        /** ResearcherLogin */
+        ResearcherLogin: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
+        /** ResearcherResponse */
+        ResearcherResponse: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** ResearcherSessionResponse */
+        ResearcherSessionResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            researcher: components["schemas"]["ResearcherResponse"];
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             */
+            token_type: "bearer";
+        };
         /**
          * SessionLifecycle
          * @enum {string}
@@ -1247,6 +1334,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -1291,6 +1379,7 @@ export interface operations {
                 format?: "json" | "csv";
             };
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -1342,6 +1431,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -1393,6 +1483,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -1427,6 +1518,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    loginResearcher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearcherLogin"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearcherSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logoutResearcher: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getCurrentResearcher: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "x-demo-owner-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearcherResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1873,6 +2058,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path?: never;
@@ -1904,6 +2090,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path?: never;
@@ -1939,6 +2126,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -1981,6 +2169,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2021,6 +2210,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2067,6 +2257,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2100,6 +2291,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2146,6 +2338,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2186,6 +2379,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2228,6 +2422,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2270,6 +2465,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2325,6 +2521,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2367,6 +2564,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2410,6 +2608,7 @@ export interface operations {
             query?: never;
             header?: {
                 "Idempotency-Key"?: string | null;
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2461,6 +2660,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {
@@ -2512,6 +2712,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                authorization?: string | null;
                 "x-demo-owner-id"?: string | null;
             };
             path: {

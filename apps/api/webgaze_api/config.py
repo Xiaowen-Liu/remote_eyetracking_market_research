@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     database_url: str = Field(default="postgresql+psycopg://webgaze:webgaze@localhost:5432/webgaze")
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
     sql_echo: bool = False
+    researcher_auth_required: bool = False
+    researcher_session_hours: int = Field(default=12, ge=1, le=168)
+    demo_researcher_email: str = "demo@webgaze.local"
+    demo_researcher_password: SecretStr | None = None
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -25,6 +29,11 @@ class Settings(BaseSettings):
         if value.startswith("postgres://"):
             return value.replace("postgres://", "postgresql+psycopg://", 1)
         return value
+
+    @field_validator("demo_researcher_password", mode="before")
+    @classmethod
+    def empty_researcher_password_is_unset(cls, value: object) -> object:
+        return None if value == "" else value
 
 
 @lru_cache

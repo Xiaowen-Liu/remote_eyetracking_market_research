@@ -23,8 +23,10 @@ gaze estimation has laboratory-grade accuracy.
 
 ## Next engineering milestones
 
-1. **Researcher identity and authorization** — replace the temporary demo-owner
-   seam with real authentication, per-project roles, and auditable access.
+1. **Researcher identity and authorization** — identity is in progress: salted
+   password hashes, expiring/revocable opaque sessions, a researcher login UI,
+   and a production-safe migration from the demo-owner seam are implemented.
+   Per-project memberships, roles, and auditable access remain.
 2. **Retention enforcement** — turn each study's retention policy into a tested
    deletion workflow for server telemetry, snapshots, exports, and audit-safe
    tombstones.

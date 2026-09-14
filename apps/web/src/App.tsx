@@ -3,10 +3,13 @@ import { useEffect, useRef, useState, type FormEvent, type PointerEvent as React
 import {
   api,
   ApiClientError,
+  hasResearcherToken,
+  saveResearcherToken,
   type AnalysisJob,
   type AnalysisResult,
   type ParticipantSessionSummary,
   type Project,
+  type Researcher,
   type StudyDraft,
   type StudyDraftResponse,
 } from "./api";
@@ -137,6 +140,8 @@ function StudyBuilder() {
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [projectCreationOpen, setProjectCreationOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [researcher, setResearcher] = useState<Researcher | null>(null);
 
   useEffect(() => {
     if (bootstrapStarted.current) return;
@@ -146,6 +151,9 @@ function StudyBuilder() {
 
   async function bootstrap() {
     try {
+      if (hasResearcherToken()) {
+        setResearcher(await api.getCurrentResearcher());
+      }
       const projectList = await api.listProjects();
       const current =
         projectList.items[0] ?? (await api.createProject("Checkout UX research"));
@@ -153,7 +161,16 @@ function StudyBuilder() {
       setProjects(available);
       await selectProject(current);
     } catch (error) {
-      showError(error);
+      if (
+        error instanceof ApiClientError &&
+        ["RESEARCHER_AUTH_REQUIRED", "INVALID_RESEARCHER_SESSION"].includes(error.code)
+      ) {
+        saveResearcherToken(null);
+        setResearcher(null);
+        setAuthRequired(true);
+      } else {
+        showError(error);
+      }
     } finally {
       setBusy(false);
     }
@@ -342,6 +359,19 @@ function StudyBuilder() {
   const publishedVersion = study?.current_published_version ?? null;
   const isLocked = publishedVersion !== null && !editing;
 
+  if (authRequired) {
+    return (
+      <ResearcherLoginPage
+        onAuthenticated={async (sessionResearcher) => {
+          setResearcher(sessionResearcher);
+          setAuthRequired(false);
+          setBusy(true);
+          await bootstrap();
+        }}
+      />
+    );
+  }
+
   if (dashboardOpen) {
     if (projectCreationOpen) {
       return (
@@ -372,7 +402,29 @@ function StudyBuilder() {
           <span className="brand-mark" aria-hidden="true">◉</span>
           WebGaze Research
         </a>
-        <span className="environment">Independent demo</span>
+        {researcher ? (
+          <div className="researcher-session">
+            <span>{researcher.display_name}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void (async () => {
+                  try {
+                    await api.logoutResearcher();
+                  } finally {
+                    saveResearcherToken(null);
+                    setResearcher(null);
+                    setAuthRequired(true);
+                  }
+                })();
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <span className="environment">Independent demo</span>
+        )}
       </header>
 
       <main>
@@ -1379,6 +1431,85 @@ function ProjectDashboard({
         </section>
       </main>
     </div>
+  );
+}
+
+function ResearcherLoginPage({
+  onAuthenticated,
+}: {
+  onAuthenticated: (researcher: Researcher) => Promise<void>;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const session = await api.loginResearcher(email.trim(), password);
+      saveResearcherToken(session.access_token);
+      await onAuthenticated(session.researcher);
+    } catch (loginError) {
+      saveResearcherToken(null);
+      setError(
+        loginError instanceof ApiClientError
+          ? loginError.message
+          : "Sign in could not be completed. Try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="auth-shell">
+      <section className="auth-card" aria-labelledby="researcher-sign-in-title">
+        <div className="auth-brand">
+          <span className="brand-mark" aria-hidden="true">◉</span>
+          <span>WebGaze Research</span>
+        </div>
+        <div>
+          <p className="eyebrow">Researcher workspace</p>
+          <h1 id="researcher-sign-in-title">Sign in to your studies</h1>
+          <p>Manage study protocols, participant links, and consented research results.</p>
+        </div>
+        {error && <div className="notice error" role="alert">{error}</div>}
+        <form onSubmit={(event) => void submit(event)}>
+          <label>
+            Email
+            <input
+              autoComplete="email"
+              inputMode="email"
+              required
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              autoComplete="current-password"
+              minLength={12}
+              required
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <button className="primary-button" disabled={submitting} type="submit">
+            {submitting ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+        <p className="auth-privacy-note">
+          Researcher access is separate from participant sessions. Participant links do not expose
+          this account or its credentials.
+        </p>
+      </section>
+    </main>
   );
 }
 
