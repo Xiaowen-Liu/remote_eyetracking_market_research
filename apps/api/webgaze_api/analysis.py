@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from .authorization import require_analysis_job_access
 from .errors import ApiError
 from .models import (
     AnalysisJob,
@@ -13,9 +14,7 @@ from .models import (
     GazeSample,
     GazeSampleBatch,
     ParticipantSession,
-    ResearchProject,
-    Study,
-    StudyVersion,
+    ProjectRole,
     Task,
     TaskRun,
 )
@@ -51,17 +50,13 @@ def analysis_result_payload(result: AnalysisResult) -> AnalysisResultResponse:
     )
 
 
-def owned_analysis_job(db: Session, job_id: uuid.UUID, owner_id: uuid.UUID) -> AnalysisJob:
-    job = db.scalar(
-        select(AnalysisJob)
-        .join(ParticipantSession, ParticipantSession.id == AnalysisJob.session_id)
-        .join(StudyVersion, StudyVersion.id == ParticipantSession.study_version_id)
-        .join(Study, Study.id == StudyVersion.study_id)
-        .join(ResearchProject, ResearchProject.id == Study.project_id)
-        .where(AnalysisJob.id == job_id, ResearchProject.owner_id == owner_id)
-    )
-    if not job:
-        raise ApiError(404, "ANALYSIS_JOB_NOT_FOUND", "Analysis job was not found")
+def owned_analysis_job(
+    db: Session,
+    job_id: uuid.UUID,
+    owner_id: uuid.UUID,
+    minimum_role: ProjectRole = ProjectRole.VIEWER,
+) -> AnalysisJob:
+    job, _ = require_analysis_job_access(db, job_id, owner_id, minimum_role)
     return job
 
 

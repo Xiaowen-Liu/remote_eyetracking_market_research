@@ -26,7 +26,9 @@ gaze estimation has laboratory-grade accuracy.
 1. **Researcher identity and authorization** — identity is in progress: salted
    password hashes, expiring/revocable opaque sessions, a researcher login UI,
    and a production-safe migration from the demo-owner seam are implemented.
-   Per-project memberships, roles, and auditable access remain.
+   Backend Owner/Editor/Viewer memberships, nested-resource authorization, and
+   project-scoped audit events are also implemented. A researcher-facing member
+   management UI and owner-transfer workflow remain.
 2. **Retention enforcement** — turn each study's retention policy into a tested
    deletion workflow for server telemetry, snapshots, exports, and audit-safe
    tombstones.

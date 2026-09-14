@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from .models import (
     AnalysisStatus,
+    ProjectRole,
     ProjectStatus,
     QualityGrade,
     SessionLifecycle,
@@ -75,6 +76,45 @@ class ProjectResponse(ApiModel):
 
 class ProjectListResponse(ApiModel):
     items: list[ProjectResponse]
+    total: int
+
+
+class ProjectMembershipCreate(ApiModel):
+    email: str = Field(min_length=3, max_length=320)
+    role: Literal[ProjectRole.EDITOR, ProjectRole.VIEWER]
+
+
+class ProjectMembershipUpdate(ApiModel):
+    role: Literal[ProjectRole.EDITOR, ProjectRole.VIEWER]
+
+
+class ProjectMembershipResponse(ApiModel):
+    id: UUID
+    project_id: UUID
+    researcher: ResearcherResponse
+    role: ProjectRole
+    invited_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProjectMembershipListResponse(ApiModel):
+    items: list[ProjectMembershipResponse]
+    total: int
+
+
+class AuditEventResponse(ApiModel):
+    id: UUID
+    actor_id: UUID | None
+    action: str
+    resource_type: str
+    resource_id: UUID
+    occurred_at: datetime
+    event_metadata: dict[str, Any]
+
+
+class AuditEventListResponse(ApiModel):
+    items: list[AuditEventResponse]
     total: int
 
 

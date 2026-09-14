@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from ..authorization import require_project_access, require_study_access
 from ..database import get_db
 from ..dependencies import CurrentOwnerId
 from ..errors import ApiError
@@ -15,7 +16,7 @@ from ..models import (
     AuditEvent,
     ParticipantLink,
     ParticipantSession,
-    ResearchProject,
+    ProjectRole,
     Study,
     StudyLifecycle,
     StudyVersion,
@@ -37,33 +38,6 @@ from ..schemas import (
 
 router = APIRouter(tags=["studies"])
 DbSession = Depends(get_db)
-
-
-def owned_project(db: Session, project_id: uuid.UUID, owner_id: uuid.UUID) -> ResearchProject:
-    project = db.scalar(
-        select(ResearchProject).where(
-            ResearchProject.id == project_id, ResearchProject.owner_id == owner_id
-        )
-    )
-    if not project:
-        raise ApiError(404, "PROJECT_NOT_FOUND", "Research project was not found")
-    return project
-
-
-def owned_study(
-    db: Session, study_id: uuid.UUID, owner_id: uuid.UUID, *, lock: bool = False
-) -> Study:
-    statement = (
-        select(Study)
-        .join(ResearchProject)
-        .where(Study.id == study_id, ResearchProject.owner_id == owner_id)
-    )
-    if lock:
-        statement = statement.with_for_update()
-    study = db.scalar(statement)
-    if not study:
-        raise ApiError(404, "STUDY_NOT_FOUND", "Study was not found")
-    return study
 
 
 def draft_version(db: Session, study_id: uuid.UUID) -> StudyVersion:
@@ -155,7 +129,7 @@ def create_study(
     owner_id: CurrentOwnerId,
     db: Session = DbSession,
 ) -> StudyDraftResponse:
-    owned_project(db, project_id, owner_id)
+    require_project_access(db, project_id, owner_id, ProjectRole.EDITOR)
     study = Study(project_id=project_id, title=payload.title.strip())
     draft = StudyVersion(
         version_number=0,
@@ -181,7 +155,7 @@ def create_study(
 def list_studies(
     project_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> StudyListResponse:
-    owned_project(db, project_id, owner_id)
+    require_project_access(db, project_id, owner_id)
     studies = list(
         db.scalars(
             select(Study).where(Study.project_id == project_id).order_by(Study.updated_at.desc())
@@ -199,7 +173,7 @@ def list_studies(
 def get_study_draft(
     study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> StudyDraftResponse:
-    study = owned_study(db, study_id, owner_id)
+    study, _ = require_study_access(db, study_id, owner_id)
     return draft_payload(study, draft_version(db, study_id))
 
 
@@ -215,7 +189,9 @@ def replace_study_draft(
     owner_id: CurrentOwnerId,
     db: Session = DbSession,
 ) -> StudyDraftResponse:
-    study = owned_study(db, study_id, owner_id, lock=True)
+    study, _ = require_study_access(
+        db, study_id, owner_id, ProjectRole.EDITOR, lock=True
+    )
     if study.lifecycle in {StudyLifecycle.CLOSED, StudyLifecycle.ARCHIVED}:
         raise ApiError(409, "STUDY_NOT_EDITABLE", "Closed or archived studies cannot be edited")
     draft = draft_version(db, study_id)
@@ -245,7 +221,9 @@ def publish_study(
     db: Session = DbSession,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> PublishResponse:
-    study = owned_study(db, study_id, owner_id, lock=True)
+    study, role = require_study_access(
+        db, study_id, owner_id, ProjectRole.EDITOR, lock=True
+    )
     if study.lifecycle in {StudyLifecycle.CLOSED, StudyLifecycle.ARCHIVED}:
         raise ApiError(
             409, "STUDY_NOT_PUBLISHABLE", "Closed or archived studies cannot be published"
@@ -346,6 +324,7 @@ def publish_study(
     db.add(
         AuditEvent(
             actor_id=owner_id,
+            project_id=study.project_id,
             action="study.published",
             resource_type="study",
             resource_id=study.id,
@@ -353,6 +332,7 @@ def publish_study(
                 "version": next_version,
                 "draft_revision": study.draft_revision,
                 "idempotency_key_hash": key_hash,
+                "role": role.value,
             },
         )
     )
@@ -387,7 +367,7 @@ def publish_study(
 def get_active_participant_link(
     study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> ParticipantLinkResponse:
-    study = owned_study(db, study_id, owner_id)
+    study, _ = require_study_access(db, study_id, owner_id)
     if not study.current_published_version:
         raise ApiError(404, "PARTICIPANT_LINK_NOT_FOUND", "No participant link is active")
     link = db.scalar(
@@ -479,7 +459,7 @@ def get_study_version(
     owner_id: CurrentOwnerId,
     db: Session = DbSession,
 ) -> StudyVersionResponse:
-    owned_study(db, study_id, owner_id)
+    require_study_access(db, study_id, owner_id)
     if version_number < 1:
         raise ApiError(404, "STUDY_VERSION_NOT_FOUND", "Published study version was not found")
     version = db.scalar(
@@ -504,7 +484,7 @@ def get_study_version(
 def delete_study(
     study_id: uuid.UUID, owner_id: CurrentOwnerId, db: Session = DbSession
 ) -> Response:
-    study = owned_study(db, study_id, owner_id)
+    study, _ = require_study_access(db, study_id, owner_id, ProjectRole.EDITOR)
     db.delete(study)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
