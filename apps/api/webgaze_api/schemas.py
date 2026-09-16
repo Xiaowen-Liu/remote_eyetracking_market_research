@@ -116,6 +116,31 @@ class ProjectMembershipListResponse(ApiModel):
     total: int
 
 
+class ProjectInvitationResponse(ApiModel):
+    id: UUID
+    project_id: UUID
+    email: str
+    role: ProjectRole
+    invited_by: UUID
+    status: Literal["pending", "accepted", "cancelled", "expired"]
+    expires_at: datetime
+    accepted_at: datetime | None
+    cancelled_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProjectInvitationListResponse(ApiModel):
+    items: list[ProjectInvitationResponse]
+    total: int
+
+
+class ProjectInviteResult(ApiModel):
+    outcome: Literal["member_added", "invitation_pending"]
+    membership: ProjectMembershipResponse | None = None
+    invitation: ProjectInvitationResponse | None = None
+
+
 class AuditEventResponse(ApiModel):
     id: UUID
     actor_id: UUID | None
@@ -129,6 +154,26 @@ class AuditEventResponse(ApiModel):
 class AuditEventListResponse(ApiModel):
     items: list[AuditEventResponse]
     total: int
+
+
+class RetentionRunRequest(ApiModel):
+    dry_run: bool = True
+    limit: int = Field(default=100, ge=1, le=1000)
+
+
+class RetentionCandidate(ApiModel):
+    session_id: UUID
+    study_id: UUID
+    study_version_id: UUID
+    retention_expired_at: datetime
+
+
+class RetentionRunResponse(ApiModel):
+    dry_run: bool
+    evaluated_at: datetime
+    candidates: list[RetentionCandidate]
+    deleted_sessions: int
+    deleted_counts: dict[str, int]
 
 
 class AreaOfInterestDraft(ApiModel):

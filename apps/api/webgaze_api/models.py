@@ -156,6 +156,32 @@ class ProjectMembership(TimestampMixin, Base):
     invited_by: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
 
 
+class ProjectInvitation(TimestampMixin, Base):
+    __tablename__ = "project_invitations"
+    __table_args__ = (
+        UniqueConstraint("project_id", "email"),
+        CheckConstraint("role IN ('editor', 'viewer')", name="project_invitation_role"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    role: Mapped[ProjectRole] = mapped_column(
+        Enum(
+            ProjectRole,
+            native_enum=False,
+            values_callable=lambda role_type: [role.value for role in role_type],
+        ),
+        nullable=False,
+    )
+    invited_by: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Study(TimestampMixin, Base):
     __tablename__ = "studies"
 
@@ -444,6 +470,19 @@ class AnalysisResult(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class RetentionTombstone(Base):
+    __tablename__ = "retention_tombstones"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, unique=True, index=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    study_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    study_version_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    retention_expired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    deleted_counts: Mapped[dict[str, int]] = mapped_column(JSON, default=dict, nullable=False)
 
 
 class AuditEvent(Base):

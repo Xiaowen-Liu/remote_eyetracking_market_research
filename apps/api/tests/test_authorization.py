@@ -226,6 +226,78 @@ def test_owner_can_change_and_remove_a_collaborator(client, db_session):
     ).status_code == 404
 
 
+def test_owner_can_invite_an_unknown_email_and_invitation_is_claimed_on_login(
+    client, db_session
+):
+    owner, owner_headers = researcher_session(client, db_session, "invite-owner@example.com")
+    created = client.post(
+        "/api/v1/projects",
+        headers=owner_headers,
+        json={"name": "Invitation lifecycle"},
+    )
+    project_id = created.json()["id"]
+
+    invitation = client.post(
+        f"/api/v1/projects/{project_id}/invitations",
+        headers=owner_headers,
+        json={"email": "future@example.com", "role": "editor"},
+    )
+    assert invitation.status_code == 201
+    assert invitation.json()["outcome"] == "invitation_pending"
+    assert invitation.json()["invitation"]["status"] == "pending"
+
+    listed = client.get(
+        f"/api/v1/projects/{project_id}/invitations", headers=owner_headers
+    ).json()
+    assert listed["total"] == 1
+    assert listed["items"][0]["email"] == "future@example.com"
+
+    future, future_headers = researcher_session(client, db_session, "future@example.com")
+    access = client.get(
+        f"/api/v1/projects/{project_id}/access", headers=future_headers
+    )
+    assert access.status_code == 200
+    assert access.json()["role"] == "editor"
+    assert client.get(
+        f"/api/v1/projects/{project_id}/invitations", headers=owner_headers
+    ).json()["total"] == 0
+    members = client.get(
+        f"/api/v1/projects/{project_id}/members", headers=owner_headers
+    ).json()["items"]
+    assert any(item["researcher"]["id"] == str(future.id) for item in members)
+
+
+def test_owner_can_cancel_and_resend_a_pending_invitation(client, db_session):
+    _, owner_headers = researcher_session(client, db_session, "cancel-owner@example.com")
+    project_id = client.post(
+        "/api/v1/projects",
+        headers=owner_headers,
+        json={"name": "Cancel invitation"},
+    ).json()["id"]
+    first = client.post(
+        f"/api/v1/projects/{project_id}/invitations",
+        headers=owner_headers,
+        json={"email": "pending@example.com", "role": "viewer"},
+    ).json()["invitation"]
+    cancelled = client.delete(
+        f"/api/v1/projects/{project_id}/invitations/{first['id']}",
+        headers=owner_headers,
+    )
+    assert cancelled.status_code == 204
+    assert client.get(
+        f"/api/v1/projects/{project_id}/invitations", headers=owner_headers
+    ).json()["total"] == 0
+
+    resent = client.post(
+        f"/api/v1/projects/{project_id}/invitations",
+        headers=owner_headers,
+        json={"email": "pending@example.com", "role": "editor"},
+    ).json()["invitation"]
+    assert resent["id"] == first["id"]
+    assert resent["role"] == "editor"
+    assert resent["status"] == "pending"
+
+
 def test_owner_can_transfer_ownership_atomically(client, db_session):
     team = project_team(client, db_session)
     project_id = team["project_id"]

@@ -49,13 +49,30 @@ locked before an account exists:
    result access, then sign out and confirm the workspace is locked again.
 
 After the project-membership migration, the seeded account is also backfilled as
-Owner of the seeded project. Editor and Viewer accounts must already exist before
-an Owner can add them through the membership API. Owner transfer is not supported;
-do not remove or deactivate the sole owning account.
+Owner of the seeded project. Owners can invite Editor and Viewer email addresses
+before those accounts exist; the invitation is claimed when the matching active
+researcher signs in. This demo records pending invitation state but does not send
+email. Ownership can be transferred to an existing collaborator after explicit
+project-name confirmation; verify the target account before confirming.
 
 Do not place the researcher password in Vercel variables or commit it to Git. The
 web client sends it only to the API login endpoint and stores only the returned
 opaque session token.
+
+## Retention enforcement
+
+Participant sessions receive an immutable `retention_expires_at` deadline from the
+published study version. Preview eligible deletions with `npm run retention:preview`,
+then execute them with `npm run retention:run`. The job is bounded to 100 sessions
+per project per invocation by default and is safe to retry.
+
+Schedule `npm run retention:run` as a daily Railway cron job. Each deletion removes
+calibration records, task runs, session events, gaze batches and samples, analysis
+jobs, and derived results in one database transaction. It retains only a tombstone
+containing opaque resource IDs, the expiration/deletion timestamps, and per-table
+row counts. The job and the Owner-only project endpoint both emit a project audit
+event; neither tombstone nor audit metadata contains participant aliases or gaze
+coordinates.
 
 ## Non-goals for this public demo
 

@@ -14,6 +14,9 @@ const apiMocks = vi.hoisted(() => ({
   getProjectAccess: vi.fn(),
   listProjectMembers: vi.fn(),
   addProjectMember: vi.fn(),
+  listProjectInvitations: vi.fn(),
+  inviteProjectMember: vi.fn(),
+  cancelProjectInvitation: vi.fn(),
   updateProjectMember: vi.fn(),
   removeProjectMember: vi.fn(),
   transferProjectOwnership: vi.fn(),
@@ -73,6 +76,7 @@ describe("Study Builder", () => {
       can_delete: true,
     });
     apiMocks.listProjectMembers.mockResolvedValue({ items: [], total: 0 });
+    apiMocks.listProjectInvitations.mockResolvedValue({ items: [], total: 0 });
     apiMocks.listProjectAuditEvents.mockResolvedValue({ items: [], total: 0 });
     apiMocks.getParticipantLink.mockResolvedValue({
       participant_url: "/participate/demo-link",
@@ -227,9 +231,59 @@ describe("Study Builder", () => {
     await user.click(screen.getByRole("button", { name: "Projects" }));
     await user.click(screen.getByRole("button", { name: "Team & access" }));
 
-    expect(await screen.findByRole("heading", { name: "1 people" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "1 person" })).toBeInTheDocument();
     expect(screen.getByText("Project Owner")).toBeInTheDocument();
     expect(screen.getByText("Project created")).toBeInTheDocument();
+  });
+
+  it("shows an unknown researcher as a pending invitation", async () => {
+    const user = userEvent.setup();
+    apiMocks.inviteProjectMember.mockResolvedValue({
+      outcome: "invitation_pending",
+      membership: null,
+      invitation: {
+        id: "00000000-0000-4000-8000-000000000050",
+        project_id: "00000000-0000-4000-8000-000000000010",
+        email: "future@example.com",
+        role: "viewer",
+        invited_by: "00000000-0000-4000-8000-000000000001",
+        status: "pending",
+        expires_at: "2026-09-30T00:00:00Z",
+        accepted_at: null,
+        cancelled_at: null,
+        created_at: "2026-09-16T00:00:00Z",
+        updated_at: "2026-09-16T00:00:00Z",
+      },
+    });
+    apiMocks.listProjectInvitations
+      .mockResolvedValueOnce({ items: [], total: 0 })
+      .mockResolvedValue({
+        items: [{
+          id: "00000000-0000-4000-8000-000000000050",
+          project_id: "00000000-0000-4000-8000-000000000010",
+          email: "future@example.com",
+          role: "viewer",
+          invited_by: "00000000-0000-4000-8000-000000000001",
+          status: "pending",
+          expires_at: "2026-09-30T00:00:00Z",
+          accepted_at: null,
+          cancelled_at: null,
+          created_at: "2026-09-16T00:00:00Z",
+          updated_at: "2026-09-16T00:00:00Z",
+        }],
+        total: 1,
+      });
+    render(<App />);
+
+    await screen.findByText("Checkout UX research");
+    await user.click(screen.getByRole("button", { name: "Projects" }));
+    await user.click(screen.getByRole("button", { name: "Team & access" }));
+    await user.type(await screen.findByLabelText("Email"), "future@example.com");
+    await user.click(screen.getByRole("button", { name: "Invite member" }));
+
+    expect(await screen.findByText("Invitation pending for future@example.com.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Waiting for 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel invitation" })).toBeInTheDocument();
   });
 
   it("requires the project name before transferring ownership", async () => {

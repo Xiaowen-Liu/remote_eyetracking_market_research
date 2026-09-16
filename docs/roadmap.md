@@ -28,9 +28,12 @@ gaze estimation has laboratory-grade accuracy.
    nested-resource authorization, project-scoped audit events, and an owner-facing
    Team & access workspace are implemented. Ownership can be atomically transferred
    to an existing collaborator with explicit confirmation and an audit event.
-1. **Retention enforcement** — turn each study's retention policy into a tested
-   deletion workflow for server telemetry, snapshots, exports, and audit-safe
-   tombstones.
+   Pending email invitations have a 14-day lifecycle, cancellation/resend behavior,
+   automatic sign-in claim, and audit coverage.
+- [x] **Retention enforcement** — published policies now produce immutable session
+   deadlines; an Owner-only dry-run/execution API and a schedule-ready bounded job
+   delete telemetry and derived results transactionally while retaining anonymous,
+   retry-safe tombstones and project audit evidence.
 2. **Operational hardening** — queue-backed analysis workers, rate limits,
    structured observability, retry/dead-letter handling, and production alerts.
 3. **Accessibility and performance pass** — keyboard-complete replay controls,

@@ -292,10 +292,13 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .member-list { display: grid; gap: 0; padding: 0; margin: 0; list-style: none; }
 .member-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 14px 0; border-top: 1px solid #e5e9e4; }
 .member-avatar { display: grid; place-items: center; width: 38px; height: 38px; color: #fff; background: #4f6d3b; border-radius: 50%; font-weight: 800; }
+.member-avatar.pending { color: #4f633e; background: #edf3e7; }
 .member-list li > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
 .member-list small { overflow: hidden; color: #737e77; text-overflow: ellipsis; }
 .member-list .text-button { padding: 8px; }
 .member-actions { display: flex; gap: 3px; }
+.pending-invitations { display: grid; gap: 8px; padding-top: 18px; border-top: 1px solid #e5e9e4; }
+.pending-invitations h3 { margin: 4px 0 0; font: 500 20px/1.2 Georgia, serif; }
 .ownership-transfer { display: grid; gap: 14px; padding: 18px; color: #472b27; background: #fff6f3; border: 1px solid #e5b9af; border-radius: 10px; }
 .ownership-transfer h3 { margin: 5px 0 7px; font: 500 21px/1.2 Georgia, serif; }
 .ownership-transfer p:not(.eyebrow) { margin: 0; color: #725b56; font-size: 12px; line-height: 1.5; }
