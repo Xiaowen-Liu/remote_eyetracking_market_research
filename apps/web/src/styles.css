@@ -295,6 +295,16 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .member-list li > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
 .member-list small { overflow: hidden; color: #737e77; text-overflow: ellipsis; }
 .member-list .text-button { padding: 8px; }
+.member-actions { display: flex; gap: 3px; }
+.ownership-transfer { display: grid; gap: 14px; padding: 18px; color: #472b27; background: #fff6f3; border: 1px solid #e5b9af; border-radius: 10px; }
+.ownership-transfer h3 { margin: 5px 0 7px; font: 500 21px/1.2 Georgia, serif; }
+.ownership-transfer p:not(.eyebrow) { margin: 0; color: #725b56; font-size: 12px; line-height: 1.5; }
+.ownership-transfer label { display: grid; gap: 6px; color: #684d47; font-size: 11px; font-weight: 800; }
+.ownership-transfer input, .ownership-transfer select { padding: 10px; color: #302622; background: #fff; border: 1px solid #d7b7b0; border-radius: 7px; }
+.ownership-transfer > div:last-child { display: flex; justify-content: flex-end; gap: 8px; }
+.ownership-transfer .primary-button, .ownership-transfer .secondary-button { width: auto; margin: 0; }
+.danger-button { background: #923f32; border-color: #923f32; }
+.danger-button:hover { background: #7b342a; }
 .audit-panel ol { display: grid; gap: 0; padding: 8px 0 0; margin: 0; list-style: none; }
 .audit-panel li { display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 12px 0; border-top: 1px solid #e6e9e5; }
 .audit-panel li div { display: grid; gap: 4px; }
@@ -454,6 +464,6 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
   .member-invite { grid-template-columns: 1fr; }
   .member-invite small { grid-column: auto; }
   .member-list li { grid-template-columns: auto minmax(0, 1fr); }
-  .member-list li select, .member-list li .role-badge, .member-list li .text-button { grid-column: 2; justify-self: start; }
+  .member-list li select, .member-list li .role-badge, .member-list li .member-actions { grid-column: 2; justify-self: start; }
   .collector-snapshot { grid-column: auto; }
 }

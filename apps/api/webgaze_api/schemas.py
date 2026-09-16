@@ -96,6 +96,11 @@ class ProjectMembershipUpdate(ApiModel):
     role: Literal[ProjectRole.EDITOR, ProjectRole.VIEWER]
 
 
+class ProjectOwnershipTransfer(ApiModel):
+    membership_id: UUID
+    previous_owner_role: Literal[ProjectRole.EDITOR, ProjectRole.VIEWER] = ProjectRole.EDITOR
+
+
 class ProjectMembershipResponse(ApiModel):
     id: UUID
     project_id: UUID

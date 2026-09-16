@@ -1491,6 +1491,7 @@ const auditLabels: Record<string, string> = {
   "project.member_added": "Member added",
   "project.member_role_updated": "Member role changed",
   "project.member_removed": "Member removed",
+  "project.ownership_transferred": "Project ownership transferred",
 };
 
 function ProjectAccessPage({
@@ -1509,6 +1510,9 @@ function ProjectAccessPage({
   const [role, setRole] = useState<"editor" | "viewer">("viewer");
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transferTarget, setTransferTarget] = useState<ProjectMembership | null>(null);
+  const [transferConfirmation, setTransferConfirmation] = useState("");
+  const [previousOwnerRole, setPreviousOwnerRole] = useState<"editor" | "viewer">("editor");
 
   async function load() {
     setBusy(true);
@@ -1573,6 +1577,21 @@ function ProjectAccessPage({
     }
   }
 
+  async function transferOwnership() {
+    if (!transferTarget || transferConfirmation !== project.name) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.transferProjectOwnership(project.id, transferTarget.id, previousOwnerRole);
+      setTransferTarget(null);
+      setTransferConfirmation("");
+      await load();
+    } catch (transferError) {
+      setError(transferError instanceof ApiClientError ? transferError.message : "Ownership could not be transferred.");
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1612,10 +1631,18 @@ function ProjectAccessPage({
                     <span className="member-avatar" aria-hidden="true">{membership.researcher.display_name.slice(0, 1).toUpperCase()}</span>
                     <span><strong>{membership.researcher.display_name}</strong><small>{membership.researcher.email}</small></span>
                     {membership.role === "owner" ? <span className="role-badge owner">Owner</span> : <select aria-label={`Role for ${membership.researcher.display_name}`} disabled={busy} value={membership.role} onChange={(event) => void changeRole(membership, event.target.value as "editor" | "viewer")}><option value="viewer">Viewer</option><option value="editor">Editor</option></select>}
-                    {membership.role !== "owner" && <button className="text-button danger" type="button" disabled={busy} onClick={() => void removeMember(membership)}>Remove</button>}
+                    {membership.role !== "owner" && <div className="member-actions"><button className="text-button" type="button" disabled={busy} onClick={() => { setTransferTarget(membership); setTransferConfirmation(""); }}>Make owner</button><button className="text-button danger" type="button" disabled={busy} onClick={() => void removeMember(membership)}>Remove</button></div>}
                   </li>
                 ))}
               </ul>
+              {transferTarget && (
+                <section className="ownership-transfer" aria-labelledby="transfer-title">
+                  <div><p className="eyebrow">Irreversible role change</p><h3 id="transfer-title">Transfer ownership to {transferTarget.researcher.display_name}</h3><p>They will control members and project deletion. Your account will remain on the project with the role selected below.</p></div>
+                  <label>Your new role<select value={previousOwnerRole} onChange={(event) => setPreviousOwnerRole(event.target.value as "editor" | "viewer")}><option value="editor">Editor</option><option value="viewer">Viewer</option></select></label>
+                  <label>Type <strong>{project.name}</strong> to confirm<input value={transferConfirmation} onChange={(event) => setTransferConfirmation(event.target.value)} /></label>
+                  <div><button className="secondary-button" type="button" onClick={() => setTransferTarget(null)}>Cancel</button><button className="primary-button danger-button" type="button" disabled={busy || transferConfirmation !== project.name} onClick={() => void transferOwnership()}>Transfer ownership</button></div>
+                </section>
+              )}
             </section>
             <aside className="panel-card audit-panel">
               <p className="eyebrow">Audit log</p><h2>Recent activity</h2>
