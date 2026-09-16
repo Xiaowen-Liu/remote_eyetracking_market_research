@@ -16,6 +16,10 @@ WEBGAZE_CORS_ORIGINS=["https://your-project.vercel.app"]
 WEBGAZE_SQL_ECHO=false
 WEBGAZE_RESEARCHER_AUTH_REQUIRED=true
 WEBGAZE_RESEARCHER_SESSION_HOURS=12
+WEBGAZE_RATE_LIMIT_ENABLED=true
+WEBGAZE_LOGIN_RATE_LIMIT_PER_MINUTE=10
+WEBGAZE_PARTICIPANT_RATE_LIMIT_PER_MINUTE=120
+WEBGAZE_TRUST_PROXY_HEADERS=true
 WEBGAZE_DEMO_RESEARCHER_EMAIL=your-researcher@example.com
 WEBGAZE_DEMO_RESEARCHER_PASSWORD=<unique-secret-at-least-12-characters>
 ```
@@ -30,7 +34,7 @@ VITE_API_URL=https://your-api.up.railway.app
 
 1. Run `npm test`, `npm run build:web`, `npm run generate:contract`, and Ruff.
 2. Confirm migrations apply against PostgreSQL.
-3. Deploy Railway first and verify `/healthz` and `/api/docs`.
+3. Deploy Railway first and verify `/healthz`, `/readyz`, and `/api/docs`.
 4. Set the Vercel API origin, deploy the web app, then lock Railway CORS to the exact Vercel production origin.
 5. Smoke-test project creation, publishing, participant-link resolution, synthetic flow, results, and export.
 6. Confirm the UI labels synthetic data as synthetic.
@@ -83,6 +87,36 @@ an interrupted worker. Failed jobs retry with exponential delay and move to a
 dead-letter state after three attempts. Inspect `worker_attempts`, `error_code`,
 `available_at`, `lease_expires_at`, and `dead_lettered_at` through the analysis-job
 API before deciding whether to repair the underlying data or enqueue a new attempt.
+
+## Health, logs, and abuse controls
+
+`/healthz` is a process liveness probe and deliberately performs no database work.
+`/readyz` executes a minimal database query and should be used when verifying a
+release or diagnosing connectivity. Keep Railway's automatic restart check on
+`/healthz` so a temporary database incident does not create a restart loop.
+
+Every API response carries `X-Request-ID`. A valid caller-supplied ID is preserved;
+unsafe or malformed values are replaced. The `webgaze.access` logger emits one JSON
+record per request with method, path, status, latency, and request ID. Query strings,
+authorization tokens, request bodies, participant codes, and coordinates are not
+logged. Use request ID to correlate user-visible failures with Railway logs.
+
+The API applies a per-process fixed-window limit to researcher login and participant
+write routes. `WEBGAZE_TRUST_PROXY_HEADERS=true` is appropriate only behind Railway's
+trusted proxy; leave it false when the API is directly reachable. A rejected request
+returns `429`, `Retry-After`, and the normal structured error envelope. These limits
+bound accidental and low-volume abuse but do not coordinate across replicas. Before
+external recruitment, add a distributed edge/WAF limit without removing the
+application guard.
+
+Configure provider alerts for the following initial signals, then tune from observed
+traffic:
+
+- readiness failures for 5 consecutive minutes;
+- 5xx responses above 2% for 5 minutes;
+- p95 API latency above 1 second for 10 minutes;
+- any analysis dead-letter event, or oldest queued job older than 10 minutes;
+- sustained `429` responses, which may indicate abuse or a limit set too low.
 
 ## Non-goals for this public demo
 

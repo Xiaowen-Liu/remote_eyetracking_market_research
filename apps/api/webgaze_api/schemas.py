@@ -35,6 +35,11 @@ class HealthResponse(ApiModel):
     service: Literal["webgaze-api"] = "webgaze-api"
 
 
+class ReadinessResponse(ApiModel):
+    status: Literal["ready"] = "ready"
+    database: Literal["ok"] = "ok"
+
+
 class ResearcherResponse(ApiModel):
     id: UUID
     email: str
