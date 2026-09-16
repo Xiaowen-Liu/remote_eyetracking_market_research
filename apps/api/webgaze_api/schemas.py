@@ -156,6 +156,26 @@ class AuditEventListResponse(ApiModel):
     total: int
 
 
+class RetentionRunRequest(ApiModel):
+    dry_run: bool = True
+    limit: int = Field(default=100, ge=1, le=1000)
+
+
+class RetentionCandidate(ApiModel):
+    session_id: UUID
+    study_id: UUID
+    study_version_id: UUID
+    retention_expired_at: datetime
+
+
+class RetentionRunResponse(ApiModel):
+    dry_run: bool
+    evaluated_at: datetime
+    candidates: list[RetentionCandidate]
+    deleted_sessions: int
+    deleted_counts: dict[str, int]
+
+
 class AreaOfInterestDraft(ApiModel):
     label: str = Field(min_length=1, max_length=120)
     source: Literal["manual", "selector", "imported"]

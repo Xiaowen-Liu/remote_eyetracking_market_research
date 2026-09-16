@@ -401,6 +401,23 @@ export interface paths {
         patch: operations["updateProjectMember"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/retention/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Retention */
+        post: operations["runProjectRetention"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/studies": {
         parameters: {
             query?: never;
@@ -1343,6 +1360,60 @@ export interface components {
              * @constant
              */
             token_type: "bearer";
+        };
+        /** RetentionCandidate */
+        RetentionCandidate: {
+            /**
+             * Retention Expired At
+             * Format: date-time
+             */
+            retention_expired_at: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /**
+             * Study Version Id
+             * Format: uuid
+             */
+            study_version_id: string;
+        };
+        /** RetentionRunRequest */
+        RetentionRunRequest: {
+            /**
+             * Dry Run
+             * @default true
+             */
+            dry_run: boolean;
+            /**
+             * Limit
+             * @default 100
+             */
+            limit: number;
+        };
+        /** RetentionRunResponse */
+        RetentionRunResponse: {
+            /** Candidates */
+            candidates: components["schemas"]["RetentionCandidate"][];
+            /** Deleted Counts */
+            deleted_counts: {
+                [key: string]: number;
+            };
+            /** Deleted Sessions */
+            deleted_sessions: number;
+            /** Dry Run */
+            dry_run: boolean;
+            /**
+             * Evaluated At
+             * Format: date-time
+             */
+            evaluated_at: string;
         };
         /**
          * SessionLifecycle
@@ -3018,6 +3089,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectMembershipResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runProjectRetention: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetentionRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionRunResponse"];
                 };
             };
             /** @description Forbidden */

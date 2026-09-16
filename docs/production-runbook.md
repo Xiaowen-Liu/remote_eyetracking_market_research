@@ -59,6 +59,21 @@ Do not place the researcher password in Vercel variables or commit it to Git. Th
 web client sends it only to the API login endpoint and stores only the returned
 opaque session token.
 
+## Retention enforcement
+
+Participant sessions receive an immutable `retention_expires_at` deadline from the
+published study version. Preview eligible deletions with `npm run retention:preview`,
+then execute them with `npm run retention:run`. The job is bounded to 100 sessions
+per project per invocation by default and is safe to retry.
+
+Schedule `npm run retention:run` as a daily Railway cron job. Each deletion removes
+calibration records, task runs, session events, gaze batches and samples, analysis
+jobs, and derived results in one database transaction. It retains only a tombstone
+containing opaque resource IDs, the expiration/deletion timestamps, and per-table
+row counts. The job and the Owner-only project endpoint both emit a project audit
+event; neither tombstone nor audit metadata contains participant aliases or gaze
+coordinates.
+
 ## Non-goals for this public demo
 
 Do not connect sensitive or consequential human-subject research data without

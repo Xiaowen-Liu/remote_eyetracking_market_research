@@ -472,6 +472,19 @@ class AnalysisResult(Base):
     )
 
 
+class RetentionTombstone(Base):
+    __tablename__ = "retention_tombstones"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, unique=True, index=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    study_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    study_version_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    retention_expired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    deleted_counts: Mapped[dict[str, int]] = mapped_column(JSON, default=dict, nullable=False)
+
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
