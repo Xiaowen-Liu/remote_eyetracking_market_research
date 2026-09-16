@@ -8,6 +8,9 @@ import {
   type AnalysisJob,
   type AnalysisResult,
   type ParticipantSessionSummary,
+  type ProjectAccess,
+  type ProjectMembership,
+  type AuditEvent,
   type Project,
   type Researcher,
   type StudyDraft,
@@ -140,6 +143,8 @@ function StudyBuilder() {
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [projectCreationOpen, setProjectCreationOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false);
+  const [accessProject, setAccessProject] = useState<Project | null>(null);
+  const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [researcher, setResearcher] = useState<Researcher | null>(null);
 
@@ -181,6 +186,7 @@ function StudyBuilder() {
     setNotice(null);
     try {
       setProject(nextProject);
+      setProjectAccess(null);
       setDashboardOpen(false);
       setResultsOpen(false);
       setStudy(null);
@@ -188,7 +194,11 @@ function StudyBuilder() {
       setDirty(false);
       setEditing(true);
       setParticipantUrl(null);
-      const studies = await api.listStudies(nextProject.id);
+      const [studies, access] = await Promise.all([
+        api.listStudies(nextProject.id),
+        api.getProjectAccess(nextProject.id),
+      ]);
+      setProjectAccess(access);
       if (!studies.items[0]) return;
       const existing = await api.getDraft(studies.items[0].id);
       setStudy(existing);
@@ -357,7 +367,8 @@ function StudyBuilder() {
   }
 
   const publishedVersion = study?.current_published_version ?? null;
-  const isLocked = publishedVersion !== null && !editing;
+  const canEdit = projectAccess?.can_edit ?? false;
+  const isLocked = !canEdit || (publishedVersion !== null && !editing);
 
   if (authRequired) {
     return (
@@ -373,6 +384,15 @@ function StudyBuilder() {
   }
 
   if (dashboardOpen) {
+    if (accessProject) {
+      return (
+        <ProjectAccessPage
+          project={accessProject}
+          researcher={researcher}
+          onBack={() => setAccessProject(null)}
+        />
+      );
+    }
     if (projectCreationOpen) {
       return (
         <ProjectCreationPage
@@ -387,6 +407,8 @@ function StudyBuilder() {
         currentProjectId={project?.id ?? null}
         onOpenProject={(nextProject) => void selectProject(nextProject)}
         onCreateProject={() => setProjectCreationOpen(true)}
+        onManageAccess={setAccessProject}
+        researcher={researcher}
       />
     );
   }
@@ -643,7 +665,9 @@ function StudyBuilder() {
                     </button>
                     {isLocked && (
                       <p className="supporting locked-action-note">
-                        This version is live. Select Edit study to change its tasks.
+                        {canEdit
+                          ? "This version is live. Select Edit study to change its tasks."
+                          : "Viewer access is read-only. An owner can change your project role."}
                       </p>
                     )}
                   </>
@@ -674,19 +698,21 @@ function StudyBuilder() {
                     </button>
                   </div>
                 ) : null}
-                <button
-                  type="button"
-                  className="secondary-button full"
-                  onClick={() => {
-                    setEditing(true);
-                    setNotice({
-                      kind: "success",
-                      text: `You can now edit this study. Version ${publishedVersion} remains live until you publish changes.`,
-                    });
-                  }}
-                >
-                  Edit study
-                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    className="secondary-button full"
+                    onClick={() => {
+                      setEditing(true);
+                      setNotice({
+                        kind: "success",
+                        text: `You can now edit this study. Version ${publishedVersion} remains live until you publish changes.`,
+                      });
+                    }}
+                  >
+                    Edit study
+                  </button>
+                )}
                 <button
                   type="button"
                   className="secondary-button full"
@@ -700,6 +726,20 @@ function StudyBuilder() {
               </>
             ) : (
               <>
+                {!canEdit ? (
+                  <>
+                    <p className="eyebrow">Viewer access</p>
+                    <h2>Read-only study</h2>
+                    <p className="panel-description">
+                      You can review this protocol and its results, but only an owner or editor can publish changes.
+                    </p>
+                    {study && (
+                      <button type="button" className="secondary-button full" onClick={() => setResultsOpen(true)}>
+                        View results
+                      </button>
+                    )}
+                  </>
+                ) : <>
                 <p className="eyebrow">
                   {publishedVersion ? "New revision" : "Study status"}
                 </p>
@@ -742,6 +782,7 @@ function StudyBuilder() {
                     ? `Version ${publishedVersion} remains live until this revision is published.`
                     : "Published versions cannot be edited."}
                 </p>
+                </>}
               </>
             )}
           </aside>
@@ -1388,11 +1429,15 @@ function ProjectDashboard({
   currentProjectId,
   onOpenProject,
   onCreateProject,
+  onManageAccess,
+  researcher,
 }: {
   projects: Project[];
   currentProjectId: string | null;
   onOpenProject: (project: Project) => void;
   onCreateProject: () => void;
+  onManageAccess: (project: Project) => void;
+  researcher: Researcher | null;
 }) {
   return (
     <div className="app-shell">
@@ -1401,7 +1446,7 @@ function ProjectDashboard({
           <span className="brand-mark" aria-hidden="true">◉</span>
           WebGaze Research
         </a>
-        <span className="environment">Independent demo</span>
+        <span className="environment">{researcher?.display_name ?? "Independent demo"}</span>
       </header>
       <main>
         <p className="eyebrow">Research workspace</p>
@@ -1423,12 +1468,189 @@ function ProjectDashboard({
               </div>
               <h2>{item.name}</h2>
               <p>{item.research_question ?? "No research question added yet."}</p>
-              <button className="secondary-button full" type="button" onClick={() => onOpenProject(item)}>
-                Open project
-              </button>
+              <div className="project-card-actions">
+                <button className="secondary-button full" type="button" onClick={() => onOpenProject(item)}>
+                  Open project
+                </button>
+                <button className="text-button" type="button" onClick={() => onManageAccess(item)}>
+                  Team &amp; access
+                </button>
+              </div>
             </article>
           ))}
         </section>
+      </main>
+    </div>
+  );
+}
+
+const auditLabels: Record<string, string> = {
+  "project.created": "Project created",
+  "project.updated": "Project details updated",
+  "project.deleted": "Project deleted",
+  "project.member_added": "Member added",
+  "project.member_role_updated": "Member role changed",
+  "project.member_removed": "Member removed",
+  "project.ownership_transferred": "Project ownership transferred",
+};
+
+function ProjectAccessPage({
+  project,
+  researcher,
+  onBack,
+}: {
+  project: Project;
+  researcher: Researcher | null;
+  onBack: () => void;
+}) {
+  const [access, setAccess] = useState<ProjectAccess | null>(null);
+  const [members, setMembers] = useState<ProjectMembership[]>([]);
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"editor" | "viewer">("viewer");
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [transferTarget, setTransferTarget] = useState<ProjectMembership | null>(null);
+  const [transferConfirmation, setTransferConfirmation] = useState("");
+  const [previousOwnerRole, setPreviousOwnerRole] = useState<"editor" | "viewer">("editor");
+
+  async function load() {
+    setBusy(true);
+    setError(null);
+    try {
+      const currentAccess = await api.getProjectAccess(project.id);
+      setAccess(currentAccess);
+      if (currentAccess.can_manage_members) {
+        const [memberList, auditList] = await Promise.all([
+          api.listProjectMembers(project.id),
+          api.listProjectAuditEvents(project.id),
+        ]);
+        setMembers(memberList.items);
+        setEvents(auditList.items);
+      }
+    } catch (loadError) {
+      setError(loadError instanceof ApiClientError ? loadError.message : "Project access could not be loaded.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, [project.id]);
+
+  async function addMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!email.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.addProjectMember(project.id, email.trim(), role);
+      setEmail("");
+      await load();
+    } catch (addError) {
+      setError(addError instanceof ApiClientError ? addError.message : "The member could not be added.");
+      setBusy(false);
+    }
+  }
+
+  async function changeRole(membership: ProjectMembership, nextRole: "editor" | "viewer") {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateProjectMember(project.id, membership.id, nextRole);
+      await load();
+    } catch (updateError) {
+      setError(updateError instanceof ApiClientError ? updateError.message : "The role could not be changed.");
+      setBusy(false);
+    }
+  }
+
+  async function removeMember(membership: ProjectMembership) {
+    if (!window.confirm(`Remove ${membership.researcher.display_name} from this project?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.removeProjectMember(project.id, membership.id);
+      await load();
+    } catch (removeError) {
+      setError(removeError instanceof ApiClientError ? removeError.message : "The member could not be removed.");
+      setBusy(false);
+    }
+  }
+
+  async function transferOwnership() {
+    if (!transferTarget || transferConfirmation !== project.name) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.transferProjectOwnership(project.id, transferTarget.id, previousOwnerRole);
+      setTransferTarget(null);
+      setTransferConfirmation("");
+      await load();
+    } catch (transferError) {
+      setError(transferError instanceof ApiClientError ? transferError.message : "Ownership could not be transferred.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <button className="brand brand-button" type="button" onClick={onBack}>
+          <span className="brand-mark" aria-hidden="true">◉</span> WebGaze Research
+        </button>
+        <span className="environment">{researcher?.display_name ?? "Independent demo"}</span>
+      </header>
+      <main>
+        <button className="text-button access-back" type="button" onClick={onBack}>← Back to projects</button>
+        <div className="page-heading access-heading">
+          <div><p className="eyebrow">Team &amp; access</p><h1>{project.name}</h1><p>Control who can configure studies and inspect consented research results.</p></div>
+          {access && <span className={`role-badge ${access.role}`}>Your role · {access.role}</span>}
+        </div>
+        {error && <div className="notice error" role="alert">{error}</div>}
+        {busy && !access ? <div className="loading">Loading project access…</div> : null}
+        {access && !access.can_manage_members && (
+          <section className="access-summary panel-card">
+            <p className="eyebrow">Project permissions</p>
+            <h2>{access.role === "editor" ? "You can build and publish studies" : "You have read-only access"}</h2>
+            <p>{access.role === "editor" ? "Editors can change study protocols and run analysis. Only owners can manage the team or delete the project." : "Viewers can inspect protocols, participant sessions, and results. They cannot change or publish a study."}</p>
+          </section>
+        )}
+        {access?.can_manage_members && (
+          <div className="access-layout">
+            <section className="panel-card members-panel">
+              <div><p className="eyebrow">Project members</p><h2>{members.length} people</h2></div>
+              <form className="member-invite" onSubmit={(event) => void addMember(event)}>
+                <label>Email<input type="email" required placeholder="researcher@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+                <label>Role<select value={role} onChange={(event) => setRole(event.target.value as "editor" | "viewer")}><option value="viewer">Viewer</option><option value="editor">Editor</option></select></label>
+                <button className="primary-button" type="submit" disabled={busy}>Add member</button>
+                <small>The researcher must already have an active WebGaze account.</small>
+              </form>
+              <ul className="member-list">
+                {members.map((membership) => (
+                  <li key={membership.id}>
+                    <span className="member-avatar" aria-hidden="true">{membership.researcher.display_name.slice(0, 1).toUpperCase()}</span>
+                    <span><strong>{membership.researcher.display_name}</strong><small>{membership.researcher.email}</small></span>
+                    {membership.role === "owner" ? <span className="role-badge owner">Owner</span> : <select aria-label={`Role for ${membership.researcher.display_name}`} disabled={busy} value={membership.role} onChange={(event) => void changeRole(membership, event.target.value as "editor" | "viewer")}><option value="viewer">Viewer</option><option value="editor">Editor</option></select>}
+                    {membership.role !== "owner" && <div className="member-actions"><button className="text-button" type="button" disabled={busy} onClick={() => { setTransferTarget(membership); setTransferConfirmation(""); }}>Make owner</button><button className="text-button danger" type="button" disabled={busy} onClick={() => void removeMember(membership)}>Remove</button></div>}
+                  </li>
+                ))}
+              </ul>
+              {transferTarget && (
+                <section className="ownership-transfer" aria-labelledby="transfer-title">
+                  <div><p className="eyebrow">Irreversible role change</p><h3 id="transfer-title">Transfer ownership to {transferTarget.researcher.display_name}</h3><p>They will control members and project deletion. Your account will remain on the project with the role selected below.</p></div>
+                  <label>Your new role<select value={previousOwnerRole} onChange={(event) => setPreviousOwnerRole(event.target.value as "editor" | "viewer")}><option value="editor">Editor</option><option value="viewer">Viewer</option></select></label>
+                  <label>Type <strong>{project.name}</strong> to confirm<input value={transferConfirmation} onChange={(event) => setTransferConfirmation(event.target.value)} /></label>
+                  <div><button className="secondary-button" type="button" onClick={() => setTransferTarget(null)}>Cancel</button><button className="primary-button danger-button" type="button" disabled={busy || transferConfirmation !== project.name} onClick={() => void transferOwnership()}>Transfer ownership</button></div>
+                </section>
+              )}
+            </section>
+            <aside className="panel-card audit-panel">
+              <p className="eyebrow">Audit log</p><h2>Recent activity</h2>
+              <ol>{events.map((event) => <li key={event.id}><span className="audit-dot" /><div><strong>{auditLabels[event.action] ?? event.action}</strong><small>{new Date(event.occurred_at).toLocaleString()}</small></div></li>)}</ol>
+              {!events.length && <p>No project activity has been recorded yet.</p>}
+            </aside>
+          </div>
+        )}
       </main>
     </div>
   );

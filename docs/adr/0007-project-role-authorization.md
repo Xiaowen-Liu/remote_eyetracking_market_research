@@ -30,13 +30,19 @@ route-specific checks are difficult to audit and easy to bypass accidentally.
   emit project-scoped audit events. Owners can retrieve the latest 200 events.
 - Audit project IDs are intentionally durable references rather than cascading
   foreign keys, so deleting a project does not erase its audit history.
-- Owner transfer and self-service invitation acceptance are deliberately excluded
-  from this slice. Collaborators must already have a researcher account.
+- Ownership transfer is atomic: the selected collaborator becomes Owner, the
+  previous Owner remains as an explicitly selected Editor or Viewer, and one audit
+  event records the transition. Self-service invitation acceptance remains outside
+  this slice; collaborators must already have a researcher account.
+- A viewer-readable capability endpoint lets the web application render the
+  effective role without duplicating authorization rules. The Team & access UI
+  exposes membership mutations and the audit feed only when that endpoint grants
+  owner capabilities.
 
 ## Consequences
 
 Backend access is enforced consistently across nested resources, and tests exercise
-real login sessions rather than spoofed owner headers. A future membership UI can
-consume the generated contract without changing the authorization boundary. Audit
-events are operational evidence, not an immutable compliance ledger; stronger
+real login sessions rather than spoofed owner headers. The generated contract keeps
+the member-management UI aligned with the same server-owned authorization boundary.
+Audit events are operational evidence, not an immutable compliance ledger; stronger
 tamper resistance and long-term audit retention remain future production work.

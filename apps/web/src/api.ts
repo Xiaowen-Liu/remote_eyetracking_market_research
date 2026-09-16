@@ -18,6 +18,9 @@ export type AnalysisResult = components["schemas"]["AnalysisResultResponse"];
 export type ParticipantSessionSummary = components["schemas"]["ParticipantSessionSummary"];
 export type Researcher = components["schemas"]["ResearcherResponse"];
 export type ResearcherSession = components["schemas"]["ResearcherSessionResponse"];
+export type ProjectAccess = components["schemas"]["ProjectAccessResponse"];
+export type ProjectMembership = components["schemas"]["ProjectMembershipResponse"];
+export type AuditEvent = components["schemas"]["AuditEventResponse"];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 const RESEARCHER_TOKEN_KEY = "webgaze.researcher.access-token";
@@ -114,6 +117,35 @@ export const api = {
         research_question: researchQuestion?.trim() || null,
       }),
     }),
+  getProjectAccess: (projectId: string) =>
+    researcherRequest<ProjectAccess>(`/projects/${projectId}/access`),
+  listProjectMembers: (projectId: string) =>
+    researcherRequest<{ items: ProjectMembership[]; total: number }>(`/projects/${projectId}/members`),
+  addProjectMember: (projectId: string, email: string, role: "editor" | "viewer") =>
+    researcherRequest<ProjectMembership>(`/projects/${projectId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+  updateProjectMember: (projectId: string, membershipId: string, role: "editor" | "viewer") =>
+    researcherRequest<ProjectMembership>(`/projects/${projectId}/members/${membershipId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  removeProjectMember: (projectId: string, membershipId: string) =>
+    researcherRequest<void>(`/projects/${projectId}/members/${membershipId}`, { method: "DELETE" }),
+  transferProjectOwnership: (
+    projectId: string,
+    membershipId: string,
+    previousOwnerRole: "editor" | "viewer",
+  ) => researcherRequest<Project>(`/projects/${projectId}/transfer-ownership`, {
+    method: "POST",
+    body: JSON.stringify({
+      membership_id: membershipId,
+      previous_owner_role: previousOwnerRole,
+    }),
+  }),
+  listProjectAuditEvents: (projectId: string) =>
+    researcherRequest<{ items: AuditEvent[]; total: number }>(`/projects/${projectId}/audit-events`),
   listStudies: (projectId: string) =>
     researcherRequest<{ items: StudySummary[]; total: number }>(`/projects/${projectId}/studies`),
   getDraft: (studyId: string) => researcherRequest<StudyDraftResponse>(`/studies/${studyId}/draft`),
