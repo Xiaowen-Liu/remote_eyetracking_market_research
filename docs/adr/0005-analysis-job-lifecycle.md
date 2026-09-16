@@ -12,8 +12,13 @@ version and parameters, and never replace an existing result in place.
   have ended and that gaze-batch sequence numbers have no gaps.
 - Submission is idempotent and creates one `queued` `AnalysisJob` for the
   current algorithm version and attempt.
-- A researcher-owned worker seam, `POST /analysis-jobs/{job_id}/run`, performs
-  the deterministic task-metrics computation and records one immutable result.
+- A database-backed worker claims eligible jobs with a row lock, records a bounded
+  lease, and performs deterministic task-metrics computation. Expired leases can be
+  reclaimed after worker interruption.
+- Failures retry with capped exponential delay. After three worker attempts the job
+  remains failed with a `dead_lettered_at` timestamp for operator review. The
+  researcher-owned `POST /analysis-jobs/{job_id}/run` seam remains available for
+  deterministic debugging.
 - Result retrieval is separate from job retrieval, so a dashboard can render a
   truthful pending state rather than inventing metrics.
 - The first algorithm version reports sample count, mean confidence, centroid,
@@ -22,7 +27,8 @@ version and parameters, and never replace an existing result in place.
 
 ## Consequences
 
-The HTTP worker seam makes the workflow testable without a private queue or
-cloud worker. A production deployment can invoke the same `run_analysis_job`
-domain function from a queue consumer; wiring an external queue is deliberately
-deferred until deployment requirements justify it.
+The queue remains inside PostgreSQL, avoiding a second broker while preserving
+durability, concurrency-safe claims, retry timing, and dead-letter evidence. A
+dedicated worker process can scale independently from the API. Very high-volume
+deployments may replace this adapter with a managed queue without changing the
+analysis domain function or immutable result contract.

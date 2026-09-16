@@ -1,3 +1,7 @@
+import json
+import logging
+import re
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -5,6 +9,10 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+access_logger = logging.getLogger("webgaze.access")
+access_logger.setLevel(logging.INFO)
+REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
 @dataclass
@@ -22,11 +30,30 @@ def request_id(request: Request) -> str:
 def install_error_handlers(app: FastAPI) -> None:
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):
-        value = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        supplied = request.headers.get("X-Request-ID", "")
+        value = supplied if REQUEST_ID_PATTERN.fullmatch(supplied) else str(uuid.uuid4())
         request.state.request_id = value
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = value
-        return response
+        started_at = time.perf_counter()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            response.headers["X-Request-ID"] = value
+            return response
+        finally:
+            access_logger.info(
+                json.dumps(
+                    {
+                        "event": "http_request",
+                        "request_id": value,
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status_code": status_code,
+                        "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+                    },
+                    separators=(",", ":"),
+                )
+            )
 
     @app.exception_handler(ApiError)
     async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:

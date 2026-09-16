@@ -34,8 +34,12 @@ gaze estimation has laboratory-grade accuracy.
    deadlines; an Owner-only dry-run/execution API and a schedule-ready bounded job
    delete telemetry and derived results transactionally while retaining anonymous,
    retry-safe tombstones and project audit evidence.
-2. **Operational hardening** — queue-backed analysis workers, rate limits,
-   structured observability, retry/dead-letter handling, and production alerts.
+2. **Operational hardening** — database-backed analysis workers with leases,
+   exponential retry, and dead-letter handling are implemented. Critical login and
+   participant-write paths now have bounded process-level rate limits with stable
+   `429` responses; request IDs, structured latency logs, liveness, and database
+   readiness probes provide a deployment-safe observability baseline. Remaining
+   work is provider-level alert wiring and distributed edge abuse controls.
 3. **Accessibility and performance pass** — keyboard-complete replay controls,
    reduced-motion behavior, screen-reader status announcements, large-session
    virtualization, and measurable performance budgets.
