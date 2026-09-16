@@ -32,6 +32,23 @@
             "title": "Attempt",
             "type": "integer"
           },
+          "available_at": {
+            "format": "date-time",
+            "title": "Available At",
+            "type": "string"
+          },
+          "dead_lettered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dead Lettered At"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -59,6 +76,18 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "lease_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lease Expires At"
           },
           "parameters": {
             "additionalProperties": true,
@@ -89,6 +118,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/AnalysisStatus"
+          },
+          "worker_attempts": {
+            "title": "Worker Attempts",
+            "type": "integer"
           }
         },
         "required": [
@@ -101,7 +134,11 @@
           "queued_at",
           "started_at",
           "finished_at",
-          "error_code"
+          "error_code",
+          "worker_attempts",
+          "available_at",
+          "lease_expires_at",
+          "dead_lettered_at"
         ],
         "title": "AnalysisJobResponse",
         "type": "object"

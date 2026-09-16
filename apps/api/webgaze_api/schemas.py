@@ -446,6 +446,10 @@ class AnalysisJobResponse(ApiModel):
     started_at: datetime | None
     finished_at: datetime | None
     error_code: str | None
+    worker_attempts: int
+    available_at: datetime
+    lease_expires_at: datetime | None
+    dead_lettered_at: datetime | None
 
 
 class AnalysisJobListResponse(ApiModel):

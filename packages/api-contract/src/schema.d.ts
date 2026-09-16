@@ -624,6 +624,13 @@ export interface components {
             algorithm_version: string;
             /** Attempt */
             attempt: number;
+            /**
+             * Available At
+             * Format: date-time
+             */
+            available_at: string;
+            /** Dead Lettered At */
+            dead_lettered_at: string | null;
             /** Error Code */
             error_code: string | null;
             /** Finished At */
@@ -633,6 +640,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Lease Expires At */
+            lease_expires_at: string | null;
             /** Parameters */
             parameters: {
                 [key: string]: unknown;
@@ -650,6 +659,8 @@ export interface components {
             /** Started At */
             started_at: string | null;
             status: components["schemas"]["AnalysisStatus"];
+            /** Worker Attempts */
+            worker_attempts: number;
         };
         /** AnalysisResultResponse */
         AnalysisResultResponse: {

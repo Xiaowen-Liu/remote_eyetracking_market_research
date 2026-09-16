@@ -35,6 +35,10 @@ def analysis_job_payload(job: AnalysisJob) -> AnalysisJobResponse:
         started_at=job.started_at,
         finished_at=job.finished_at,
         error_code=job.error_code,
+        worker_attempts=job.worker_attempts,
+        available_at=job.available_at,
+        lease_expires_at=job.lease_expires_at,
+        dead_lettered_at=job.dead_lettered_at,
     )
 
 
@@ -157,7 +161,7 @@ def run_analysis_job(db: Session, job: AnalysisJob) -> AnalysisResult:
     existing = result_for_job(db, job.id)
     if existing:
         return existing
-    if job.status not in {AnalysisStatus.QUEUED, AnalysisStatus.FAILED}:
+    if job.status not in {AnalysisStatus.QUEUED, AnalysisStatus.FAILED, AnalysisStatus.RUNNING}:
         raise ApiError(409, "ANALYSIS_JOB_NOT_RUNNABLE", "Analysis job is already running")
 
     job.status = AnalysisStatus.RUNNING

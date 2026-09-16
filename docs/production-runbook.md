@@ -74,6 +74,16 @@ row counts. The job and the Owner-only project endpoint both emit a project audi
 event; neither tombstone nor audit metadata contains participant aliases or gaze
 coordinates.
 
+## Analysis worker
+
+Run `npm run analysis:worker` in a separate Railway worker or scheduled service.
+Each invocation processes at most 25 eligible jobs. PostgreSQL row locks prevent
+two workers from claiming the same job; a two-minute lease permits recovery after
+an interrupted worker. Failed jobs retry with exponential delay and move to a
+dead-letter state after three attempts. Inspect `worker_attempts`, `error_code`,
+`available_at`, `lease_expires_at`, and `dead_lettered_at` through the analysis-job
+API before deciding whether to repair the underlying data or enqueue a new attempt.
+
 ## Non-goals for this public demo
 
 Do not connect sensitive or consequential human-subject research data without
