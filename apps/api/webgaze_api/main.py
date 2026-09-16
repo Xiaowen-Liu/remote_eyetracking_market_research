@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .errors import install_error_handlers
+from .rate_limit import install_rate_limits
 from .routers import analysis, auth, health, participants, projects, studies
 
 
-def create_app() -> FastAPI:
-    settings = get_settings()
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
     app = FastAPI(
         title="WebGaze API",
         summary="Eye-tracking research platform API",
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
             "Authorization",
         ],
     )
+    install_rate_limits(app, settings)
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(auth.router, prefix="/api/v1")

@@ -1,6 +1,14 @@
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from test_participants import gaze_batch, ready_session
 from test_studies import create_project, study_payload
+
+from webgaze_api import analysis_worker
+from webgaze_api.analysis_worker import claim_analysis_job, process_claimed_job
+from webgaze_api.models import AnalysisJob, AnalysisStatus
 
 
 def complete_study_with_samples(client: TestClient) -> tuple[dict, dict[str, str]]:
@@ -79,6 +87,54 @@ def test_submission_queues_idempotent_analysis_and_task_metrics(client: TestClie
     assert exported_csv.headers["content-type"].startswith("text/csv")
     assert "task_position,task_title" in exported_csv.text
     assert "Find pricing" in exported_csv.text
+
+
+def test_worker_claims_and_processes_a_queued_analysis_job(client, db_session) -> None:
+    session, headers = complete_study_with_samples(client)
+    submitted = client.post(
+        f"/api/v1/participant-sessions/{session['id']}/submit", headers=headers
+    )
+    assert submitted.status_code == 200
+
+    claimed = claim_analysis_job(db_session)
+    assert claimed is not None
+    assert claimed.id == UUID(submitted.json()["analysis_job"]["id"])
+    assert claimed.status == AnalysisStatus.RUNNING
+    assert claimed.worker_attempts == 1
+    assert claimed.lease_expires_at is not None
+
+    assert process_claimed_job(db_session, claimed) is True
+    db_session.expire_all()
+    completed = db_session.scalar(select(AnalysisJob).where(AnalysisJob.id == claimed.id))
+    assert completed.status == AnalysisStatus.SUCCEEDED
+    assert completed.lease_expires_at is None
+    assert completed.dead_lettered_at is None
+
+
+def test_worker_retries_then_dead_letters_a_failed_job(client, db_session, monkeypatch) -> None:
+    session, headers = complete_study_with_samples(client)
+    submitted = client.post(
+        f"/api/v1/participant-sessions/{session['id']}/submit", headers=headers
+    )
+    job_id = UUID(submitted.json()["analysis_job"]["id"])
+
+    def fail_analysis(*_args, **_kwargs):
+        raise RuntimeError("injected worker failure")
+
+    monkeypatch.setattr(analysis_worker, "run_analysis_job", fail_analysis)
+    for expected_attempt in range(1, 4):
+        job = db_session.get(AnalysisJob, job_id)
+        job.available_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db_session.commit()
+        claimed = claim_analysis_job(db_session)
+        assert claimed.worker_attempts == expected_attempt
+        assert process_claimed_job(db_session, claimed) is False
+
+    db_session.expire_all()
+    failed = db_session.get(AnalysisJob, job_id)
+    assert failed.status == AnalysisStatus.FAILED
+    assert failed.dead_lettered_at is not None
+    assert claim_analysis_job(db_session) is None
 
 
 def test_synthetic_results_are_disclosed_and_idempotent(client: TestClient) -> None:

@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     sql_echo: bool = False
     researcher_auth_required: bool = False
     researcher_session_hours: int = Field(default=12, ge=1, le=168)
+    rate_limit_enabled: bool = True
+    login_rate_limit_per_minute: int = Field(default=10, ge=1, le=10_000)
+    participant_rate_limit_per_minute: int = Field(default=120, ge=1, le=100_000)
+    trust_proxy_headers: bool = False
     demo_researcher_email: str = "demo@webgaze.local"
     demo_researcher_password: SecretStr | None = None
 
