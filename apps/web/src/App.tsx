@@ -10,6 +10,7 @@ import {
   type ParticipantSessionSummary,
   type ProjectAccess,
   type ProjectMembership,
+  type ProjectInvitation,
   type AuditEvent,
   type Project,
   type Researcher,
@@ -1491,6 +1492,9 @@ const auditLabels: Record<string, string> = {
   "project.member_added": "Member added",
   "project.member_role_updated": "Member role changed",
   "project.member_removed": "Member removed",
+  "project.invitation_created": "Invitation created",
+  "project.invitation_cancelled": "Invitation cancelled",
+  "project.invitation_accepted": "Invitation accepted",
   "project.ownership_transferred": "Project ownership transferred",
 };
 
@@ -1505,11 +1509,13 @@ function ProjectAccessPage({
 }) {
   const [access, setAccess] = useState<ProjectAccess | null>(null);
   const [members, setMembers] = useState<ProjectMembership[]>([]);
+  const [invitations, setInvitations] = useState<ProjectInvitation[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"editor" | "viewer">("viewer");
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<ProjectMembership | null>(null);
   const [transferConfirmation, setTransferConfirmation] = useState("");
   const [previousOwnerRole, setPreviousOwnerRole] = useState<"editor" | "viewer">("editor");
@@ -1521,11 +1527,13 @@ function ProjectAccessPage({
       const currentAccess = await api.getProjectAccess(project.id);
       setAccess(currentAccess);
       if (currentAccess.can_manage_members) {
-        const [memberList, auditList] = await Promise.all([
+        const [memberList, invitationList, auditList] = await Promise.all([
           api.listProjectMembers(project.id),
+          api.listProjectInvitations(project.id),
           api.listProjectAuditEvents(project.id),
         ]);
         setMembers(memberList.items);
+        setInvitations(invitationList.items);
         setEvents(auditList.items);
       }
     } catch (loadError) {
@@ -1542,12 +1550,28 @@ function ProjectAccessPage({
     if (!email.trim()) return;
     setBusy(true);
     setError(null);
+    setSuccess(null);
     try {
-      await api.addProjectMember(project.id, email.trim(), role);
+      const result = await api.inviteProjectMember(project.id, email.trim(), role);
+      setSuccess(result.outcome === "member_added" ? "Member added." : `Invitation pending for ${email.trim().toLowerCase()}.`);
       setEmail("");
       await load();
     } catch (addError) {
       setError(addError instanceof ApiClientError ? addError.message : "The member could not be added.");
+      setBusy(false);
+    }
+  }
+
+  async function cancelInvitation(invitation: ProjectInvitation) {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await api.cancelProjectInvitation(project.id, invitation.id);
+      setSuccess(`Invitation cancelled for ${invitation.email}.`);
+      await load();
+    } catch (cancelError) {
+      setError(cancelError instanceof ApiClientError ? cancelError.message : "The invitation could not be cancelled.");
       setBusy(false);
     }
   }
@@ -1607,6 +1631,7 @@ function ProjectAccessPage({
           {access && <span className={`role-badge ${access.role}`}>Your role · {access.role}</span>}
         </div>
         {error && <div className="notice error" role="alert">{error}</div>}
+        {success && <div className="notice success" role="status">{success}</div>}
         {busy && !access ? <div className="loading">Loading project access…</div> : null}
         {access && !access.can_manage_members && (
           <section className="access-summary panel-card">
@@ -1618,12 +1643,12 @@ function ProjectAccessPage({
         {access?.can_manage_members && (
           <div className="access-layout">
             <section className="panel-card members-panel">
-              <div><p className="eyebrow">Project members</p><h2>{members.length} people</h2></div>
+              <div><p className="eyebrow">Project members</p><h2>{members.length} {members.length === 1 ? "person" : "people"}</h2></div>
               <form className="member-invite" onSubmit={(event) => void addMember(event)}>
                 <label>Email<input type="email" required placeholder="researcher@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
                 <label>Role<select value={role} onChange={(event) => setRole(event.target.value as "editor" | "viewer")}><option value="viewer">Viewer</option><option value="editor">Editor</option></select></label>
-                <button className="primary-button" type="submit" disabled={busy}>Add member</button>
-                <small>The researcher must already have an active WebGaze account.</small>
+                <button className="primary-button" type="submit" disabled={busy}>Invite member</button>
+                <small>Existing researchers join immediately. New researchers appear as pending until they sign in.</small>
               </form>
               <ul className="member-list">
                 {members.map((membership) => (
@@ -1635,6 +1660,21 @@ function ProjectAccessPage({
                   </li>
                 ))}
               </ul>
+              {invitations.length > 0 && (
+                <section className="pending-invitations" aria-labelledby="pending-invitations-title">
+                  <div><p className="eyebrow">Pending invitations</p><h3 id="pending-invitations-title">Waiting for {invitations.length}</h3></div>
+                  <ul className="member-list">
+                    {invitations.map((invitation) => (
+                      <li key={invitation.id}>
+                        <span className="member-avatar pending" aria-hidden="true">✉</span>
+                        <span><strong>{invitation.email}</strong><small>Expires {new Date(invitation.expires_at).toLocaleDateString()}</small></span>
+                        <span className={`role-badge ${invitation.role}`}>{invitation.role}</span>
+                        <button className="text-button danger" type="button" disabled={busy} onClick={() => void cancelInvitation(invitation)}>Cancel invitation</button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               {transferTarget && (
                 <section className="ownership-transfer" aria-labelledby="transfer-title">
                   <div><p className="eyebrow">Irreversible role change</p><h3 id="transfer-title">Transfer ownership to {transferTarget.researcher.display_name}</h3><p>They will control members and project deletion. Your account will remain on the project with the role selected below.</p></div>

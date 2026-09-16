@@ -28,6 +28,8 @@ gaze estimation has laboratory-grade accuracy.
    nested-resource authorization, project-scoped audit events, and an owner-facing
    Team & access workspace are implemented. Ownership can be atomically transferred
    to an existing collaborator with explicit confirmation and an audit event.
+   Pending email invitations have a 14-day lifecycle, cancellation/resend behavior,
+   automatic sign-in claim, and audit coverage.
 1. **Retention enforcement** — turn each study's retention policy into a tested
    deletion workflow for server telemetry, snapshots, exports, and audit-safe
    tombstones.

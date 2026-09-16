@@ -116,6 +116,31 @@ class ProjectMembershipListResponse(ApiModel):
     total: int
 
 
+class ProjectInvitationResponse(ApiModel):
+    id: UUID
+    project_id: UUID
+    email: str
+    role: ProjectRole
+    invited_by: UUID
+    status: Literal["pending", "accepted", "cancelled", "expired"]
+    expires_at: datetime
+    accepted_at: datetime | None
+    cancelled_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProjectInvitationListResponse(ApiModel):
+    items: list[ProjectInvitationResponse]
+    total: int
+
+
+class ProjectInviteResult(ApiModel):
+    outcome: Literal["member_added", "invitation_pending"]
+    membership: ProjectMembershipResponse | None = None
+    invitation: ProjectInvitationResponse | None = None
+
+
 class AuditEventResponse(ApiModel):
     id: UUID
     actor_id: UUID | None

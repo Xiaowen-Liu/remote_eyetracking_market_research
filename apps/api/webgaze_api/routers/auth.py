@@ -15,7 +15,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..dependencies import CurrentOwnerId
 from ..errors import ApiError
-from ..models import Researcher, ResearcherSession
+from ..models import AuditEvent, ProjectInvitation, ProjectMembership, Researcher, ResearcherSession
 from ..schemas import ResearcherLogin, ResearcherResponse, ResearcherSessionResponse
 
 router = APIRouter(prefix="/auth", tags=["researcher-auth"])
@@ -36,6 +36,48 @@ def login_researcher(
     )
     if not researcher or not researcher.active or not password_valid:
         raise ApiError(401, "INVALID_CREDENTIALS", "Email or password is incorrect")
+
+    now = datetime.now(timezone.utc)
+    invitations = list(
+        db.scalars(
+            select(ProjectInvitation).where(
+                ProjectInvitation.email == researcher.email,
+                ProjectInvitation.accepted_at.is_(None),
+                ProjectInvitation.cancelled_at.is_(None),
+                ProjectInvitation.expires_at > now,
+            )
+        )
+    )
+    for invitation in invitations:
+        membership = db.scalar(
+            select(ProjectMembership).where(
+                ProjectMembership.project_id == invitation.project_id,
+                ProjectMembership.researcher_id == researcher.id,
+            )
+        )
+        if not membership:
+            membership = ProjectMembership(
+                project_id=invitation.project_id,
+                researcher_id=researcher.id,
+                role=invitation.role,
+                invited_by=invitation.invited_by,
+            )
+            db.add(membership)
+            db.flush()
+            db.add(
+                AuditEvent(
+                    actor_id=researcher.id,
+                    project_id=invitation.project_id,
+                    action="project.invitation_accepted",
+                    resource_type="project_invitation",
+                    resource_id=invitation.id,
+                    event_metadata={
+                        "researcher_id": str(researcher.id),
+                        "role": invitation.role.value,
+                    },
+                )
+            )
+        invitation.accepted_at = now
 
     raw_token = issue_session_token()
     expires_at = datetime.now(timezone.utc) + timedelta(

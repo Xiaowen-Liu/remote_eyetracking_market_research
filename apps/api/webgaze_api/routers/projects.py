@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import func, or_, select
@@ -8,12 +9,22 @@ from ..authorization import require_project_access
 from ..database import get_db
 from ..dependencies import CurrentOwnerId
 from ..errors import ApiError
-from ..models import AuditEvent, ProjectMembership, ProjectRole, Researcher, ResearchProject
+from ..models import (
+    AuditEvent,
+    ProjectInvitation,
+    ProjectMembership,
+    ProjectRole,
+    Researcher,
+    ResearchProject,
+)
 from ..schemas import (
     AuditEventListResponse,
     ErrorResponse,
     ProjectAccessResponse,
     ProjectCreate,
+    ProjectInvitationListResponse,
+    ProjectInvitationResponse,
+    ProjectInviteResult,
     ProjectListResponse,
     ProjectMembershipCreate,
     ProjectMembershipListResponse,
@@ -39,6 +50,35 @@ def membership_payload(
         invited_by=membership.invited_by,
         created_at=membership.created_at,
         updated_at=membership.updated_at,
+    )
+
+
+def invitation_payload(invitation: ProjectInvitation) -> ProjectInvitationResponse:
+    now = datetime.now(timezone.utc)
+    expires_at = invitation.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    invitation_status = (
+        "accepted"
+        if invitation.accepted_at
+        else "cancelled"
+        if invitation.cancelled_at
+        else "expired"
+        if expires_at <= now
+        else "pending"
+    )
+    return ProjectInvitationResponse(
+        id=invitation.id,
+        project_id=invitation.project_id,
+        email=invitation.email,
+        role=invitation.role,
+        invited_by=invitation.invited_by,
+        status=invitation_status,
+        expires_at=invitation.expires_at,
+        accepted_at=invitation.accepted_at,
+        cancelled_at=invitation.cancelled_at,
+        created_at=invitation.created_at,
+        updated_at=invitation.updated_at,
     )
 
 
@@ -224,7 +264,7 @@ def list_project_members(
     owner_id: CurrentOwnerId,
     db: Session = DbSession,
 ) -> ProjectMembershipListResponse:
-    require_project_access(db, project_id, owner_id, ProjectRole.OWNER)
+    project, _ = require_project_access(db, project_id, owner_id, ProjectRole.OWNER)
     rows = list(
         db.execute(
             select(ProjectMembership, Researcher)
@@ -233,6 +273,19 @@ def list_project_members(
             .order_by(ProjectMembership.created_at)
         ).all()
     )
+    if not any(membership.researcher_id == project.owner_id for membership, _ in rows):
+        owner = db.get(Researcher, project.owner_id)
+        if owner:
+            membership = ProjectMembership(
+                project_id=project.id,
+                researcher_id=owner.id,
+                role=ProjectRole.OWNER,
+                invited_by=owner.id,
+            )
+            db.add(membership)
+            db.commit()
+            db.refresh(membership)
+            rows.insert(0, (membership, owner))
     return ProjectMembershipListResponse(
         items=[membership_payload(membership, researcher) for membership, researcher in rows],
         total=len(rows),
@@ -286,6 +339,156 @@ def add_project_member(
     db.commit()
     db.refresh(membership)
     return membership_payload(membership, researcher)
+
+
+@router.get(
+    "/{project_id}/invitations",
+    response_model=ProjectInvitationListResponse,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    operation_id="listProjectInvitations",
+)
+def list_project_invitations(
+    project_id: uuid.UUID,
+    owner_id: CurrentOwnerId,
+    db: Session = DbSession,
+) -> ProjectInvitationListResponse:
+    require_project_access(db, project_id, owner_id, ProjectRole.OWNER)
+    invitations = list(
+        db.scalars(
+            select(ProjectInvitation)
+            .where(ProjectInvitation.project_id == project_id)
+            .order_by(ProjectInvitation.created_at)
+        )
+    )
+    pending = [item for item in invitations if invitation_payload(item).status == "pending"]
+    return ProjectInvitationListResponse(
+        items=[invitation_payload(item) for item in pending], total=len(pending)
+    )
+
+
+@router.post(
+    "/{project_id}/invitations",
+    response_model=ProjectInviteResult,
+    status_code=status.HTTP_201_CREATED,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    operation_id="inviteProjectMember",
+)
+def invite_project_member(
+    project_id: uuid.UUID,
+    payload: ProjectMembershipCreate,
+    owner_id: CurrentOwnerId,
+    db: Session = DbSession,
+) -> ProjectInviteResult:
+    require_project_access(db, project_id, owner_id, ProjectRole.OWNER)
+    email = payload.email.strip().lower()
+    researcher = db.scalar(select(Researcher).where(Researcher.email == email))
+    if researcher and researcher.active:
+        existing = db.scalar(
+            select(ProjectMembership).where(
+                ProjectMembership.project_id == project_id,
+                ProjectMembership.researcher_id == researcher.id,
+            )
+        )
+        if existing:
+            raise ApiError(409, "PROJECT_MEMBER_EXISTS", "Researcher is already a project member")
+        membership = ProjectMembership(
+            project_id=project_id,
+            researcher_id=researcher.id,
+            role=payload.role,
+            invited_by=owner_id,
+        )
+        db.add(membership)
+        db.flush()
+        add_audit_event(
+            db,
+            actor_id=owner_id,
+            project_id=project_id,
+            action="project.member_added",
+            resource_type="project_membership",
+            resource_id=membership.id,
+            metadata={"researcher_id": str(researcher.id), "role": payload.role.value},
+        )
+        db.commit()
+        db.refresh(membership)
+        return ProjectInviteResult(
+            outcome="member_added", membership=membership_payload(membership, researcher)
+        )
+
+    invitation = db.scalar(
+        select(ProjectInvitation).where(
+            ProjectInvitation.project_id == project_id,
+            ProjectInvitation.email == email,
+        )
+    )
+    now = datetime.now(timezone.utc)
+    if invitation:
+        invitation.role = payload.role
+        invitation.invited_by = owner_id
+        invitation.expires_at = now + timedelta(days=14)
+        invitation.accepted_at = None
+        invitation.cancelled_at = None
+        invitation.updated_at = now
+    else:
+        invitation = ProjectInvitation(
+            project_id=project_id,
+            email=email,
+            role=payload.role,
+            invited_by=owner_id,
+            expires_at=now + timedelta(days=14),
+        )
+        db.add(invitation)
+    db.flush()
+    add_audit_event(
+        db,
+        actor_id=owner_id,
+        project_id=project_id,
+        action="project.invitation_created",
+        resource_type="project_invitation",
+        resource_id=invitation.id,
+        metadata={"email": email, "role": payload.role.value},
+    )
+    db.commit()
+    db.refresh(invitation)
+    return ProjectInviteResult(
+        outcome="invitation_pending", invitation=invitation_payload(invitation)
+    )
+
+
+@router.delete(
+    "/{project_id}/invitations/{invitation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    operation_id="cancelProjectInvitation",
+)
+def cancel_project_invitation(
+    project_id: uuid.UUID,
+    invitation_id: uuid.UUID,
+    owner_id: CurrentOwnerId,
+    db: Session = DbSession,
+) -> Response:
+    require_project_access(db, project_id, owner_id, ProjectRole.OWNER)
+    invitation = db.scalar(
+        select(ProjectInvitation).where(
+            ProjectInvitation.id == invitation_id,
+            ProjectInvitation.project_id == project_id,
+            ProjectInvitation.accepted_at.is_(None),
+            ProjectInvitation.cancelled_at.is_(None),
+        )
+    )
+    if not invitation:
+        raise ApiError(404, "PROJECT_INVITATION_NOT_FOUND", "Project invitation was not found")
+    invitation.cancelled_at = datetime.now(timezone.utc)
+    add_audit_event(
+        db,
+        actor_id=owner_id,
+        project_id=project_id,
+        action="project.invitation_cancelled",
+        resource_type="project_invitation",
+        resource_id=invitation.id,
+        metadata={"email": invitation.email},
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch(

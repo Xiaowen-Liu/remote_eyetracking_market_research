@@ -20,6 +20,8 @@ export type Researcher = components["schemas"]["ResearcherResponse"];
 export type ResearcherSession = components["schemas"]["ResearcherSessionResponse"];
 export type ProjectAccess = components["schemas"]["ProjectAccessResponse"];
 export type ProjectMembership = components["schemas"]["ProjectMembershipResponse"];
+export type ProjectInvitation = components["schemas"]["ProjectInvitationResponse"];
+export type ProjectInviteResult = components["schemas"]["ProjectInviteResult"];
 export type AuditEvent = components["schemas"]["AuditEventResponse"];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -126,6 +128,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, role }),
     }),
+  listProjectInvitations: (projectId: string) =>
+    researcherRequest<{ items: ProjectInvitation[]; total: number }>(`/projects/${projectId}/invitations`),
+  inviteProjectMember: (projectId: string, email: string, role: "editor" | "viewer") =>
+    researcherRequest<ProjectInviteResult>(`/projects/${projectId}/invitations`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+  cancelProjectInvitation: (projectId: string, invitationId: string) =>
+    researcherRequest<void>(`/projects/${projectId}/invitations/${invitationId}`, { method: "DELETE" }),
   updateProjectMember: (projectId: string, membershipId: string, role: "editor" | "viewer") =>
     researcherRequest<ProjectMembership>(`/projects/${projectId}/members/${membershipId}`, {
       method: "PATCH",
