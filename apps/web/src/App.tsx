@@ -23,6 +23,7 @@ import { buildHeatmap, domProposalStates, gazeSamplesForSnapshot, parseCollector
 import { syntheticCollectorReplay } from "./demoCollectorArtifact";
 import { AOI_MEANINGFUL_VISIT_MS, aggregateAoiMetrics, calculateAoiMetrics } from "./aoiMetrics";
 import { detectScrollSegments, inferDocumentExtent, insertReplaySnapshot, projectReplaySample, snapshotDocumentStyle, type ReplayCoordinateMode } from "./replayCoordinates";
+import { isEditableReplayTarget, replayKeyboardAction } from "./replayAccessibility";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { clearStoredArtifacts, deleteStoredArtifact, listStoredArtifacts, storeArtifacts } from "./analysisStore";
 import { collectorSessionHealth } from "./sessionHealth";
@@ -815,6 +816,7 @@ function ResultsDashboard({
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [replaySpeed, setReplaySpeed] = useState(1);
   const [replayTimeMs, setReplayTimeMs] = useState(0);
+  const [replayAnnouncement, setReplayAnnouncement] = useState("Replay paused at 0 seconds.");
   const [heatMode, setHeatMode] = useState<"selected" | "buildup" | "whole">("buildup");
   const [orderMode, setOrderMode] = useState<"off" | "scanpath" | "aoi">("off");
   const [drawingAoi, setDrawingAoi] = useState(false);
@@ -890,6 +892,36 @@ function ResultsDashboard({
     });
     setSelectedSnapshot(nextIndex);
   }, [collectorArtifact, replayTimeMs]);
+
+  useEffect(() => {
+    if (workspaceView !== "analysis" || analysisView !== "replay" || !collectorArtifact) return;
+    const duration = Math.max(0, Date.parse(collectorArtifact.endedAt ?? collectorArtifact.startedAt) - Date.parse(collectorArtifact.startedAt));
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableReplayTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
+      const action = replayKeyboardAction(event.key);
+      if (!action) return;
+      event.preventDefault();
+      if (action.type === "toggle") {
+        setReplayPlaying((current) => !current);
+        return;
+      }
+      setReplayPlaying(false);
+      const next = action.type === "seek"
+        ? Math.min(duration, Math.max(0, replayTimeMs + action.deltaMs))
+        : action.position === "start" ? 0 : duration;
+      setReplayTimeMs(next);
+      setReplayAnnouncement(`Replay paused at ${formatReplayTime(next)}.`);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [analysisView, collectorArtifact, replayTimeMs, workspaceView]);
+
+  useEffect(() => {
+    if (!collectorArtifact) return;
+    setReplayAnnouncement(`${replayPlaying ? "Replay playing from" : "Replay paused at"} ${formatReplayTime(replayTimeMs)}.`);
+    // Announce state transitions, not each 50 ms playback tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectorArtifact, replayPlaying]);
 
   async function loadJobs() {
     setBusy(true);
@@ -1406,6 +1438,8 @@ function ResultsDashboard({
           </section>}
         </section>}
         {analysisView === "replay" && <section className="collector-review" aria-label="Collector session review">
+          <p className="replay-shortcut-help">Keyboard: Space or K play/pause · J/← back 5 seconds · L/→ forward 5 seconds · Home/End jump to boundary.</p>
+          <p className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{replayAnnouncement}</p>
           <div className="collector-review-heading">
             <div><p className="eyebrow">Local collector review</p><h2>Open an extension session</h2><p>Use this for a private researcher-side review of the exported artifact. The JSON stays in this browser and is not submitted to the API.</p></div>
             <div className="collector-actions">{collectorArtifacts.length > 1 && <select aria-label="Replay session" value={collectorArtifact?.sessionId ?? ""} onChange={(event) => { const artifact = collectorArtifacts.find((item) => item.sessionId === event.target.value); if (artifact) { setCollectorArtifact(artifact); setReplayTimeMs(0); setSelectedSnapshot(0); restoreHeatPreferences(artifact); } }}>{collectorArtifacts.map((artifact) => <option value={artifact.sessionId} key={artifact.sessionId}>{artifact.sessionId.slice(0, 8)} · {(artifact.gazeSamples ?? []).length} samples</option>)}</select>}<button className="secondary-button" type="button" onClick={loadSyntheticCollectorReplay}>Load synthetic replay</button></div>

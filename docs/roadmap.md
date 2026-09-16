@@ -40,10 +40,10 @@ gaze estimation has laboratory-grade accuracy.
    `429` responses; request IDs, structured latency logs, liveness, and database
    readiness probes provide a deployment-safe observability baseline. Remaining
    work is provider-level alert wiring and distributed edge abuse controls.
-3. **Accessibility and performance pass** — semantic analysis tabs and a global
-   reduced-motion mode are implemented. Remaining work: keyboard-complete replay
-   shortcuts, screen-reader playback announcements, large-session virtualization,
-   and measurable performance budgets.
+3. **Accessibility and performance pass** — semantic analysis tabs, a global
+   reduced-motion mode, keyboard-complete replay shortcuts, and screen-reader
+   playback announcements are implemented. Remaining work: large-session
+   virtualization and measurable performance budgets.
 
 ## Deliberate boundaries
 
