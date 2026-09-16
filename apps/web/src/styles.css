@@ -470,3 +470,13 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
   .member-list li select, .member-list li .role-badge, .member-list li .member-actions { grid-column: 2; justify-self: start; }
   .collector-snapshot { grid-column: auto; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .replay-heat-cell { filter: none; }
+}
