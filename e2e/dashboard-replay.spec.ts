@@ -28,6 +28,18 @@ test("imports a real extension artifact and exposes replay health", async ({ pag
       await route.fulfill({ json: { items: [{ id: studyId }], total: 1 } });
       return;
     }
+    if (path === `/api/v1/projects/${projectId}/access`) {
+      await route.fulfill({
+        json: {
+          project_id: projectId,
+          role: "owner",
+          can_edit: true,
+          can_manage_members: true,
+          can_delete: true,
+        },
+      });
+      return;
+    }
     if (path === `/api/v1/studies/${studyId}/draft`) {
       await route.fulfill({
         json: {
