@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import func, select
-
 from test_participants import gaze_batch, ready_session
+
 from webgaze_api.models import (
     GazeSample,
     ParticipantSession,

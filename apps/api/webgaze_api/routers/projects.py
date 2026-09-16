@@ -33,10 +33,10 @@ from ..schemas import (
     ProjectMembershipUpdate,
     ProjectOwnershipTransfer,
     ProjectResponse,
+    ProjectUpdate,
     RetentionCandidate,
     RetentionRunRequest,
     RetentionRunResponse,
-    ProjectUpdate,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
