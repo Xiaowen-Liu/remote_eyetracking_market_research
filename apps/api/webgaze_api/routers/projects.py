@@ -17,6 +17,7 @@ from ..models import (
     Researcher,
     ResearchProject,
 )
+from ..retention import run_project_retention
 from ..schemas import (
     AuditEventListResponse,
     ErrorResponse,
@@ -32,6 +33,9 @@ from ..schemas import (
     ProjectMembershipUpdate,
     ProjectOwnershipTransfer,
     ProjectResponse,
+    RetentionCandidate,
+    RetentionRunRequest,
+    RetentionRunResponse,
     ProjectUpdate,
 )
 
@@ -196,6 +200,57 @@ def get_project_access(
         can_edit=can_edit,
         can_manage_members=is_owner,
         can_delete=is_owner,
+    )
+
+
+@router.post(
+    "/{project_id}/retention/run",
+    response_model=RetentionRunResponse,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    operation_id="runProjectRetention",
+)
+def run_retention(
+    project_id: uuid.UUID,
+    payload: RetentionRunRequest,
+    owner_id: CurrentOwnerId,
+    db: Session = DbSession,
+) -> RetentionRunResponse:
+    require_project_access(db, project_id, owner_id, ProjectRole.OWNER)
+    evaluated_at, candidates, deleted_counts = run_project_retention(
+        db,
+        project_id,
+        dry_run=payload.dry_run,
+        limit=payload.limit,
+    )
+    if not payload.dry_run and candidates:
+        add_audit_event(
+            db,
+            actor_id=owner_id,
+            project_id=project_id,
+            action="project.retention_executed",
+            resource_type="project",
+            resource_id=project_id,
+            metadata={
+                "deleted_sessions": len(candidates),
+                "deleted_counts": deleted_counts,
+                "cutoff": evaluated_at.isoformat(),
+            },
+        )
+        db.commit()
+    return RetentionRunResponse(
+        dry_run=payload.dry_run,
+        evaluated_at=evaluated_at,
+        candidates=[
+            RetentionCandidate(
+                session_id=item.session_id,
+                study_id=item.study_id,
+                study_version_id=item.study_version_id,
+                retention_expired_at=item.retention_expired_at,
+            )
+            for item in candidates
+        ],
+        deleted_sessions=0 if payload.dry_run else len(candidates),
+        deleted_counts={} if payload.dry_run else deleted_counts,
     )
 
 
