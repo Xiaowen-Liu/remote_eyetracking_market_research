@@ -399,7 +399,8 @@ function startBoundaryCalibration(root: HTMLDivElement) {
   root.querySelector<HTMLElement>("[data-webgaze-status]")!.textContent = "";
   root.querySelector<HTMLElement>("[data-webgaze-calibration-status]")!.textContent = "";
   window.addEventListener("mousemove", onBoundaryMouseMove, { passive: true });
-  window.addEventListener("click", onBoundaryClick);
+  // Capture clicks before the underlying study page can stop propagation.
+  window.addEventListener("click", onBoundaryClick, true);
   runtime.boundaryTimer = window.setInterval(processBoundaryTimer, 50);
   showBoundaryCorner(root);
 }
@@ -440,7 +441,7 @@ function showBoundaryCorner(root: HTMLDivElement) {
   target.hidden = false;
   target.style.left = `${corner.x}px`;
   target.style.top = `${corner.y}px`;
-  target.style.pointerEvents = "none";
+  target.style.pointerEvents = "auto";
   target.textContent = `0/${boundaryCornerClicksRequired}`;
   target.setAttribute(
     "aria-label",
@@ -478,7 +479,15 @@ function recordBoundaryCorner(root: HTMLDivElement, event: MouseEvent) {
 }
 
 function onBoundaryClick(event: MouseEvent) {
-  if (runtime.boundaryRoot) recordBoundaryCorner(runtime.boundaryRoot, event);
+  if (!runtime.boundaryRoot) return;
+  if (runtime.boundaryMode === "trace") {
+    setCalibrationStatus(
+      runtime.boundaryRoot,
+      "Follow the dashed edge slowly with your cursor. The corner becomes clickable after you reach it.",
+    );
+    return;
+  }
+  recordBoundaryCorner(runtime.boundaryRoot, event);
 }
 
 function startBoundaryTrace(root: HTMLDivElement) {
@@ -498,6 +507,10 @@ function startBoundaryTrace(root: HTMLDivElement) {
   target.style.pointerEvents = "none";
   target.textContent = "";
   target.onclick = null;
+  setCalibrationStatus(
+    root,
+    "Move slowly along the dashed edge toward the next corner — do not click yet.",
+  );
   root.querySelector("[data-webgaze-progress-copy]")!.textContent =
     `Trace edge ${runtime.boundaryCornerIndex + 1} of 4`;
 }
@@ -605,7 +618,7 @@ function cleanupBoundaryCalibration() {
     ?.querySelector<HTMLElement>("[data-webgaze-boundary-guide]")
     ?.setAttribute("hidden", "");
   window.removeEventListener("mousemove", onBoundaryMouseMove);
-  window.removeEventListener("click", onBoundaryClick);
+  window.removeEventListener("click", onBoundaryClick, true);
   if (runtime.boundaryTimer !== null) window.clearInterval(runtime.boundaryTimer);
   runtime.boundaryTimer = null;
   runtime.boundaryRoot = null;
