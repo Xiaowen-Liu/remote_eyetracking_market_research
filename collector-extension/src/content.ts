@@ -252,6 +252,8 @@ function startBoundaryCalibration(root: HTMLDivElement) {
   root.dataset.calibrationStep = "boundary";
   root.querySelector("[data-webgaze-phase]")!.textContent = "Step 2 of 3";
   root.querySelector("[data-webgaze-title]")!.textContent = "Boundary calibration";
+  root.querySelector<HTMLElement>("[data-webgaze-status]")!.textContent = "";
+  root.querySelector<HTMLElement>("[data-webgaze-calibration-status]")!.textContent = "";
   window.addEventListener("mousemove", onBoundaryMouseMove, { passive: true });
   window.addEventListener("click", onBoundaryClick);
   boundaryTimer = window.setInterval(processBoundaryTimer, 50);
@@ -301,21 +303,20 @@ function showBoundaryCorner(root: HTMLDivElement) {
   progress.hidden = false;
   progress.querySelector<HTMLElement>("b")!.style.width = `${(boundaryCornerIndex / 4) * 100}%`;
   root.querySelector("[data-webgaze-progress-copy]")!.textContent = `Boundary corner ${boundaryCornerIndex + 1} of 5 · click 0 of 2`;
-  setCalibrationStatus(root, boundaryCornerIndex === 4 ? "Close the loop: look at the starting corner and click it twice." : "Look at the corner target and click it twice.");
 }
 
 function recordBoundaryCorner(root: HTMLDivElement, event: MouseEvent) {
   if (calibrationStage !== "boundary" || boundaryMode !== "corner") return;
   const corner = boundaryPath()[boundaryCornerIndex];
   if (Math.hypot(event.clientX - corner.x, event.clientY - corner.y) > boundaryCornerRadiusPx) return;
-  if (!faceFrame.inBounds) { setCalibrationStatus(root, "Move your face inside the guide before recording this corner."); return; }
-  if (featureWindow.length < 3 || motion(featureWindow) >= .08) { setCalibrationStatus(root, "Keep your face steady, then click this corner again."); return; }
+  if (!faceFrame.inBounds) return;
+  if (featureWindow.length < 3 || motion(featureWindow) >= .08) return;
   if (!addCalibrationSample(normalizePixelPoint(corner), 2)) return;
   boundaryCornerClicks += 1;
   const target = root.querySelector<HTMLElement>("[data-webgaze-target]")!;
   target.textContent = `${boundaryCornerClicks}/${boundaryCornerClicksRequired}`;
   root.querySelector("[data-webgaze-progress-copy]")!.textContent = `Boundary corner ${boundaryCornerIndex + 1} of 5 · click ${boundaryCornerClicks} of 2`;
-  if (boundaryCornerClicks < boundaryCornerClicksRequired) { setCalibrationStatus(root, "Corner sample saved. Keep looking here and click once more."); return; }
+  if (boundaryCornerClicks < boundaryCornerClicksRequired) return;
   if (boundaryCornerIndex === 4) { cleanupBoundaryCalibration(); showAccuracyCheckIntro(root); return; }
   startBoundaryTrace(root);
 }
@@ -342,7 +343,6 @@ function startBoundaryTrace(root: HTMLDivElement) {
   target.textContent = "";
   target.onclick = null;
   root.querySelector("[data-webgaze-progress-copy]")!.textContent = `Trace edge ${boundaryCornerIndex + 1} of 4`;
-  setCalibrationStatus(root, "Slowly follow the dashed edge with your mouse while keeping your eyes on the cursor.");
 }
 
 function recordBoundaryTraceSample(point: PixelPoint, weight = 1) {
@@ -362,7 +362,6 @@ function processBoundaryPointer(root: HTMLDivElement, point: PixelPoint, now: nu
     boundaryRecoverySince = null;
     if (observation.progress >= .75) {
       boundaryNeedsRecovery = true;
-      setCalibrationStatus(root, "That movement was too fast. Return to the middle, pause briefly, then move slowly toward the corner.");
     }
     return;
   }
@@ -376,8 +375,6 @@ function processBoundaryPointer(root: HTMLDivElement, point: PixelPoint, now: nu
       if (now - boundaryRecoverySince >= boundaryRecoveryHoldMs) {
         boundaryAnchorRecorded = recordBoundaryTraceSample(point, 3);
         boundaryNeedsRecovery = false;
-      } else {
-        setCalibrationStatus(root, "Good. Hold briefly in the middle, then continue slowly toward the corner.");
       }
     }
   } else if (!boundaryAnchorRecorded && boundaryNeedsRecovery) {
@@ -388,7 +385,6 @@ function processBoundaryPointer(root: HTMLDivElement, point: PixelPoint, now: nu
   if (!boundaryAnchorRecorded) {
     boundaryNeedsRecovery = true;
     boundaryRecoverySince = null;
-    setCalibrationStatus(root, "Return to the middle of this edge, hold for a moment, then approach the corner slowly.");
     return;
   }
   boundaryCornerIndex += 1;

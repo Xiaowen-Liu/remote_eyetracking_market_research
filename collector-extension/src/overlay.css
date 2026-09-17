@@ -25,6 +25,8 @@
 #webgaze-collector-overlay [data-webgaze-calibration-status]{color:#334d37;font-size:12px;font-weight:650;text-align:center}
 #webgaze-collector-overlay[data-mode="calibration"] [data-webgaze-target]{align-items:center;box-sizing:border-box;color:#fff;display:flex;font-size:10px;font-style:normal;font-weight:800;height:44px;justify-content:center;width:44px}
 #webgaze-collector-overlay [data-webgaze-boundary-guide]{border-top:2px dashed #74a95d;box-sizing:border-box;height:1px;pointer-events:none;position:fixed;transform-origin:left center;z-index:2}
+#webgaze-collector-overlay[data-calibration-step="boundary"] .webgaze-intro{display:none}
+#webgaze-collector-overlay[data-calibration-step="boundary"] [data-webgaze-stage]{background:#fff0;pointer-events:none}
 #webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-panel]{background:#f5f7f4ee}
 #webgaze-collector-overlay[data-mode="calibration-intro"] .webgaze-panel-head{display:none}
 #webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-stage]{padding:32px}
