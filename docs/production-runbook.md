@@ -17,6 +17,7 @@ WEBGAZE_SQL_ECHO=false
 WEBGAZE_RESEARCHER_AUTH_REQUIRED=true
 WEBGAZE_RESEARCHER_SESSION_HOURS=12
 WEBGAZE_RATE_LIMIT_ENABLED=true
+WEBGAZE_RATE_LIMIT_BACKEND=auto
 WEBGAZE_LOGIN_RATE_LIMIT_PER_MINUTE=10
 WEBGAZE_PARTICIPANT_RATE_LIMIT_PER_MINUTE=120
 WEBGAZE_TRUST_PROXY_HEADERS=true
@@ -101,13 +102,19 @@ record per request with method, path, status, latency, and request ID. Query str
 authorization tokens, request bodies, participant codes, and coordinates are not
 logged. Use request ID to correlate user-visible failures with Railway logs.
 
-The API applies a per-process fixed-window limit to researcher login and participant
-write routes. `WEBGAZE_TRUST_PROXY_HEADERS=true` is appropriate only behind Railway's
-trusted proxy; leave it false when the API is directly reachable. A rejected request
-returns `429`, `Retry-After`, and the normal structured error envelope. These limits
-bound accidental and low-volume abuse but do not coordinate across replicas. Before
-external recruitment, add a distributed edge/WAF limit without removing the
-application guard.
+The API applies a fixed-window limit to researcher login and participant write routes.
+`WEBGAZE_RATE_LIMIT_BACKEND=auto` selects PostgreSQL coordination when
+`WEBGAZE_ENVIRONMENT=production` and process memory during local development. An
+explicit `database` or `memory` value overrides that choice. With database
+coordination, every API instance atomically consumes the same buckets. Bucket keys
+are SHA-256 digests, so raw IP addresses and capability tokens are not persisted.
+Expired buckets are pruned opportunistically. The `memory` backend remains convenient
+for a single local process.
+
+`WEBGAZE_TRUST_PROXY_HEADERS=true` is appropriate only behind Railway's trusted proxy;
+leave it false when the API is directly reachable. A rejected request returns `429`,
+`Retry-After`, and the normal structured error envelope. The database guard coordinates
+replicas, but a provider edge/WAF limit remains desirable before external recruitment.
 
 Configure provider alerts for the following initial signals, then tune from observed
 traffic:

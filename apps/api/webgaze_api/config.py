@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     researcher_auth_required: bool = False
     researcher_session_hours: int = Field(default=12, ge=1, le=168)
     rate_limit_enabled: bool = True
+    rate_limit_backend: Literal["auto", "memory", "database"] = "auto"
     login_rate_limit_per_minute: int = Field(default=10, ge=1, le=10_000)
     participant_rate_limit_per_minute: int = Field(default=120, ge=1, le=100_000)
     trust_proxy_headers: bool = False

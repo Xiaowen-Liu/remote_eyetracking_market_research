@@ -36,10 +36,11 @@ gaze estimation has laboratory-grade accuracy.
    retry-safe tombstones and project audit evidence.
 2. **Operational hardening** — database-backed analysis workers with leases,
    exponential retry, and dead-letter handling are implemented. Critical login and
-   participant-write paths now have bounded process-level rate limits with stable
-   `429` responses; request IDs, structured latency logs, liveness, and database
-   readiness probes provide a deployment-safe observability baseline. Remaining
-   work is provider-level alert wiring and distributed edge abuse controls.
+   participant-write paths now have stable `429` responses and an optional atomic,
+   database-coordinated rate-limit backend for multi-replica deployments; request IDs,
+   structured latency logs, liveness, and database readiness probes provide a
+   deployment-safe observability baseline. Remaining work is provider-level alert
+   wiring and edge/WAF abuse controls.
 3. **Accessibility and performance pass** — semantic analysis tabs, a global
    reduced-motion mode, keyboard-complete replay shortcuts, and screen-reader
    playback announcements, CI-enforced gzip bundle budgets, and bounded replay

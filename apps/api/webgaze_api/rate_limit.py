@@ -2,18 +2,28 @@ import hashlib
 import threading
 import time
 from dataclasses import dataclass
+from typing import Protocol
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import delete, text
+from sqlalchemy.orm import Session, sessionmaker
+from starlette.concurrency import run_in_threadpool
 
 from .config import Settings
+from .database import SessionLocal
 from .errors import request_id
+from .models import RateLimitBucket
 
 
 @dataclass
 class Window:
     started_at: float
     count: int
+
+
+class RateLimiter(Protocol):
+    def consume(self, key: str, limit: int, now: float | None = None) -> tuple[bool, int]: ...
 
 
 class FixedWindowLimiter:
@@ -47,6 +57,52 @@ class FixedWindowLimiter:
         }
 
 
+class DatabaseFixedWindowLimiter:
+    """Atomic fixed windows shared by every API replica using the same database."""
+
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        window_seconds: int = 60,
+        prune_every: int = 1_000,
+    ) -> None:
+        self.session_factory = session_factory
+        self.window_seconds = window_seconds
+        self.prune_every = prune_every
+        self._consumes = 0
+
+    def consume(self, key: str, limit: int, now: float | None = None) -> tuple[bool, int]:
+        current = time.time() if now is None else now
+        window_id = int(current // self.window_seconds)
+        key_digest = hashlib.sha256(key.encode()).hexdigest()
+        statement = text(
+            """
+            INSERT INTO rate_limit_buckets (key_digest, window_id, request_count)
+            VALUES (:key_digest, :window_id, 1)
+            ON CONFLICT (key_digest, window_id) DO UPDATE
+            SET request_count = rate_limit_buckets.request_count + 1
+            WHERE rate_limit_buckets.request_count < :request_limit
+            RETURNING request_count
+            """
+        )
+        with self.session_factory.begin() as session:
+            count = session.execute(
+                statement,
+                {
+                    "key_digest": key_digest,
+                    "window_id": window_id,
+                    "request_limit": limit,
+                },
+            ).scalar_one_or_none()
+            self._consumes += 1
+            if self._consumes % self.prune_every == 0:
+                session.execute(
+                    delete(RateLimitBucket).where(RateLimitBucket.window_id < window_id - 1)
+                )
+        retry_after = max(1, int(self.window_seconds - (current % self.window_seconds)))
+        return count is not None, 0 if count is not None else retry_after
+
+
 def _client_key(request: Request, settings: Settings) -> str:
     if settings.trust_proxy_headers:
         forwarded = request.headers.get("X-Forwarded-For", "").split(",", 1)[0].strip()
@@ -63,7 +119,14 @@ def _participant_key(request: Request, settings: Settings) -> str:
 
 
 def install_rate_limits(app: FastAPI, settings: Settings) -> None:
-    limiter = FixedWindowLimiter()
+    database_backend = settings.rate_limit_backend == "database" or (
+        settings.rate_limit_backend == "auto" and settings.environment == "production"
+    )
+    limiter: RateLimiter = (
+        DatabaseFixedWindowLimiter(SessionLocal)
+        if database_backend
+        else FixedWindowLimiter()
+    )
     app.state.rate_limiter = limiter
 
     @app.middleware("http")
@@ -85,7 +148,9 @@ def install_rate_limits(app: FastAPI, settings: Settings) -> None:
             identity = _participant_key(request, settings)
 
         if limit is not None:
-            allowed, retry_after = limiter.consume(f"{bucket}:{identity}", limit)
+            allowed, retry_after = await run_in_threadpool(
+                limiter.consume, f"{bucket}:{identity}", limit
+            )
             if not allowed:
                 return JSONResponse(
                     status_code=429,
