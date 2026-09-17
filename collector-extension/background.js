@@ -6,7 +6,7 @@ import {
   gazeBatch,
   nextBatchSequence,
   participantToken,
-  usableStudyUrl,
+  resolveStudyUrl,
 } from "./core/study-session.js";
 
 const key = "webgaze.experimental.collector.session";
@@ -97,11 +97,7 @@ async function enqueueSamples(session, samples) {
 async function startStudy(session) {
   const tab = await activeTab(),
     protocol = session.protocol;
-  const firstTaskUrl = protocol.tasks[0]?.start_url;
-  if (!usableStudyUrl(firstTaskUrl))
-    throw new Error(
-      "This study still uses an example task URL. Ask the researcher to edit the study, enter a real task URL, and publish a new version.",
-    );
+  const firstTaskUrl = resolveStudyUrl(protocol.tasks[0]?.start_url);
   const access = await request(session, `/participate/${session.participantToken}/sessions`, {
     method: "POST",
     body: JSON.stringify({
@@ -137,10 +133,7 @@ async function startStudy(session) {
 async function startTask(session) {
   const task = session.protocol.tasks[session.completedTasks];
   if (!task) throw new Error("Every task is already complete");
-  if (!usableStudyUrl(task.start_url))
-    throw new Error(
-      "This task still uses an example URL. Ask the researcher to publish a new study version with a real task URL.",
-    );
+  const taskUrl = resolveStudyUrl(task.start_url);
   const run = await participantRequest(
     session,
     `/participant-sessions/${session.sessionId}/task-runs`,
@@ -149,8 +142,8 @@ async function startTask(session) {
   const tab = await activeTab(),
     next = { ...session, taskRun: run, phase: "running", lastError: null };
   await write(next);
-  if (tab.url !== task.start_url)
-    await navigateAndMessage(tab.id, task.start_url, {
+  if (tab.url !== taskUrl)
+    await navigateAndMessage(tab.id, taskUrl, {
       type: "COLLECTOR_START_TASK",
       taskTitle: task.title,
     });
