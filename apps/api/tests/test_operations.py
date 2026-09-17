@@ -2,10 +2,15 @@ import json
 import logging
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from webgaze_api.config import Settings
-from webgaze_api.database import get_db
+from webgaze_api.database import Base, get_db
 from webgaze_api.main import create_app
+from webgaze_api.models import RateLimitBucket
+from webgaze_api.rate_limit import DatabaseFixedWindowLimiter
 
 
 def test_readiness_checks_database(client):
@@ -82,3 +87,42 @@ def test_trusted_proxy_rate_limit_uses_first_forwarded_address(db_session):
 
     assert first.status_code == 401
     assert second.status_code == 401
+
+
+def test_database_rate_limit_is_shared_and_does_not_store_identity():
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    first_replica = DatabaseFixedWindowLimiter(sessions)
+    second_replica = DatabaseFixedWindowLimiter(sessions)
+
+    assert first_replica.consume("researcher-login:203.0.113.20", 2, now=120.0) == (True, 0)
+    assert second_replica.consume("researcher-login:203.0.113.20", 2, now=121.0) == (True, 0)
+    allowed, retry_after = first_replica.consume(
+        "researcher-login:203.0.113.20", 2, now=122.0
+    )
+
+    assert allowed is False
+    assert retry_after == 58
+    with sessions() as session:
+        bucket = session.scalar(select(RateLimitBucket))
+        assert bucket is not None
+        assert bucket.request_count == 2
+        assert bucket.key_digest != "researcher-login:203.0.113.20"
+
+
+def test_database_rate_limit_opens_a_fresh_window():
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    limiter = DatabaseFixedWindowLimiter(sessionmaker(bind=engine, expire_on_commit=False))
+
+    assert limiter.consume("participant-write:token", 1, now=59.9) == (True, 0)
+    assert limiter.consume("participant-write:token", 1, now=60.0) == (True, 0)

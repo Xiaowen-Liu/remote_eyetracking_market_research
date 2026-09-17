@@ -115,6 +115,15 @@ class ResearcherSession(Base):
     )
 
 
+class RateLimitBucket(Base):
+    __tablename__ = "rate_limit_buckets"
+    __table_args__ = (Index("ix_rate_limit_buckets_window_id", "window_id"),)
+
+    key_digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class ResearchProject(TimestampMixin, Base):
     __tablename__ = "research_projects"
 
