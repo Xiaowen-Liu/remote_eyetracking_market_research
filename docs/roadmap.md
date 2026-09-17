@@ -42,8 +42,9 @@ gaze estimation has laboratory-grade accuracy.
    work is provider-level alert wiring and distributed edge abuse controls.
 3. **Accessibility and performance pass** — semantic analysis tabs, a global
    reduced-motion mode, keyboard-complete replay shortcuts, and screen-reader
-   playback announcements, and CI-enforced gzip bundle budgets are implemented.
-   Remaining work: large-session virtualization and runtime interaction budgets.
+   playback announcements, CI-enforced gzip bundle budgets, and bounded replay
+   rendering for large gaze datasets are implemented. Remaining work: virtualized
+   raw-sample inspection and runtime interaction budgets.
 
 ## Deliberate boundaries
 

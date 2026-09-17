@@ -24,6 +24,7 @@ import { syntheticCollectorReplay } from "./demoCollectorArtifact";
 import { AOI_MEANINGFUL_VISIT_MS, aggregateAoiMetrics, calculateAoiMetrics } from "./aoiMetrics";
 import { detectScrollSegments, inferDocumentExtent, insertReplaySnapshot, projectReplaySample, snapshotDocumentStyle, type ReplayCoordinateMode } from "./replayCoordinates";
 import { isEditableReplayTarget, replayKeyboardAction } from "./replayAccessibility";
+import { windowReplaySamples } from "./replayWindow";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { clearStoredArtifacts, deleteStoredArtifact, listStoredArtifacts, storeArtifacts } from "./analysisStore";
 import { collectorSessionHealth } from "./sessionHealth";
@@ -1323,7 +1324,7 @@ function ResultsDashboard({
   const visibleReplaySamples = heatMode === "whole" ? scopedReplaySamples : heatMode === "selected" && collectorArtifact ? scopedReplaySamples.filter((sample) => { const time = sample.at ? Date.parse(sample.at) - Date.parse(collectorArtifact.startedAt) : 0; return time >= activeHeatSegment.start && time <= activeHeatSegment.end; }) : scopedReplaySamples.filter((sample) => !sample.at || Date.parse(sample.at) <= replayCutoff);
   const documentExtent = collectorArtifact ? inferDocumentExtent(collectorArtifact) : { width: 1, height: 1 };
   const activeSnapshot = collectorArtifact?.snapshots[selectedSnapshot];
-  const displayReplaySamples = visibleReplaySamples.map((sample) => projectReplaySample(sample, coordinateMode, documentExtent, activeSnapshot));
+  const displayReplaySamples = windowReplaySamples(visibleReplaySamples).map((sample) => projectReplaySample(sample, coordinateMode, documentExtent, activeSnapshot));
   const replayHeatmap = buildHeatmap(displayReplaySamples);
   const scanpathNodes = displayReplaySamples.filter((_, index) => index % Math.max(1, Math.floor(displayReplaySamples.length / 12)) === 0).slice(-12);
   const aoiOrder = replayAois.filter((aoi) => visibleReplaySamples.some((sample) => sample.x >= aoi.x && sample.x <= aoi.x + aoi.width && sample.y >= aoi.y && sample.y <= aoi.y + aoi.height));

@@ -25,3 +25,11 @@ npm run check:bundle-budget
 
 This is a transfer-size guard, not a substitute for runtime profiling. Large
 session rendering, interaction latency, and memory use remain separate concerns.
+
+## Large-session replay bound
+
+Replay visualization projects at most 5,000 systematically selected gaze samples
+per frame. The first and last samples and the full temporal range are preserved;
+the immutable artifact, AOI computations, raw-data views, and exports continue to
+use the complete dataset. This prevents a long recording from turning the 50 ms
+playback update into an unbounded projection and heatmap loop.
