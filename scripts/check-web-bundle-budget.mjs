@@ -26,8 +26,13 @@ let failed = false;
 
 for (const [name, budget] of Object.entries(budgets)) {
   const matching = filenames.filter((filename) => filename.endsWith(budget.extension));
-  const gzipBytes = (await Promise.all(matching.map(async (filename) => gzipSync(await readFile(join(assetDirectory, filename))).byteLength)))
-    .reduce((total, bytes) => total + bytes, 0);
+  const gzipBytes = (
+    await Promise.all(
+      matching.map(
+        async (filename) => gzipSync(await readFile(join(assetDirectory, filename))).byteLength,
+      ),
+    )
+  ).reduce((total, bytes) => total + bytes, 0);
   measurements[name] = gzipBytes;
   const status = gzipBytes <= budget.gzipBytes ? "PASS" : "FAIL";
   console.log(`${status} ${name}: ${kib(gzipBytes)} / ${kib(budget.gzipBytes)} gzip`);

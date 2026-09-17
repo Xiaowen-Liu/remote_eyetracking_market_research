@@ -502,6 +502,8 @@ class AnalysisResultResponse(ApiModel):
     session_id: UUID
     quality: dict[str, Any]
     task_metrics: dict[str, Any]
+    fixations: list[dict[str, Any]]
+    aoi_metrics: list[dict[str, Any]]
     diagnostics: dict[str, Any]
     created_at: datetime
 

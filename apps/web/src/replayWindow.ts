@@ -7,5 +7,8 @@ export function windowReplaySamples<T>(samples: T[], maximum = 5_000): T[] {
   if (maximum < 2) throw new Error("Replay render window must contain at least two samples.");
   if (samples.length <= maximum) return samples;
   const lastIndex = samples.length - 1;
-  return Array.from({ length: maximum }, (_, index) => samples[Math.round(index * lastIndex / (maximum - 1))]);
+  return Array.from(
+    { length: maximum },
+    (_, index) => samples[Math.round((index * lastIndex) / (maximum - 1))],
+  );
 }

@@ -49,6 +49,8 @@ def analysis_result_payload(result: AnalysisResult) -> AnalysisResultResponse:
         session_id=result.session_id,
         quality=result.quality,
         task_metrics=result.task_metrics,
+        fixations=result.fixations,
+        aoi_metrics=result.aoi_metrics,
         diagnostics=result.diagnostics,
         created_at=result.created_at,
     )
@@ -152,7 +154,7 @@ def run_task_metrics(db: Session, job: AnalysisJob) -> AnalysisResult:
         quality=quality,
         task_metrics={"tasks": task_metrics},
         fixations=[],
-        aoi_metrics={},
+        aoi_metrics=[],
         diagnostics=diagnostics,
     )
 

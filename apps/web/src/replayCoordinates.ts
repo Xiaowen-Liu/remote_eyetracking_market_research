@@ -1,4 +1,8 @@
-import type { CollectorArtifact, CollectorGazeSample, CollectorSnapshot } from "./collectorArtifact";
+import type {
+  CollectorArtifact,
+  CollectorGazeSample,
+  CollectorSnapshot,
+} from "./collectorArtifact";
 
 export type ReplayCoordinateMode = "viewport" | "document";
 export type ReplayScrollSegment = {
@@ -13,7 +17,10 @@ export type DocumentExtent = { width: number; height: number };
 const scrollDistance = (left: { x: number; y: number }, right: { x: number; y: number }) =>
   Math.hypot(left.x - right.x, left.y - right.y);
 
-export function detectScrollSegments(samples: CollectorGazeSample[], tolerance = 24): ReplayScrollSegment[] {
+export function detectScrollSegments(
+  samples: CollectorGazeSample[],
+  tolerance = 24,
+): ReplayScrollSegment[] {
   const segments: ReplayScrollSegment[] = [];
   for (const sample of samples) {
     const scroll = sample.scroll ?? { x: 0, y: 0 };
@@ -39,13 +46,22 @@ export function detectScrollSegments(samples: CollectorGazeSample[], tolerance =
 
 export function inferDocumentExtent(artifact: CollectorArtifact): DocumentExtent {
   const contexts = [
-    ...(artifact.gazeSamples ?? []).map((sample) => ({ viewport: sample.viewport, scroll: sample.scroll })),
-    ...artifact.snapshots.map((snapshot) => ({ viewport: snapshot.viewport, scroll: snapshot.scroll })),
+    ...(artifact.gazeSamples ?? []).map((sample) => ({
+      viewport: sample.viewport,
+      scroll: sample.scroll,
+    })),
+    ...artifact.snapshots.map((snapshot) => ({
+      viewport: snapshot.viewport,
+      scroll: snapshot.scroll,
+    })),
   ];
-  return contexts.reduce<DocumentExtent>((extent, context) => ({
-    width: Math.max(extent.width, (context.scroll?.x ?? 0) + (context.viewport?.width ?? 1)),
-    height: Math.max(extent.height, (context.scroll?.y ?? 0) + (context.viewport?.height ?? 1)),
-  }), { width: 1, height: 1 });
+  return contexts.reduce<DocumentExtent>(
+    (extent, context) => ({
+      width: Math.max(extent.width, (context.scroll?.x ?? 0) + (context.viewport?.width ?? 1)),
+      height: Math.max(extent.height, (context.scroll?.y ?? 0) + (context.viewport?.height ?? 1)),
+    }),
+    { width: 1, height: 1 },
+  );
 }
 
 export function projectReplaySample(
@@ -55,7 +71,8 @@ export function projectReplaySample(
   fallbackSnapshot?: CollectorSnapshot,
 ): CollectorGazeSample {
   if (mode === "viewport") return sample;
-  const viewport = sample.viewport ?? fallbackSnapshot?.viewport ?? { width: extent.width, height: extent.height };
+  const viewport = sample.viewport ??
+    fallbackSnapshot?.viewport ?? { width: extent.width, height: extent.height };
   const scroll = sample.scroll ?? fallbackSnapshot?.scroll ?? { x: 0, y: 0 };
   return {
     ...sample,
@@ -80,10 +97,14 @@ export function insertReplaySnapshot(
   dataUrl: string,
   replayTimeMs: number,
 ): CollectorArtifact {
-  if (!dataUrl.startsWith("data:image/")) throw new Error("Choose an image file to insert into replay.");
+  if (!dataUrl.startsWith("data:image/"))
+    throw new Error("Choose an image file to insert into replay.");
   const at = new Date(Date.parse(artifact.startedAt) + Math.max(0, replayTimeMs)).toISOString();
-  const nearest = [...artifact.snapshots]
-    .sort((left, right) => Math.abs(Date.parse(left.at) - Date.parse(at)) - Math.abs(Date.parse(right.at) - Date.parse(at)))[0];
+  const nearest = [...artifact.snapshots].sort(
+    (left, right) =>
+      Math.abs(Date.parse(left.at) - Date.parse(at)) -
+      Math.abs(Date.parse(right.at) - Date.parse(at)),
+  )[0];
   const snapshot: CollectorSnapshot = {
     at,
     dataUrl,
@@ -92,5 +113,10 @@ export function insertReplaySnapshot(
     viewport: nearest?.viewport,
     scroll: nearest?.scroll,
   };
-  return { ...artifact, snapshots: [...artifact.snapshots, snapshot].sort((left, right) => Date.parse(left.at) - Date.parse(right.at)) };
+  return {
+    ...artifact,
+    snapshots: [...artifact.snapshots, snapshot].sort(
+      (left, right) => Date.parse(left.at) - Date.parse(right.at),
+    ),
+  };
 }

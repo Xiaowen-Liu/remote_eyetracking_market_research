@@ -37,15 +37,15 @@ flowchart LR
 
 ## Engineering decisions
 
-| Concern | Decision | Why it matters |
-|---|---|---|
-| Protocol edits | Drafts publish as immutable versions | A participant session always runs the exact consent and task protocol it started with. |
-| Participant access | High-entropy, hash-stored capability tokens | No participant account or direct identifier is necessary. |
-| Collection correctness | Server-owned lifecycle state machine | Prevents consent skips, overlapping tasks, out-of-order calibration, and collection before quality acceptance. |
-| Unreliable networks | Sequence-numbered batches plus payload checksum | A client can retry safely; duplicates replay and conflicting retries fail explicitly. |
-| Analysis | Idempotent, versioned job/result pair | Results are reproducible and never silently overwritten. |
-| Data provenance | Synthetic demo results are labelled and aggregate-ineligible | The public demo does not make claims from fabricated telemetry. |
-| Frontend contracts | OpenAPI is generated from FastAPI and TypeScript types are generated in CI | Prevents silently drifting frontend/backend interfaces. |
+| Concern                | Decision                                                                   | Why it matters                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Protocol edits         | Drafts publish as immutable versions                                       | A participant session always runs the exact consent and task protocol it started with.                         |
+| Participant access     | High-entropy, hash-stored capability tokens                                | No participant account or direct identifier is necessary.                                                      |
+| Collection correctness | Server-owned lifecycle state machine                                       | Prevents consent skips, overlapping tasks, out-of-order calibration, and collection before quality acceptance. |
+| Unreliable networks    | Sequence-numbered batches plus payload checksum                            | A client can retry safely; duplicates replay and conflicting retries fail explicitly.                          |
+| Analysis               | Idempotent, versioned job/result pair                                      | Results are reproducible and never silently overwritten.                                                       |
+| Data provenance        | Synthetic demo results are labelled and aggregate-ineligible               | The public demo does not make claims from fabricated telemetry.                                                |
+| Frontend contracts     | OpenAPI is generated from FastAPI and TypeScript types are generated in CI | Prevents silently drifting frontend/backend interfaces.                                                        |
 
 More detailed reasoning is in the [architecture notes](docs/architecture.md) and [ADRs](docs/adr).
 Current delivery status and remaining production gaps are tracked in the [roadmap](docs/roadmap.md).
@@ -66,6 +66,21 @@ The researcher dashboard also has a CI-enforced [web performance budget](docs/pe
 - Clean-room MV3 participant extension: consent-aware published-study session, explicit on-device camera calibration, arbitrary-page event timeline, idempotent coordinate ingestion, optional visible-tab snapshots, and local artifact review
 - Snapshot-linked gaze replay with URL/time/viewport context and bounded heatmap aggregation
 - Persistent local analysis workspace with ZIP import, raw-session and analysis-bundle export, session health, AOI drill-down, DOM proposals, and replay video
+
+### Analysis boundary
+
+The versioned FastAPI worker currently produces server-side v1 task summaries:
+sample counts, mean confidence, gaze centroids, sequence ranges, calibration
+quality, and diagnostics. Its response contract includes `fixations` and
+`aoi_metrics` as typed lists, but v1 intentionally returns empty lists; they are
+reserved for a future documented server-side fixation algorithm rather than
+being presented as completed analysis.
+
+Snapshot replay, heatmaps, AOI drill-down, DOM-based AOI proposals, and replay
+video are computed locally in the researcher browser from an explicitly opened
+collector artifact. That JSON remains in the browser and is not uploaded by the
+review UI. This client-side exploratory analysis is separate from the immutable
+server-side analysis result and its exports.
 
 ## Repository layout
 
@@ -121,6 +136,8 @@ uploaded by that review UI.
 npm test
 npm run test:e2e
 npm run build:web
+npm run lint
+npm run format:check
 npm run generate:contract
 .venv/bin/ruff check apps/api
 ```

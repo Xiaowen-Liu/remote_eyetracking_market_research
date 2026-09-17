@@ -33,8 +33,21 @@ export type CollectorCalibration = {
 };
 
 export type HeatCell = { x: number; y: number; count: number; intensity: number };
-export type DomProposal = { label: string; tag: string; role?: string | null; x: number; y: number; width: number; height: number };
-export type DomProposalState = { at: string; url: string; trigger: string; proposals: DomProposal[] };
+export type DomProposal = {
+  label: string;
+  tag: string;
+  role?: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+export type DomProposalState = {
+  at: string;
+  url: string;
+  trigger: string;
+  proposals: DomProposal[];
+};
 
 export type CollectorArtifact = {
   schemaVersion: "1.0";
@@ -61,7 +74,11 @@ function isIsoTimestamp(value: unknown): value is string {
 export function parseCollectorArtifact(value: unknown): CollectorArtifact {
   if (!value || typeof value !== "object") throw new Error("Choose a collector JSON export.");
   const artifact = value as Partial<CollectorArtifact>;
-  if (artifact.schemaVersion !== "1.0" || typeof artifact.sessionId !== "string" || !isIsoTimestamp(artifact.startedAt)) {
+  if (
+    artifact.schemaVersion !== "1.0" ||
+    typeof artifact.sessionId !== "string" ||
+    !isIsoTimestamp(artifact.startedAt)
+  ) {
     throw new Error("This is not a supported WebGaze collector export.");
   }
   if (!Array.isArray(artifact.events) || !Array.isArray(artifact.snapshots) || !artifact.privacy) {
@@ -70,26 +87,42 @@ export function parseCollectorArtifact(value: unknown): CollectorArtifact {
   if (artifact.privacy.rawCameraVideo !== false || artifact.privacy.eventCollection !== true) {
     throw new Error("This export does not meet the collector privacy contract.");
   }
-  const events = artifact.events.filter((event): event is CollectorEvent =>
-    Boolean(event) && typeof event.type === "string" && typeof event.url === "string" && isIsoTimestamp(event.at),
+  const events = artifact.events.filter(
+    (event): event is CollectorEvent =>
+      Boolean(event) &&
+      typeof event.type === "string" &&
+      typeof event.url === "string" &&
+      isIsoTimestamp(event.at),
   );
-  const snapshots = artifact.snapshots.filter((snapshot): snapshot is CollectorSnapshot =>
-    Boolean(snapshot) && typeof snapshot.dataUrl === "string" && snapshot.dataUrl.startsWith("data:image/") && isIsoTimestamp(snapshot.at),
+  const snapshots = artifact.snapshots.filter(
+    (snapshot): snapshot is CollectorSnapshot =>
+      Boolean(snapshot) &&
+      typeof snapshot.dataUrl === "string" &&
+      snapshot.dataUrl.startsWith("data:image/") &&
+      isIsoTimestamp(snapshot.at),
   );
   const gazeSamples = Array.isArray(artifact.gazeSamples)
-    ? artifact.gazeSamples.filter((sample): sample is CollectorGazeSample =>
-      Boolean(sample) && Number.isFinite(sample.x) && Number.isFinite(sample.y) && sample.x >= 0 && sample.x <= 1 && sample.y >= 0 && sample.y <= 1,
-    )
+    ? artifact.gazeSamples.filter(
+        (sample): sample is CollectorGazeSample =>
+          Boolean(sample) &&
+          Number.isFinite(sample.x) &&
+          Number.isFinite(sample.y) &&
+          sample.x >= 0 &&
+          sample.x <= 1 &&
+          sample.y >= 0 &&
+          sample.y <= 1,
+      )
     : [];
   const rawCalibration = artifact.calibration as Partial<CollectorCalibration> | undefined;
-  const calibration = rawCalibration
-    && Number.isFinite(rawCalibration.attempt)
-    && Number.isFinite(rawCalibration.observed_sample_count)
-    && (rawCalibration.error_px === null || Number.isFinite(rawCalibration.error_px))
-    && ["strong", "variable", "failed"].includes(String(rawCalibration.quality_grade))
-    && typeof rawCalibration.accepted === "boolean"
-    ? rawCalibration as CollectorCalibration
-    : undefined;
+  const calibration =
+    rawCalibration &&
+    Number.isFinite(rawCalibration.attempt) &&
+    Number.isFinite(rawCalibration.observed_sample_count) &&
+    (rawCalibration.error_px === null || Number.isFinite(rawCalibration.error_px)) &&
+    ["strong", "variable", "failed"].includes(String(rawCalibration.quality_grade)) &&
+    typeof rawCalibration.accepted === "boolean"
+      ? (rawCalibration as CollectorCalibration)
+      : undefined;
   return {
     schemaVersion: "1.0",
     sessionId: artifact.sessionId,
@@ -104,13 +137,20 @@ export function parseCollectorArtifact(value: unknown): CollectorArtifact {
   };
 }
 
-export function gazeSamplesForSnapshot(artifact: CollectorArtifact, snapshotIndex: number): CollectorGazeSample[] {
+export function gazeSamplesForSnapshot(
+  artifact: CollectorArtifact,
+  snapshotIndex: number,
+): CollectorGazeSample[] {
   const snapshot = artifact.snapshots[snapshotIndex];
   if (!snapshot) return [];
-  const start = snapshotIndex > 0 ? Date.parse(artifact.snapshots[snapshotIndex - 1].at) : Date.parse(artifact.startedAt);
-  const end = snapshotIndex < artifact.snapshots.length - 1
-    ? Date.parse(artifact.snapshots[snapshotIndex + 1].at)
-    : Date.parse(artifact.endedAt ?? snapshot.at) + 1;
+  const start =
+    snapshotIndex > 0
+      ? Date.parse(artifact.snapshots[snapshotIndex - 1].at)
+      : Date.parse(artifact.startedAt);
+  const end =
+    snapshotIndex < artifact.snapshots.length - 1
+      ? Date.parse(artifact.snapshots[snapshotIndex + 1].at)
+      : Date.parse(artifact.endedAt ?? snapshot.at) + 1;
   return (artifact.gazeSamples ?? []).filter((sample) => {
     if (sample.url && snapshot.url && sample.url !== snapshot.url) return false;
     if (!sample.at) return artifact.snapshots.length === 1;
@@ -125,7 +165,11 @@ export function buildHeatmap(samples: CollectorGazeSample[], gridSize = 14): Hea
     const column = Math.min(gridSize - 1, Math.floor(sample.x * gridSize));
     const row = Math.min(gridSize - 1, Math.floor(sample.y * gridSize));
     const key = `${column}:${row}`;
-    const bucket = buckets.get(key) ?? { x: (column + 0.5) / gridSize, y: (row + 0.5) / gridSize, count: 0 };
+    const bucket = buckets.get(key) ?? {
+      x: (column + 0.5) / gridSize,
+      y: (row + 0.5) / gridSize,
+      count: 0,
+    };
     bucket.count += 1;
     buckets.set(key, bucket);
   }
@@ -135,14 +179,30 @@ export function buildHeatmap(samples: CollectorGazeSample[], gridSize = 14): Hea
 
 export function domProposalStates(artifact: CollectorArtifact): DomProposalState[] {
   return artifact.events.flatMap((event) => {
-    const detail = event.detail as { value?: { trigger?: unknown; proposals?: unknown } } | undefined;
+    const detail = event.detail as
+      { value?: { trigger?: unknown; proposals?: unknown } } | undefined;
     const value = detail?.value;
     if (!value || !Array.isArray(value.proposals)) return [];
     const proposals = value.proposals.filter((proposal): proposal is DomProposal => {
       if (!proposal || typeof proposal !== "object") return false;
       const candidate = proposal as Partial<DomProposal>;
-      return typeof candidate.label === "string" && typeof candidate.tag === "string" && [candidate.x, candidate.y, candidate.width, candidate.height].every((number) => typeof number === "number" && Number.isFinite(number));
+      return (
+        typeof candidate.label === "string" &&
+        typeof candidate.tag === "string" &&
+        [candidate.x, candidate.y, candidate.width, candidate.height].every(
+          (number) => typeof number === "number" && Number.isFinite(number),
+        )
+      );
     });
-    return proposals.length ? [{ at: event.at, url: event.url, trigger: typeof value.trigger === "string" ? value.trigger : event.type, proposals }] : [];
+    return proposals.length
+      ? [
+          {
+            at: event.at,
+            url: event.url,
+            trigger: typeof value.trigger === "string" ? value.trigger : event.type,
+            proposals,
+          },
+        ]
+      : [];
   });
 }
