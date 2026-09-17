@@ -64,6 +64,8 @@ def test_submission_queues_idempotent_analysis_and_task_metrics(client: TestClie
     assert result_body["quality"]["batch_continuity"] == "complete"
     assert result_body["quality"]["calibration_quality"] == "strong"
     assert result_body["diagnostics"]["sample_count"] == 2
+    assert result_body["fixations"] == []
+    assert result_body["aoi_metrics"] == []
     metrics = result_body["task_metrics"]["tasks"]
     assert [metric["task_position"] for metric in metrics] == [1, 2]
     assert [metric["sample_count"] for metric in metrics] == [1, 1]
@@ -155,6 +157,8 @@ def test_synthetic_results_are_disclosed_and_idempotent(client: TestClient) -> N
     assert body["diagnostics"]["source"] == "synthetic-demo"
     assert body["diagnostics"]["aggregate_eligible"] is False
     assert len(body["task_metrics"]["tasks"]) == 2
+    assert body["fixations"] == []
+    assert body["aoi_metrics"] == []
 
     repeated = client.post(endpoint)
     assert repeated.status_code == 200

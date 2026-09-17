@@ -18,7 +18,7 @@ describe("large-session replay window", () => {
   });
 
   it("keeps a 100k-sample replay projection inside its interaction budget", () => {
-    const samples = Array.from({ length: 100_000 }, (_, index) => ({ x: index / 100_000, y: .5 }));
+    const samples = Array.from({ length: 100_000 }, (_, index) => ({ x: index / 100_000, y: 0.5 }));
     const started = performance.now();
     for (let run = 0; run < 20; run += 1) windowReplaySamples(samples);
     const elapsed = performance.now() - started;

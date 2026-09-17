@@ -22,6 +22,8 @@ jobs:
       - run: .venv/bin/python -m pip install -e 'apps/api[dev]'
       - run: npm ci
       - run: .venv/bin/ruff check apps/api
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm test
       - run: npm run build:web:budget
       - run: npm run generate:contract

@@ -29,7 +29,10 @@ const RESEARCHER_TOKEN_KEY = "webgaze.researcher.access-token";
 let memoryResearcherToken: string | null = null;
 
 export class ApiClientError extends Error {
-  constructor(message: string, readonly code: string) {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
     super(message);
   }
 }
@@ -122,21 +125,27 @@ export const api = {
   getProjectAccess: (projectId: string) =>
     researcherRequest<ProjectAccess>(`/projects/${projectId}/access`),
   listProjectMembers: (projectId: string) =>
-    researcherRequest<{ items: ProjectMembership[]; total: number }>(`/projects/${projectId}/members`),
+    researcherRequest<{ items: ProjectMembership[]; total: number }>(
+      `/projects/${projectId}/members`,
+    ),
   addProjectMember: (projectId: string, email: string, role: "editor" | "viewer") =>
     researcherRequest<ProjectMembership>(`/projects/${projectId}/members`, {
       method: "POST",
       body: JSON.stringify({ email, role }),
     }),
   listProjectInvitations: (projectId: string) =>
-    researcherRequest<{ items: ProjectInvitation[]; total: number }>(`/projects/${projectId}/invitations`),
+    researcherRequest<{ items: ProjectInvitation[]; total: number }>(
+      `/projects/${projectId}/invitations`,
+    ),
   inviteProjectMember: (projectId: string, email: string, role: "editor" | "viewer") =>
     researcherRequest<ProjectInviteResult>(`/projects/${projectId}/invitations`, {
       method: "POST",
       body: JSON.stringify({ email, role }),
     }),
   cancelProjectInvitation: (projectId: string, invitationId: string) =>
-    researcherRequest<void>(`/projects/${projectId}/invitations/${invitationId}`, { method: "DELETE" }),
+    researcherRequest<void>(`/projects/${projectId}/invitations/${invitationId}`, {
+      method: "DELETE",
+    }),
   updateProjectMember: (projectId: string, membershipId: string, role: "editor" | "viewer") =>
     researcherRequest<ProjectMembership>(`/projects/${projectId}/members/${membershipId}`, {
       method: "PATCH",
@@ -148,15 +157,18 @@ export const api = {
     projectId: string,
     membershipId: string,
     previousOwnerRole: "editor" | "viewer",
-  ) => researcherRequest<Project>(`/projects/${projectId}/transfer-ownership`, {
-    method: "POST",
-    body: JSON.stringify({
-      membership_id: membershipId,
-      previous_owner_role: previousOwnerRole,
+  ) =>
+    researcherRequest<Project>(`/projects/${projectId}/transfer-ownership`, {
+      method: "POST",
+      body: JSON.stringify({
+        membership_id: membershipId,
+        previous_owner_role: previousOwnerRole,
+      }),
     }),
-  }),
   listProjectAuditEvents: (projectId: string) =>
-    researcherRequest<{ items: AuditEvent[]; total: number }>(`/projects/${projectId}/audit-events`),
+    researcherRequest<{ items: AuditEvent[]; total: number }>(
+      `/projects/${projectId}/audit-events`,
+    ),
   listStudies: (projectId: string) =>
     researcherRequest<{ items: StudySummary[]; total: number }>(`/projects/${projectId}/studies`),
   getDraft: (studyId: string) => researcherRequest<StudyDraftResponse>(`/studies/${studyId}/draft`),
@@ -177,8 +189,7 @@ export const api = {
       method: "POST",
       headers: { "Idempotency-Key": crypto.randomUUID() },
     }),
-  resolveParticipantLink: (token: string) =>
-    request<PublicStudyProtocol>(`/participate/${token}`),
+  resolveParticipantLink: (token: string) => request<PublicStudyProtocol>(`/participate/${token}`),
   createParticipantSession: (token: string) =>
     request<ParticipantSession>(`/participate/${token}/sessions`, {
       method: "POST",
@@ -195,12 +206,7 @@ export const api = {
       headers: participantHeaders(accessToken),
       body: JSON.stringify({ accepted: true, consent_version: consentVersion }),
     }),
-  recordCalibration: (
-    sessionId: string,
-    accessToken: string,
-    attempt: number,
-    startedAt: string,
-  ) =>
+  recordCalibration: (sessionId: string, accessToken: string, attempt: number, startedAt: string) =>
     request<CalibrationResult>(`/participant-sessions/${sessionId}/calibrations`, {
       method: "POST",
       headers: participantHeaders(accessToken),
@@ -241,10 +247,13 @@ export const api = {
   listStudyAnalysisJobs: (studyId: string) =>
     researcherRequest<{ items: AnalysisJob[]; total: number }>(`/studies/${studyId}/analysis-jobs`),
   listStudyParticipantSessions: (studyId: string) =>
-    researcherRequest<{ items: ParticipantSessionSummary[]; total: number }>(`/studies/${studyId}/participant-sessions`),
+    researcherRequest<{ items: ParticipantSessionSummary[]; total: number }>(
+      `/studies/${studyId}/participant-sessions`,
+    ),
   runAnalysisJob: (jobId: string) =>
     researcherRequest<AnalysisResult>(`/analysis-jobs/${jobId}/run`, { method: "POST" }),
-  getAnalysisResult: (jobId: string) => researcherRequest<AnalysisResult>(`/analysis-jobs/${jobId}/result`),
+  getAnalysisResult: (jobId: string) =>
+    researcherRequest<AnalysisResult>(`/analysis-jobs/${jobId}/result`),
   createSyntheticStudyResults: (studyId: string) =>
     researcherRequest<AnalysisResult>(`/studies/${studyId}/synthetic-results`, { method: "POST" }),
   downloadAnalysisExport: (jobId: string, format: "json" | "csv") =>

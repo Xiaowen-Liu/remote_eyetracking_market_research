@@ -681,6 +681,10 @@ export interface components {
         };
         /** AnalysisResultResponse */
         AnalysisResultResponse: {
+            /** Aoi Metrics */
+            aoi_metrics: {
+                [key: string]: unknown;
+            }[];
             /**
              * Created At
              * Format: date-time
@@ -690,6 +694,10 @@ export interface components {
             diagnostics: {
                 [key: string]: unknown;
             };
+            /** Fixations */
+            fixations: {
+                [key: string]: unknown;
+            }[];
             /**
              * Id
              * Format: uuid

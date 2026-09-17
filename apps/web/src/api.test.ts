@@ -17,9 +17,9 @@ describe("researcher API authentication", () => {
   });
 
   it("attaches the researcher session to owner-scoped requests", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse({ items: [], total: 0 }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ items: [], total: 0 }));
     saveResearcherToken("private-researcher-token");
 
     await api.listProjects();
@@ -35,9 +35,9 @@ describe("researcher API authentication", () => {
   });
 
   it("never sends the researcher session to a participant link", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse({ id: "public-study" }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ id: "public-study" }));
     saveResearcherToken("private-researcher-token");
 
     await api.resolveParticipantLink("public-capability-token");

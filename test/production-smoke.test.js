@@ -35,13 +35,10 @@ test("validates the deployed web, API, contract, database, and CORS boundary", a
   });
 
   assert.equal(result.status, "pass");
-  assert.deepEqual(result.checks.map((check) => check.name), [
-    "web_app",
-    "api_liveness",
-    "api_readiness",
-    "openapi_contract",
-    "cors_preflight",
-  ]);
+  assert.deepEqual(
+    result.checks.map((check) => check.name),
+    ["web_app", "api_liveness", "api_readiness", "openapi_contract", "cors_preflight"],
+  );
   assert.equal(seen.at(-1).method, "OPTIONS");
 });
 

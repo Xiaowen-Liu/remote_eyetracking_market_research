@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildHeatmap, domProposalStates, gazeSamplesForSnapshot, parseCollectorArtifact } from "./collectorArtifact";
+import {
+  buildHeatmap,
+  domProposalStates,
+  gazeSamplesForSnapshot,
+  parseCollectorArtifact,
+} from "./collectorArtifact";
 
 describe("parseCollectorArtifact", () => {
   const artifact = {
@@ -11,17 +16,40 @@ describe("parseCollectorArtifact", () => {
     captureSnapshots: true,
     events: [{ type: "page-open", url: "https://example.com", at: "2026-09-11T00:00:00.000Z" }],
     snapshots: [{ at: "2026-09-11T00:00:05.000Z", dataUrl: "data:image/jpeg;base64,abc" }],
-    gazeSamples: [{ x: 0.4, y: 0.6, confidence: 0.8, at: "2026-09-11T00:00:04.000Z", url: "https://example.com" }],
-    calibration: { attempt: 1, observed_sample_count: 35, error_px: 41, quality_grade: "strong", accepted: true },
+    gazeSamples: [
+      {
+        x: 0.4,
+        y: 0.6,
+        confidence: 0.8,
+        at: "2026-09-11T00:00:04.000Z",
+        url: "https://example.com",
+      },
+    ],
+    calibration: {
+      attempt: 1,
+      observed_sample_count: 35,
+      error_px: 41,
+      quality_grade: "strong",
+      accepted: true,
+    },
     privacy: { rawCameraVideo: false, eventCollection: true, visibleTabSnapshots: true },
   };
 
   it("accepts a privacy-preserving collector export", () => {
-    expect(parseCollectorArtifact(artifact)).toMatchObject({ sessionId: "collector-session", gazeSamples: [{ x: 0.4, y: 0.6 }], calibration: { quality_grade: "strong", accepted: true } });
+    expect(parseCollectorArtifact(artifact)).toMatchObject({
+      sessionId: "collector-session",
+      gazeSamples: [{ x: 0.4, y: 0.6 }],
+      calibration: { quality_grade: "strong", accepted: true },
+    });
   });
 
   it("rejects an artifact that claims to include raw camera video", () => {
-    expect(() => parseCollectorArtifact({ ...artifact, privacy: { ...artifact.privacy, rawCameraVideo: true } })).toThrow("privacy contract");
+    expect(() =>
+      parseCollectorArtifact({
+        ...artifact,
+        privacy: { ...artifact.privacy, rawCameraVideo: true },
+      }),
+    ).toThrow("privacy contract");
   });
 
   it("selects snapshot-context samples and aggregates heat cells", () => {
@@ -40,6 +68,27 @@ describe("parseCollectorArtifact", () => {
 });
 
 it("reads DOM proposals only from recorded screen-state events", () => {
-  const artifact = parseCollectorArtifact({ schemaVersion: "1.0", sessionId: "session", startedAt: "2026-01-01T00:00:00Z", captureSnapshots: false, snapshots: [], gazeSamples: [], privacy: { rawCameraVideo: false, eventCollection: true, visibleTabSnapshots: false }, events: [{ type: "page-open", url: "https://example.com", at: "2026-01-01T00:00:00Z", detail: { value: { trigger: "page-open", proposals: [{ label: "Buy", tag: "button", x: .1, y: .2, width: .2, height: .1 }] } } }] });
+  const artifact = parseCollectorArtifact({
+    schemaVersion: "1.0",
+    sessionId: "session",
+    startedAt: "2026-01-01T00:00:00Z",
+    captureSnapshots: false,
+    snapshots: [],
+    gazeSamples: [],
+    privacy: { rawCameraVideo: false, eventCollection: true, visibleTabSnapshots: false },
+    events: [
+      {
+        type: "page-open",
+        url: "https://example.com",
+        at: "2026-01-01T00:00:00Z",
+        detail: {
+          value: {
+            trigger: "page-open",
+            proposals: [{ label: "Buy", tag: "button", x: 0.1, y: 0.2, width: 0.2, height: 0.1 }],
+          },
+        },
+      },
+    ],
+  });
   expect(domProposalStates(artifact)[0].proposals[0].label).toBe("Buy");
 });

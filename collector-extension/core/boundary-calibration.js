@@ -12,7 +12,8 @@ export function observeSegment(start, end, point) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const lengthSquared = dx * dx + dy * dy;
-  const rawProgress = lengthSquared === 0 ? 0 : ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
+  const rawProgress =
+    lengthSquared === 0 ? 0 : ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
   const progress = Math.max(0, Math.min(1, rawProgress));
   const projected = { x: start.x + dx * progress, y: start.y + dy * progress };
   return {
@@ -28,5 +29,8 @@ export function pointerSpeed(previous, current, elapsedMs) {
 }
 
 export function hasArrived(observation, arrivalRadius = 52, railTolerance = 56) {
-  return observation.distanceToEnd <= arrivalRadius || (observation.progress >= 1 && observation.distance <= railTolerance);
+  return (
+    observation.distanceToEnd <= arrivalRadius ||
+    (observation.progress >= 1 && observation.distance <= railTolerance)
+  );
 }

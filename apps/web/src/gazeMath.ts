@@ -30,7 +30,8 @@ function fitAxis(samples: CalibrationSample[], axis: 0 | 1): number[] | null {
     const vector = [1, sample.feature[0], sample.feature[1]];
     for (let row = 0; row < 3; row += 1) {
       target[row] += vector[row] * sample.target[axis];
-      for (let column = 0; column < 3; column += 1) normal[row][column] += vector[row] * vector[column];
+      for (let column = 0; column < 3; column += 1)
+        normal[row][column] += vector[row] * vector[column];
     }
   }
   for (let index = 0; index < 3; index += 1) normal[index][index] += 0.0001;
@@ -46,7 +47,8 @@ export function fitGazeModel(samples: CalibrationSample[]): GazeModel | null {
 
 export function predictGaze(model: GazeModel, feature: GazeFeature): GazeFeature {
   const vector = [1, feature[0], feature[1]];
-  const dot = (weights: number[]) => weights.reduce((sum, weight, index) => sum + weight * vector[index], 0);
+  const dot = (weights: number[]) =>
+    weights.reduce((sum, weight, index) => sum + weight * vector[index], 0);
   return [Math.min(1, Math.max(0, dot(model.x))), Math.min(1, Math.max(0, dot(model.y)))];
 }
 

@@ -9,7 +9,16 @@ import {
   type SessionSubmit,
   type TaskRun,
 } from "./api";
-type Phase = "loading" | "extension" | "consent" | "calibration" | "ready" | "running" | "submitting" | "complete" | "error";
+type Phase =
+  | "loading"
+  | "extension"
+  | "consent"
+  | "calibration"
+  | "ready"
+  | "running"
+  | "submitting"
+  | "complete"
+  | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
 type AccessSession = { id: string; accessToken: string };
 type StoredSession = AccessSession & {
@@ -48,7 +57,9 @@ export function ParticipantRunner({ token }: { token: string }) {
   const [submission, setSubmission] = useState<SessionSubmit | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-  const [extensionStatus, setExtensionStatus] = useState<"checking" | "connected" | "missing">("checking");
+  const [extensionStatus, setExtensionStatus] = useState<"checking" | "connected" | "missing">(
+    "checking",
+  );
   const sequenceRef = useRef(0);
 
   function persist(
@@ -68,7 +79,10 @@ export function ParticipantRunner({ token }: { token: string }) {
   }
 
   function showError(error: unknown) {
-    const message = error instanceof ApiClientError ? error.message : "Connection failed. Your queue is still safe in this browser.";
+    const message =
+      error instanceof ApiClientError
+        ? error.message
+        : "Connection failed. Your queue is still safe in this browser.";
     setNotice({ kind: "error", text: message });
   }
 
@@ -108,14 +122,18 @@ export function ParticipantRunner({ token }: { token: string }) {
       }
     }
     void bootstrap();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   useEffect(() => {
     if (phase !== "extension") return;
     const readExtensionStatus = () => {
       const value = document.documentElement.dataset.webgazeExtensionStatus;
-      setExtensionStatus(value === "connected" ? "connected" : value === "installed" ? "checking" : "missing");
+      setExtensionStatus(
+        value === "connected" ? "connected" : value === "installed" ? "checking" : "missing",
+      );
     };
     readExtensionStatus();
     document.addEventListener("webgaze-extension-status", readExtensionStatus);
@@ -152,7 +170,10 @@ export function ParticipantRunner({ token }: { token: string }) {
       );
       if (!result.accepted) {
         setCalibrationAttempt((attempt) => attempt + 1);
-        setNotice({ kind: "error", text: "Calibration did not meet this protocol's threshold. Try again." });
+        setNotice({
+          kind: "error",
+          text: "Calibration did not meet this protocol's threshold. Try again.",
+        });
         return;
       }
       setPhase("ready");
@@ -187,7 +208,11 @@ export function ParticipantRunner({ token }: { token: string }) {
         api.ingestGazeBatch(session.id, session.accessToken, batch),
       );
       setPendingCount(pendingBatches(window.localStorage, session.id).length);
-      if (sent) setNotice({ kind: "success", text: `${sent} buffered gaze batch${sent === 1 ? "" : "es"} uploaded.` });
+      if (sent)
+        setNotice({
+          kind: "success",
+          text: `${sent} buffered gaze batch${sent === 1 ? "" : "es"} uploaded.`,
+        });
       return sent;
     } catch (error) {
       setPendingCount(pendingBatches(window.localStorage, session.id).length);
@@ -205,16 +230,18 @@ export function ParticipantRunner({ token }: { token: string }) {
       schema_version: "1.0",
       captured_from: now,
       captured_to: now,
-      samples: [{
-        timestamp: now,
-        x_normalized: 0.2 + (nextSequence % 3) * 0.25,
-        y_normalized: 0.4 + (nextSequence % 2) * 0.2,
-        confidence: 0.91,
-        scroll_x: 0,
-        scroll_y: 0,
-        viewport_width: window.innerWidth,
-        viewport_height: window.innerHeight,
-      }],
+      samples: [
+        {
+          timestamp: now,
+          x_normalized: 0.2 + (nextSequence % 3) * 0.25,
+          y_normalized: 0.4 + (nextSequence % 2) * 0.2,
+          confidence: 0.91,
+          scroll_x: 0,
+          scroll_y: 0,
+          viewport_width: window.innerWidth,
+          viewport_height: window.innerHeight,
+        },
+      ],
     };
     enqueueBatch(window.localStorage, session.id, batch);
     const newSequence = nextSequence + 1;
@@ -232,7 +259,10 @@ export function ParticipantRunner({ token }: { token: string }) {
   async function finishTask() {
     if (!session || !activeRun || !protocol) return;
     if (offlineDemo || pendingBatches(window.localStorage, session.id).length > 0) {
-      setNotice({ kind: "error", text: "Reconnect and flush all buffered batches before finishing this task." });
+      setNotice({
+        kind: "error",
+        text: "Reconnect and flush all buffered batches before finishing this task.",
+      });
       return;
     }
     setBusy(true);
@@ -272,83 +302,235 @@ export function ParticipantRunner({ token }: { token: string }) {
   return (
     <main className="participant-shell">
       <header className="participant-header">
-        <a className="brand" href="/">◉ WebGaze Research</a>
+        <a className="brand" href="/">
+          ◉ WebGaze Research
+        </a>
         <span className="environment">Participant demo</span>
       </header>
       <section className="participant-card" aria-live="polite">
         {phase === "loading" && <p>Preparing your study…</p>}
-        {phase === "error" && <><h1>Study unavailable</h1><p>Please check the participant link and try again.</p></>}
-        {protocol && phase !== "loading" && phase !== "error" && <>
-          <p className="eyebrow">{phase === "running" ? `Task ${completedTasks + 1}` : "Participant study"}</p>
-          <h1>{protocol.title}</h1>
-          {notice && <div className={`notice ${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
-          {phase === "extension" && <section className="extension-handoff" aria-labelledby="extension-handoff-title">
-            <div className={`extension-connection ${extensionStatus}`}>
-              <span aria-hidden="true">{extensionStatus === "connected" ? "✓" : "◉"}</span>
-              <strong>{extensionStatus === "connected" ? "Extension connected" : extensionStatus === "checking" ? "Checking for WebGaze Collector…" : "WebGaze Collector required"}</strong>
-            </div>
-            <h2 id="extension-handoff-title">Continue in the browser extension</h2>
-            <p>This webcam study uses the full collector flow: camera check, three-sample point calibration, guided boundary calibration, accuracy measurement, and task collection on the target website.</p>
-            <ol>
-              <li>Load or enable the WebGaze Research Collector extension.</li>
-              <li>Open the extension from the browser toolbar.</li>
-              <li>Review the study consent, then continue to calibration.</li>
-            </ol>
-            <button className="primary-button" type="button" onClick={() => void navigator.clipboard.writeText(window.location.href).then(() => setNotice({ kind: "success", text: "Participant link copied. Paste it into the extension if it did not connect automatically." })).catch(() => setNotice({ kind: "error", text: "Copy failed. Copy the participant URL from the address bar." }))}>Copy participant link</button>
-            <p className="fine-print">The web page no longer substitutes a reduced camera experience. Camera frames and face landmarks remain inside the extension runtime.</p>
-          </section>}
+        {phase === "error" && (
+          <>
+            <h1>Study unavailable</h1>
+            <p>Please check the participant link and try again.</p>
+          </>
+        )}
+        {protocol && phase !== "loading" && phase !== "error" && (
+          <>
+            <p className="eyebrow">
+              {phase === "running" ? `Task ${completedTasks + 1}` : "Participant study"}
+            </p>
+            <h1>{protocol.title}</h1>
+            {notice && (
+              <div
+                className={`notice ${notice.kind}`}
+                role={notice.kind === "error" ? "alert" : "status"}
+              >
+                {notice.text}
+              </div>
+            )}
+            {phase === "extension" && (
+              <section className="extension-handoff" aria-labelledby="extension-handoff-title">
+                <div className={`extension-connection ${extensionStatus}`}>
+                  <span aria-hidden="true">{extensionStatus === "connected" ? "✓" : "◉"}</span>
+                  <strong>
+                    {extensionStatus === "connected"
+                      ? "Extension connected"
+                      : extensionStatus === "checking"
+                        ? "Checking for WebGaze Collector…"
+                        : "WebGaze Collector required"}
+                  </strong>
+                </div>
+                <h2 id="extension-handoff-title">Continue in the browser extension</h2>
+                <p>
+                  This webcam study uses the full collector flow: camera check, three-sample point
+                  calibration, guided boundary calibration, accuracy measurement, and task
+                  collection on the target website.
+                </p>
+                <ol>
+                  <li>Load or enable the WebGaze Research Collector extension.</li>
+                  <li>Open the extension from the browser toolbar.</li>
+                  <li>Review the study consent, then continue to calibration.</li>
+                </ol>
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(window.location.href)
+                      .then(() =>
+                        setNotice({
+                          kind: "success",
+                          text: "Participant link copied. Paste it into the extension if it did not connect automatically.",
+                        }),
+                      )
+                      .catch(() =>
+                        setNotice({
+                          kind: "error",
+                          text: "Copy failed. Copy the participant URL from the address bar.",
+                        }),
+                      )
+                  }
+                >
+                  Copy participant link
+                </button>
+                <p className="fine-print">
+                  The web page no longer substitutes a reduced camera experience. Camera frames and
+                  face landmarks remain inside the extension runtime.
+                </p>
+              </section>
+            )}
 
-          {phase === "consent" && <>
-            <p>{protocol.consent_text}</p>
-            <ul className="participant-facts">
-              <li>{experimentalWebcam ? "If enabled, webcam frames are processed only in this browser." : "Webcam frames stay on-device in this public demo."}</li>
-              <li>{experimentalWebcam ? "After calibration, estimated coordinate samples are sent to this study API; no camera frames are uploaded." : "Synthetic gaze coordinates are used to demonstrate the API flow."}</li>
-              <li>You may leave before task completion.</li>
-            </ul>
-            <button className="primary-button" disabled={busy} onClick={() => void acceptConsent()}>Accept and continue</button>
-          </>}
+            {phase === "consent" && (
+              <>
+                <p>{protocol.consent_text}</p>
+                <ul className="participant-facts">
+                  <li>
+                    {experimentalWebcam
+                      ? "If enabled, webcam frames are processed only in this browser."
+                      : "Webcam frames stay on-device in this public demo."}
+                  </li>
+                  <li>
+                    {experimentalWebcam
+                      ? "After calibration, estimated coordinate samples are sent to this study API; no camera frames are uploaded."
+                      : "Synthetic gaze coordinates are used to demonstrate the API flow."}
+                  </li>
+                  <li>You may leave before task completion.</li>
+                </ul>
+                <button
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={() => void acceptConsent()}
+                >
+                  Accept and continue
+                </button>
+              </>
+            )}
 
-          {phase === "calibration" && <>
-            <p>Complete a deterministic nine-point calibration simulation before task collection begins.</p><div className="calibration-grid" aria-label="Nine calibration targets">{Array.from({ length: 9 }, (_, index) => <span key={index}>●</span>)}</div><p className="fine-print">Attempt {calibrationAttempt} of {protocol.calibration_policy.maximum_attempts}. This public route sends a synthetic result; it does not claim laboratory-grade accuracy.</p><button className="primary-button" disabled={busy} onClick={() => void completeCalibration()}>Record synthetic calibration</button>
-          </>}
+            {phase === "calibration" && (
+              <>
+                <p>
+                  Complete a deterministic nine-point calibration simulation before task collection
+                  begins.
+                </p>
+                <div className="calibration-grid" aria-label="Nine calibration targets">
+                  {Array.from({ length: 9 }, (_, index) => (
+                    <span key={index}>●</span>
+                  ))}
+                </div>
+                <p className="fine-print">
+                  Attempt {calibrationAttempt} of {protocol.calibration_policy.maximum_attempts}.
+                  This public route sends a synthetic result; it does not claim laboratory-grade
+                  accuracy.
+                </p>
+                <button
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={() => void completeCalibration()}
+                >
+                  Record synthetic calibration
+                </button>
+              </>
+            )}
 
-          {phase === "ready" && task && <>
-            <p className="task-label">Next: Task {task.position} of {protocol.tasks.length}</p>
-            <h2>{task.title}</h2>
-            <p>{task.prompt}</p>
-            <p className="fine-print">Task boundaries are stored server-side so later analysis does not infer them from timestamps.</p>
-            <button className="primary-button" disabled={busy} onClick={() => void startTask()}>Start task {task.position}</button>
-          </>}
+            {phase === "ready" && task && (
+              <>
+                <p className="task-label">
+                  Next: Task {task.position} of {protocol.tasks.length}
+                </p>
+                <h2>{task.title}</h2>
+                <p>{task.prompt}</p>
+                <p className="fine-print">
+                  Task boundaries are stored server-side so later analysis does not infer them from
+                  timestamps.
+                </p>
+                <button className="primary-button" disabled={busy} onClick={() => void startTask()}>
+                  Start task {task.position}
+                </button>
+              </>
+            )}
 
-          {phase === "running" && task && <>
-            <p className="task-label">Task {task.position} is collecting</p>
-            <h2>{task.title}</h2>
-            <p>{task.prompt}</p>
-            <div className="connection-row">
-              <span className={offlineDemo ? "connection offline" : "connection online"}>{offlineDemo ? "Offline simulation" : "Connected"}</span>
-              <span>{pendingCount} buffered batch{pendingCount === 1 ? "" : "es"}</span>
-            </div>
-            <button className="secondary-button" type="button" onClick={() => setOfflineDemo((value) => !value)}>{offlineDemo ? "Restore connection" : "Simulate connection loss"}</button>
-            {!experimentalWebcam && <button className="secondary-button" type="button" disabled={busy} onClick={() => void recordSyntheticSample()}>Record synthetic gaze sample</button>}
-            <button className="secondary-button" type="button" disabled={busy || offlineDemo || pendingCount === 0} onClick={() => void flush()}>Retry buffered batches</button>
-            <button className="primary-button" disabled={busy} onClick={() => void finishTask()}>Finish task</button>
-          </>}
+            {phase === "running" && task && (
+              <>
+                <p className="task-label">Task {task.position} is collecting</p>
+                <h2>{task.title}</h2>
+                <p>{task.prompt}</p>
+                <div className="connection-row">
+                  <span className={offlineDemo ? "connection offline" : "connection online"}>
+                    {offlineDemo ? "Offline simulation" : "Connected"}
+                  </span>
+                  <span>
+                    {pendingCount} buffered batch{pendingCount === 1 ? "" : "es"}
+                  </span>
+                </div>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setOfflineDemo((value) => !value)}
+                >
+                  {offlineDemo ? "Restore connection" : "Simulate connection loss"}
+                </button>
+                {!experimentalWebcam && (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void recordSyntheticSample()}
+                  >
+                    Record synthetic gaze sample
+                  </button>
+                )}
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={busy || offlineDemo || pendingCount === 0}
+                  onClick={() => void flush()}
+                >
+                  Retry buffered batches
+                </button>
+                <button
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={() => void finishTask()}
+                >
+                  Finish task
+                </button>
+              </>
+            )}
 
-          {phase === "complete" && <>
-            <h2>Analysis queued</h2>
-            <p>All task boundaries and acknowledged {experimentalWebcam ? "estimated coordinate" : "synthetic gaze"} batches are stored. This session is queued for versioned task-level analysis.</p>
-            {submission && <p className="fine-print">Job {submission.analysis_job.id.slice(0, 8)} · {submission.analysis_job.algorithm_version}</p>}
-            <p className="fine-print">No webcam frames were uploaded by this demo.</p>
-          </>}
+            {phase === "complete" && (
+              <>
+                <h2>Analysis queued</h2>
+                <p>
+                  All task boundaries and acknowledged{" "}
+                  {experimentalWebcam ? "estimated coordinate" : "synthetic gaze"} batches are
+                  stored. This session is queued for versioned task-level analysis.
+                </p>
+                {submission && (
+                  <p className="fine-print">
+                    Job {submission.analysis_job.id.slice(0, 8)} ·{" "}
+                    {submission.analysis_job.algorithm_version}
+                  </p>
+                )}
+                <p className="fine-print">No webcam frames were uploaded by this demo.</p>
+              </>
+            )}
 
-          {phase === "submitting" && <>
-            <h2>Ready to queue analysis</h2>
-            <p>All tasks are complete. Submit this session to create an analysis job.</p>
-            <button className="primary-button" disabled={busy} onClick={() => void submitForAnalysis()}>
-              {busy ? "Queueing analysis…" : "Submit for analysis"}
-            </button>
-          </>}
-        </>}
+            {phase === "submitting" && (
+              <>
+                <h2>Ready to queue analysis</h2>
+                <p>All tasks are complete. Submit this session to create an analysis job.</p>
+                <button
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={() => void submitForAnalysis()}
+                >
+                  {busy ? "Queueing analysis…" : "Submit for analysis"}
+                </button>
+              </>
+            )}
+          </>
+        )}
       </section>
     </main>
   );
