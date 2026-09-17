@@ -30,12 +30,12 @@ import { clearStoredArtifacts, deleteStoredArtifact, listStoredArtifacts, storeA
 import { collectorSessionHealth } from "./sessionHealth";
 
 const emptyDraft: StudyDraft = {
-  title: "Accessible checkout attention study",
-  description: "Understand how first-time visitors scan pricing and begin checkout.",
-  consent_version: "demo-v1",
+  title: "Untitled study",
+  description: "",
+  consent_version: "v1",
   consent_text:
-    "I consent to webcam-based gaze estimation for this synthetic UX research demo.",
-  target_origins: ["https://demo.example.com"],
+    "I consent to webcam-based gaze estimation for this research study.",
+  target_origins: [""],
   calibration_policy: {
     minimum_quality: "variable",
     allow_retry: true,
@@ -46,10 +46,10 @@ const emptyDraft: StudyDraft = {
   tasks: [
     {
       position: 1,
-      title: "Find pricing",
-      prompt: "Find the plan that best fits a small research team.",
-      start_url: "https://demo.example.com/pricing",
-      success_url_pattern: "/checkout",
+      title: "Task 1",
+      prompt: "",
+      start_url: "",
+      success_url_pattern: "",
       time_limit_ms: 120000,
       areas_of_interest: [],
     },
@@ -336,7 +336,7 @@ function StudyBuilder() {
           position: current.tasks.length + 1,
           title: `Task ${current.tasks.length + 1}`,
           prompt: "Describe what the participant should accomplish.",
-          start_url: "https://demo.example.com",
+          start_url: "",
           time_limit_ms: 120000,
           areas_of_interest: [],
         },

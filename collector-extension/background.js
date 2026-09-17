@@ -1,5 +1,5 @@
 import { addEvent, addSnapshot, exportArtifact, newSession } from "./core/session-artifact.js";
-import { apiUrl, calibrationPayload, defaultApiBase, gazeBatch, nextBatchSequence, participantToken } from "./core/study-session.js";
+import { apiUrl, calibrationPayload, defaultApiBase, gazeBatch, nextBatchSequence, participantToken, usableStudyUrl } from "./core/study-session.js";
 
 const key = "webgaze.experimental.collector.session";
 const read = async () => (await chrome.storage.session.get(key))[key] ?? null;
@@ -39,13 +39,16 @@ async function enqueueSamples(session, samples) {
 }
 async function startStudy(session) {
   const tab = await activeTab(), protocol = session.protocol;
+  const firstTaskUrl = protocol.tasks[0]?.start_url;
+  if (!usableStudyUrl(firstTaskUrl)) throw new Error("This study still uses an example task URL. Ask the researcher to edit the study, enter a real task URL, and publish a new version.");
   const access = await request(session, `/participate/${session.participantToken}/sessions`, { method: "POST", body: JSON.stringify({ browser_family: "Chromium extension", viewport_width: tab.width ?? 1280, viewport_height: tab.height ?? 720, device_pixel_ratio: 1 }) });
   await participantRequest({ ...session, accessToken: access.access_token }, `/participant-sessions/${access.id}/consent`, { method: "POST", body: JSON.stringify({ accepted: true, consent_version: protocol.consent_version }) });
   const next = { ...session, ...newSession({ sessionId: crypto.randomUUID(), captureSnapshots: session.captureSnapshots }), sessionId: access.id, accessToken: access.access_token, phase: "calibrating", completedTasks: 0, nextSequence: 0, pendingBatches: [], lastError: null };
-  await write(next); await navigateAndMessage(tab.id, protocol.tasks[0].start_url, { type: "COLLECTOR_ARM" }); return next;
+  await write(next); await navigateAndMessage(tab.id, firstTaskUrl, { type: "COLLECTOR_ARM" }); return next;
 }
 async function startTask(session) {
   const task = session.protocol.tasks[session.completedTasks]; if (!task) throw new Error("Every task is already complete");
+  if (!usableStudyUrl(task.start_url)) throw new Error("This task still uses an example URL. Ask the researcher to publish a new study version with a real task URL.");
   const run = await participantRequest(session, `/participant-sessions/${session.sessionId}/task-runs`, { method: "POST", body: JSON.stringify({ task_position: task.position }) });
   const tab = await activeTab(), next = { ...session, taskRun: run, phase: "running", lastError: null }; await write(next);
   if (tab.url !== task.start_url) await navigateAndMessage(tab.id, task.start_url, { type: "COLLECTOR_START_TASK", taskTitle: task.title }); else await chrome.tabs.sendMessage(tab.id, { type: "COLLECTOR_START_TASK", taskTitle: task.title }); return next;

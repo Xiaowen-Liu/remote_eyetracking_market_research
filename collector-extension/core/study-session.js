@@ -1,5 +1,16 @@
 export const defaultApiBase = "https://remoteeyetrackingmarketresearch-production.up.railway.app";
 
+const reservedExampleHosts = new Set(["example.com", "demo.example.com"]);
+
+export function usableStudyUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) && !reservedExampleHosts.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export function participantToken(value) {
   const trimmed = value.trim();
   if (!trimmed) return null;
