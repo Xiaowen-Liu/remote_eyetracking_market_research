@@ -9,10 +9,7 @@ import {
   type SessionSubmit,
   type TaskRun,
 } from "./api";
-import { LiveGazeCapture } from "./LiveGazeCapture";
-import type { GazeFeature } from "./gazeMath";
-
-type Phase = "loading" | "consent" | "calibration" | "ready" | "running" | "submitting" | "complete" | "error";
+type Phase = "loading" | "extension" | "consent" | "calibration" | "ready" | "running" | "submitting" | "complete" | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
 type AccessSession = { id: string; accessToken: string };
 type StoredSession = AccessSession & {
@@ -51,6 +48,7 @@ export function ParticipantRunner({ token }: { token: string }) {
   const [submission, setSubmission] = useState<SessionSubmit | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const [extensionStatus, setExtensionStatus] = useState<"checking" | "connected" | "missing">("checking");
   const sequenceRef = useRef(0);
 
   function persist(
@@ -81,6 +79,10 @@ export function ParticipantRunner({ token }: { token: string }) {
         const resolved = await api.resolveParticipantLink(token);
         if (cancelled) return;
         setProtocol(resolved);
+        if (resolved.collection_policy.webcam_gaze_enabled) {
+          setPhase("extension");
+          return;
+        }
         const stored = readStoredSession(token);
         if (stored) {
           setSession({ id: stored.id, accessToken: stored.accessToken });
@@ -108,6 +110,21 @@ export function ParticipantRunner({ token }: { token: string }) {
     void bootstrap();
     return () => { cancelled = true; };
   }, [token]);
+
+  useEffect(() => {
+    if (phase !== "extension") return;
+    const readExtensionStatus = () => {
+      const value = document.documentElement.dataset.webgazeExtensionStatus;
+      setExtensionStatus(value === "connected" ? "connected" : value === "installed" ? "checking" : "missing");
+    };
+    readExtensionStatus();
+    document.addEventListener("webgaze-extension-status", readExtensionStatus);
+    const timer = window.setTimeout(readExtensionStatus, 800);
+    return () => {
+      document.removeEventListener("webgaze-extension-status", readExtensionStatus);
+      window.clearTimeout(timer);
+    };
+  }, [phase]);
 
   async function acceptConsent() {
     if (!session || !protocol) return;
@@ -212,22 +229,6 @@ export function ParticipantRunner({ token }: { token: string }) {
     }
   }
 
-  function recordLiveSample(point: GazeFeature, confidence: number) {
-    if (!session || !activeRun || offlineDemo) return;
-    const now = new Date().toISOString();
-    const sequence = sequenceRef.current;
-    const batch: GazeBatchCreate = {
-      client_batch_id: crypto.randomUUID(), sequence, schema_version: "1.0", captured_from: now, captured_to: now,
-      samples: [{ timestamp: now, x_normalized: point[0], y_normalized: point[1], confidence, scroll_x: window.scrollX, scroll_y: window.scrollY, viewport_width: window.innerWidth, viewport_height: window.innerHeight }],
-    };
-    sequenceRef.current += 1;
-    setNextSequence(sequenceRef.current);
-    enqueueBatch(window.localStorage, session.id, batch);
-    setPendingCount(pendingBatches(window.localStorage, session.id).length);
-    persist("running", session, { nextSequence: sequenceRef.current, activeRun });
-    void flush();
-  }
-
   async function finishTask() {
     if (!session || !activeRun || !protocol) return;
     if (offlineDemo || pendingBatches(window.localStorage, session.id).length > 0) {
@@ -281,7 +282,21 @@ export function ParticipantRunner({ token }: { token: string }) {
           <p className="eyebrow">{phase === "running" ? `Task ${completedTasks + 1}` : "Participant study"}</p>
           <h1>{protocol.title}</h1>
           {notice && <div className={`notice ${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
-          {experimentalWebcam && (phase === "calibration" || phase === "ready" || phase === "running") && <LiveGazeCapture collecting={phase === "running"} sampleIntervalMs={protocol.collection_policy.sample_interval_ms} onGazeSample={recordLiveSample} onCalibrated={() => void completeCalibration()} />}
+          {phase === "extension" && <section className="extension-handoff" aria-labelledby="extension-handoff-title">
+            <div className={`extension-connection ${extensionStatus}`}>
+              <span aria-hidden="true">{extensionStatus === "connected" ? "✓" : "◉"}</span>
+              <strong>{extensionStatus === "connected" ? "Extension connected" : extensionStatus === "checking" ? "Checking for WebGaze Collector…" : "WebGaze Collector required"}</strong>
+            </div>
+            <h2 id="extension-handoff-title">Continue in the browser extension</h2>
+            <p>This webcam study uses the full collector flow: camera check, three-sample point calibration, guided boundary calibration, accuracy measurement, and task collection on the target website.</p>
+            <ol>
+              <li>Load or enable the WebGaze Research Collector extension.</li>
+              <li>Open the extension from the browser toolbar.</li>
+              <li>Review the study consent, then continue to calibration.</li>
+            </ol>
+            <button className="primary-button" type="button" onClick={() => void navigator.clipboard.writeText(window.location.href).then(() => setNotice({ kind: "success", text: "Participant link copied. Paste it into the extension if it did not connect automatically." })).catch(() => setNotice({ kind: "error", text: "Copy failed. Copy the participant URL from the address bar." }))}>Copy participant link</button>
+            <p className="fine-print">The web page no longer substitutes a reduced camera experience. Camera frames and face landmarks remain inside the extension runtime.</p>
+          </section>}
 
           {phase === "consent" && <>
             <p>{protocol.consent_text}</p>
@@ -294,7 +309,7 @@ export function ParticipantRunner({ token }: { token: string }) {
           </>}
 
           {phase === "calibration" && <>
-            {experimentalWebcam ? <><p>Use your webcam to complete a local nine-point calibration before task collection begins.</p><p className="fine-print">This is an experimental browser estimate; it is not validated as a laboratory-grade measurement.</p></> : <><p>Complete a deterministic nine-point calibration simulation before task collection begins.</p><div className="calibration-grid" aria-label="Nine calibration targets">{Array.from({ length: 9 }, (_, index) => <span key={index}>●</span>)}</div><p className="fine-print">Attempt {calibrationAttempt} of {protocol.calibration_policy.maximum_attempts}. This public route sends a synthetic result; it does not claim laboratory-grade accuracy.</p><button className="primary-button" disabled={busy} onClick={() => void completeCalibration()}>Record synthetic calibration</button></>}
+            <p>Complete a deterministic nine-point calibration simulation before task collection begins.</p><div className="calibration-grid" aria-label="Nine calibration targets">{Array.from({ length: 9 }, (_, index) => <span key={index}>●</span>)}</div><p className="fine-print">Attempt {calibrationAttempt} of {protocol.calibration_policy.maximum_attempts}. This public route sends a synthetic result; it does not claim laboratory-grade accuracy.</p><button className="primary-button" disabled={busy} onClick={() => void completeCalibration()}>Record synthetic calibration</button>
           </>}
 
           {phase === "ready" && task && <>

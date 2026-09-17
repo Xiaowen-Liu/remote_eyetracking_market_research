@@ -29,7 +29,7 @@ async function navigateAndMessage(tabId, url, message) {
   chrome.tabs.onUpdated.addListener(listener);
   await chrome.tabs.update(tabId, { url });
 }
-function studyState(session) { const completed = session?.completedTasks ?? 0; const next = session?.protocol?.tasks?.[completed] ?? null; return { connected: Boolean(session?.protocol), phase: session?.phase ?? "idle", title: session?.protocol?.title ?? null, consentText: session?.protocol?.consent_text ?? null, tasks: session?.protocol?.tasks?.map(({ position, title }) => ({ position, title })) ?? [], nextTask: next ? { position: next.position, title: next.title, prompt: next.prompt } : null, completedTasks: completed, calibration: session?.calibration ?? null, error: session?.lastError ?? null }; }
+function studyState(session) { const completed = session?.completedTasks ?? 0; const next = session?.protocol?.tasks?.[completed] ?? null; return { connected: Boolean(session?.protocol), participantToken: session?.participantToken ?? null, phase: session?.phase ?? "idle", title: session?.protocol?.title ?? null, consentText: session?.protocol?.consent_text ?? null, tasks: session?.protocol?.tasks?.map(({ position, title }) => ({ position, title })) ?? [], nextTask: next ? { position: next.position, title: next.title, prompt: next.prompt } : null, completedTasks: completed, calibration: session?.calibration ?? null, error: session?.lastError ?? null }; }
 async function enqueueSamples(session, samples) {
   if (!session.taskRun || !samples.length) return session;
   const batch = gazeBatch(samples, nextBatchSequence(session.nextSequence ?? 0, session.pendingBatches ?? []), crypto.randomUUID());

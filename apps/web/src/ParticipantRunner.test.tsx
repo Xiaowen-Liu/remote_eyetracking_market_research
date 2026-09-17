@@ -80,4 +80,24 @@ describe("participant collection journey", () => {
     expect(apiMocks.completeTask).toHaveBeenCalledTimes(2);
     expect(apiMocks.submitSession).toHaveBeenCalledWith("session-1", "session-token");
   });
+
+  it("hands webcam studies to the full browser extension instead of the reduced web calibrator", async () => {
+    apiMocks.resolveParticipantLink.mockResolvedValueOnce({
+      title: "Extension camera study",
+      consent_version: "demo-v1",
+      consent_text: "I consent to webcam gaze estimation.",
+      target_origins: ["https://demo.example.com"],
+      calibration_policy: { minimum_quality: "variable", allow_retry: true, maximum_attempts: 3 },
+      collection_policy: { webcam_gaze_enabled: true, screenshots_enabled: false, sample_interval_ms: 100 },
+      tasks: [{ position: 1, title: "Find pricing", prompt: "Find pricing.", start_url: "https://demo.example.com/pricing" }],
+    });
+
+    render(<ParticipantRunner token="extension-token" />);
+
+    expect(await screen.findByRole("heading", { name: "Continue in the browser extension" })).toBeInTheDocument();
+    expect(screen.getByText(/camera check, three-sample point calibration/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Allow camera and calibrate" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept and continue" })).not.toBeInTheDocument();
+    expect(apiMocks.createParticipantSession).not.toHaveBeenCalled();
+  });
 });

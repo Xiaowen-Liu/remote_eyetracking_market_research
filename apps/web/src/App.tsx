@@ -1508,9 +1508,9 @@ function ProjectDashboard({
                 <button className="secondary-button full" type="button" onClick={() => onOpenProject(item)}>
                   Open project
                 </button>
-                <button className="text-button" type="button" onClick={() => onManageAccess(item)}>
+                {researcher && <button className="text-button" type="button" onClick={() => onManageAccess(item)}>
                   Team &amp; access
-                </button>
+                </button>}
               </div>
             </article>
           ))}

@@ -22,3 +22,18 @@ new MutationObserver((entries) => {
   mutationTimer = setTimeout(() => send("dom-change", { count: pageEntries.length, ...screenState("dom-change") }), 250);
 }).observe(document.documentElement, { childList: true, subtree: true });
 send("page-open", screenState("page-open"));
+
+const participantMatch = location.pathname.match(/^\/(?:api\/v1\/)?participate\/([^/]+)$/);
+if (participantMatch) {
+  const markExtension = (status) => {
+    document.documentElement.dataset.webgazeExtensionStatus = status;
+    document.dispatchEvent(new Event("webgaze-extension-status"));
+  };
+  markExtension("installed");
+  void chrome.runtime.sendMessage({ type: "STUDY_STATUS" }).then(async (result) => {
+    if (result?.state?.participantToken !== participantMatch[1]) {
+      result = await chrome.runtime.sendMessage({ type: "CONNECT_STUDY", participantLink: location.href });
+    }
+    markExtension(result?.ok && result?.state?.connected ? "connected" : "installed");
+  }).catch(() => markExtension("installed"));
+}
