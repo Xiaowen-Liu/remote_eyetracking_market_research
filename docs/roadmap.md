@@ -40,10 +40,13 @@ gaze estimation has laboratory-grade accuracy.
    `429` responses; request IDs, structured latency logs, liveness, and database
    readiness probes provide a deployment-safe observability baseline. Remaining
    work is provider-level alert wiring and distributed edge abuse controls.
-3. **Accessibility and performance pass** — semantic analysis tabs and a global
-   reduced-motion mode are implemented. Remaining work: keyboard-complete replay
-   shortcuts, screen-reader playback announcements, large-session virtualization,
-   and measurable performance budgets.
+3. **Accessibility and performance pass** — semantic analysis tabs, a global
+   reduced-motion mode, keyboard-complete replay shortcuts, and screen-reader
+   playback announcements, CI-enforced gzip bundle budgets, and bounded replay
+   rendering for large gaze datasets are implemented. A 100k-sample runtime gate
+   and browser-native containment for off-screen raw rows now cover the primary
+   interaction path. Remaining work: full DOM row virtualization if raw inspection
+   grows beyond the current 250-row safety cap.
 
 ## Deliberate boundaries
 
