@@ -11,7 +11,12 @@ describe("hosted demo task", () => {
   it("renders a usable pricing target without bootstrapping the researcher workspace", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Research tools that grow with your team" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Choose Team" })).toHaveAttribute("href", "/demo/checkout");
+    expect(
+      screen.getByRole("heading", { name: "Research tools that grow with your team" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Choose Team" })).toHaveAttribute(
+      "href",
+      "/demo/checkout",
+    );
   });
 });

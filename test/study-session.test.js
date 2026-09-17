@@ -27,7 +27,10 @@ test("resolves reserved example task URLs to the hosted demo target", () => {
   assert.equal(usableStudyUrl("not a URL"), false);
   assert.equal(resolveStudyUrl("https://demo.example.com/pricing"), defaultDemoTaskUrl);
   assert.equal(resolveStudyUrl("not a URL"), defaultDemoTaskUrl);
-  assert.equal(resolveStudyUrl("https://en.wikipedia.org/wiki/Main_Page"), "https://en.wikipedia.org/wiki/Main_Page");
+  assert.equal(
+    resolveStudyUrl("https://en.wikipedia.org/wiki/Main_Page"),
+    "https://en.wikipedia.org/wiki/Main_Page",
+  );
 });
 
 test("builds an API-compatible coordinate batch", () => {

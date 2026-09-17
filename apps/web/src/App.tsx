@@ -58,8 +58,7 @@ const emptyDraft: StudyDraft = {
   title: "Untitled study",
   description: "",
   consent_version: "v1",
-  consent_text:
-    "I consent to webcam-based gaze estimation for this research study.",
+  consent_text: "I consent to webcam-based gaze estimation for this research study.",
   target_origins: ["https://webgaze-research.vercel.app"],
   calibration_policy: {
     minimum_quality: "variable",
