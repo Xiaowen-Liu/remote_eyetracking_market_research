@@ -164,6 +164,7 @@ describe("Study Builder", () => {
     expect(screen.getByRole("heading", { name: "Projects" })).toBeInTheDocument();
     expect(screen.getByText("Organize studies, participant protocols, and analysis work in one place.")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Open project" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Team & access" })).not.toBeInTheDocument();
   });
 
   it("creates a named project from the dashboard", async () => {
@@ -197,6 +198,8 @@ describe("Study Builder", () => {
 
   it("lets an owner inspect project members and audit activity", async () => {
     const user = userEvent.setup();
+    authMocks.hasResearcherToken.mockReturnValue(true);
+    apiMocks.getCurrentResearcher.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000001", email: "owner@example.com", display_name: "Project Owner" });
     apiMocks.listProjectMembers.mockResolvedValue({
       items: [{
         id: "00000000-0000-4000-8000-000000000030",
@@ -232,12 +235,14 @@ describe("Study Builder", () => {
     await user.click(screen.getByRole("button", { name: "Team & access" }));
 
     expect(await screen.findByRole("heading", { name: "1 person" })).toBeInTheDocument();
-    expect(screen.getByText("Project Owner")).toBeInTheDocument();
+    expect(screen.getAllByText("Project Owner")).toHaveLength(2);
     expect(screen.getByText("Project created")).toBeInTheDocument();
   });
 
   it("shows an unknown researcher as a pending invitation", async () => {
     const user = userEvent.setup();
+    authMocks.hasResearcherToken.mockReturnValue(true);
+    apiMocks.getCurrentResearcher.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000001", email: "owner@example.com", display_name: "Project Owner" });
     apiMocks.inviteProjectMember.mockResolvedValue({
       outcome: "invitation_pending",
       membership: null,
@@ -288,6 +293,8 @@ describe("Study Builder", () => {
 
   it("requires the project name before transferring ownership", async () => {
     const user = userEvent.setup();
+    authMocks.hasResearcherToken.mockReturnValue(true);
+    apiMocks.getCurrentResearcher.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000001", email: "owner@example.com", display_name: "Project Owner" });
     apiMocks.listProjectMembers.mockResolvedValue({
       items: [{
         id: "00000000-0000-4000-8000-000000000031",
