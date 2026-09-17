@@ -16,4 +16,12 @@ describe("large-session replay window", () => {
   it("rejects a window that cannot preserve both endpoints", () => {
     expect(() => windowReplaySamples([1, 2, 3], 1)).toThrow("at least two");
   });
+
+  it("keeps a 100k-sample replay projection inside its interaction budget", () => {
+    const samples = Array.from({ length: 100_000 }, (_, index) => ({ x: index / 100_000, y: .5 }));
+    const started = performance.now();
+    for (let run = 0; run < 20; run += 1) windowReplaySamples(samples);
+    const elapsed = performance.now() - started;
+    expect(elapsed).toBeLessThan(250);
+  });
 });

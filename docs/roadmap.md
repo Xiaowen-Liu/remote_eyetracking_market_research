@@ -43,8 +43,10 @@ gaze estimation has laboratory-grade accuracy.
 3. **Accessibility and performance pass** — semantic analysis tabs, a global
    reduced-motion mode, keyboard-complete replay shortcuts, and screen-reader
    playback announcements, CI-enforced gzip bundle budgets, and bounded replay
-   rendering for large gaze datasets are implemented. Remaining work: virtualized
-   raw-sample inspection and runtime interaction budgets.
+   rendering for large gaze datasets are implemented. A 100k-sample runtime gate
+   and browser-native containment for off-screen raw rows now cover the primary
+   interaction path. Remaining work: full DOM row virtualization if raw inspection
+   grows beyond the current 250-row safety cap.
 
 ## Deliberate boundaries
 

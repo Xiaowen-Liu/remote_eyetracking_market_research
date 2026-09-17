@@ -33,3 +33,9 @@ per frame. The first and last samples and the full temporal range are preserved;
 the immutable artifact, AOI computations, raw-data views, and exports continue to
 use the complete dataset. This prevents a long recording from turning the 50 ms
 playback update into an unbounded projection and heatmap loop.
+
+The test suite also enforces a deliberately generous runtime ceiling: twenty
+render-window calculations over a 100,000-sample fixture must finish within
+250 ms in CI. This catches accidental quadratic work without pretending that a
+shared runner is a precision performance laboratory. Raw sample rows use browser
+rendering containment so off-screen rows do not incur paint and layout work.

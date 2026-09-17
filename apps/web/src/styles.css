@@ -173,6 +173,7 @@ main { width: min(1180px, 92vw); margin: 0 auto; padding: 28px 0 72px; }
 .collector-review-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
 .replay-shortcut-help { margin: 0 0 18px; padding: 9px 12px; color: #536058; background: #f2f5ef; border: 1px solid #dce4d8; border-radius: 8px; font-size: 12px; }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+.raw-sample-table tbody tr { content-visibility: auto; contain-intrinsic-size: auto 44px; }
 .collector-review h2 { margin: 6px 0 8px; font: 500 26px/1.2 Georgia, serif; }
 .collector-review h3 { margin: 0 0 13px; font: 500 20px/1.2 Georgia, serif; }
 .collector-review-heading p:not(.eyebrow) { max-width: 610px; margin: 0; color: #657069; font-size: 13px; line-height: 1.5; }
