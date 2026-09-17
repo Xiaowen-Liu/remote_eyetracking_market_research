@@ -7,6 +7,8 @@
     "dev:web": "vite --config apps/web/vite.config.ts",
     "build:collector": "vite build --config collector-extension/vite.config.ts && WEBGAZE_CAMERA_RUNTIME=1 vite build --config collector-extension/vite.config.ts && mkdir -p collector-extension/wasm && cp node_modules/@mediapipe/tasks-vision/wasm/* collector-extension/wasm/",
     "build:web": "tsc -p apps/web/tsconfig.json && vite build --config apps/web/vite.config.ts",
+    "check:bundle-budget": "node scripts/check-web-bundle-budget.mjs",
+    "build:web:budget": "npm run build:web && npm run check:bundle-budget",
     "db:migrate": "cd apps/api && ../../.venv/bin/alembic upgrade head",
     "db:seed": ".venv/bin/python -m webgaze_api.seed",
     "retention:preview": "PYTHONPATH=apps/api .venv/bin/python apps/api/scripts/run_retention.py --dry-run",

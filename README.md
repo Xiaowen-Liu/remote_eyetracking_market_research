@@ -49,6 +49,7 @@ flowchart LR
 
 More detailed reasoning is in the [architecture notes](docs/architecture.md) and [ADRs](docs/adr).
 Current delivery status and remaining production gaps are tracked in the [roadmap](docs/roadmap.md).
+The researcher dashboard also has a CI-enforced [web performance budget](docs/performance-budget.md).
 
 ## Features implemented
 
