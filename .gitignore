@@ -1,6 +1,9 @@
 .DS_Store
 node_modules/
 dist/
+!collector-extension/dist/
+!collector-extension/dist/content.js
+!collector-extension/dist/camera.js
 .venv/
 .env
 .pytest_cache/

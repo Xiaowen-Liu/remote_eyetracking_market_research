@@ -16,10 +16,14 @@ calibration-dependent and is not a validated attention measurement.
 
 ## Load locally
 
-1. Run `npm run build:collector`.
+1. Pull the latest `main`. The repository includes the reviewed collector
+   bundle used by Chrome. Contributors changing extension source should
+   regenerate it with `npm run build:collector` before committing.
 2. Open `chrome://extensions`, enable Developer mode, and choose **Load
    unpacked**.
-3. Select `collector-extension/` (not `collector-extension/dist/`).
+3. Select `collector-extension/` (not `collector-extension/dist/`). If it was
+   already loaded, click **Reload**, then refresh every open study/task tab so
+   Chrome replaces the previously injected content script.
 4. In the researcher app, publish a study that has **experimental webcam gaze**
    enabled, then copy its participant link.
 5. Open the target page for the study, open the extension popup, paste that
