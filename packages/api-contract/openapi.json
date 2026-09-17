@@ -145,6 +145,14 @@
       },
       "AnalysisResultResponse": {
         "properties": {
+          "aoi_metrics": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Aoi Metrics",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -154,6 +162,14 @@
             "additionalProperties": true,
             "title": "Diagnostics",
             "type": "object"
+          },
+          "fixations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Fixations",
+            "type": "array"
           },
           "id": {
             "format": "uuid",
@@ -187,6 +203,8 @@
           "session_id",
           "quality",
           "task_metrics",
+          "fixations",
+          "aoi_metrics",
           "diagnostics",
           "created_at"
         ],

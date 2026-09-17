@@ -23,11 +23,7 @@ export function savePendingBatches(
   store.setItem(queueKey(sessionId), JSON.stringify(batches));
 }
 
-export function enqueueBatch(
-  store: QueueStore,
-  sessionId: string,
-  batch: GazeBatchCreate,
-) {
+export function enqueueBatch(store: QueueStore, sessionId: string, batch: GazeBatchCreate) {
   savePendingBatches(store, sessionId, [...pendingBatches(store, sessionId), batch]);
 }
 

@@ -1,7 +1,20 @@
 import type { CollectorGazeSample } from "./collectorArtifact";
 
-export type AoiRectangle = { id: string; label: string; x: number; y: number; width: number; height: number };
-export type AoiVisit = { startedAt: string; endedAt: string; durationMs: number; samples: CollectorGazeSample[]; meaningful: boolean };
+export type AoiRectangle = {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+export type AoiVisit = {
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  samples: CollectorGazeSample[];
+  meaningful: boolean;
+};
 export type AoiMetric = {
   aoi: AoiRectangle;
   sampleCount: number;
@@ -44,13 +57,33 @@ function timestamp(sample: CollectorGazeSample, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function calculateAoiMetrics(aois: AoiRectangle[], samples: CollectorGazeSample[], sessionStartedAt: string): AoiMetric[] {
+export function calculateAoiMetrics(
+  aois: AoiRectangle[],
+  samples: CollectorGazeSample[],
+  sessionStartedAt: string,
+): AoiMetric[] {
   const sessionStart = Date.parse(sessionStartedAt);
-  const ordered = samples.map((sample, index) => ({ sample, time: timestamp(sample, sessionStart + index * 100) })).sort((a, b) => a.time - b.time);
-  const totalDwell = Math.max(1, ordered.slice(1).reduce((sum, item, index) => sum + Math.min(250, Math.max(0, item.time - ordered[index].time)), 0));
+  const ordered = samples
+    .map((sample, index) => ({ sample, time: timestamp(sample, sessionStart + index * 100) }))
+    .sort((a, b) => a.time - b.time);
+  const totalDwell = Math.max(
+    1,
+    ordered
+      .slice(1)
+      .reduce(
+        (sum, item, index) => sum + Math.min(250, Math.max(0, item.time - ordered[index].time)),
+        0,
+      ),
+  );
   return aois.map((aoi) => {
-    const matching = ordered.filter(({ sample }) => sample.x >= aoi.x && sample.x <= aoi.x + aoi.width && sample.y >= aoi.y && sample.y <= aoi.y + aoi.height);
-    const groups: typeof matching[] = [];
+    const matching = ordered.filter(
+      ({ sample }) =>
+        sample.x >= aoi.x &&
+        sample.x <= aoi.x + aoi.width &&
+        sample.y >= aoi.y &&
+        sample.y <= aoi.y + aoi.height,
+    );
+    const groups: (typeof matching)[] = [];
     for (const item of matching) {
       const group = groups.at(-1);
       if (!group || item.time - group.at(-1)!.time > visitGapMs) groups.push([item]);
@@ -60,7 +93,13 @@ export function calculateAoiMetrics(aois: AoiRectangle[], samples: CollectorGaze
       const started = group[0].time;
       const ended = group.at(-1)!.time;
       const durationMs = Math.max(100, ended - started + 100);
-      return { startedAt: new Date(started).toISOString(), endedAt: new Date(ended).toISOString(), durationMs, samples: group.map(({ sample }) => sample), meaningful: durationMs >= meaningfulVisitMs };
+      return {
+        startedAt: new Date(started).toISOString(),
+        endedAt: new Date(ended).toISOString(),
+        durationMs,
+        samples: group.map(({ sample }) => sample),
+        meaningful: durationMs >= meaningfulVisitMs,
+      };
     });
     const dwellMs = visits.reduce((sum, visit) => sum + visit.durationMs, 0);
     const meaningful = visits.find((visit) => visit.meaningful) ?? null;
@@ -70,7 +109,9 @@ export function calculateAoiMetrics(aois: AoiRectangle[], samples: CollectorGaze
       dwellMs,
       dwellProportion: dwellMs / totalDwell,
       ttffMs: matching.length ? Math.max(0, matching[0].time - sessionStart) : null,
-      firstMeaningfulLatencyMs: meaningful ? Math.max(0, Date.parse(meaningful.startedAt) - sessionStart) : null,
+      firstMeaningfulLatencyMs: meaningful
+        ? Math.max(0, Date.parse(meaningful.startedAt) - sessionStart)
+        : null,
       firstMeaningfulDurationMs: meaningful?.durationMs ?? null,
       revisitCount: Math.max(0, visits.length - 1),
       visits,
@@ -92,7 +133,12 @@ function median(values: number[]) {
 
 export function aggregateAoiMetrics(
   aois: AoiRectangle[],
-  sessions: Array<{ sessionId: string; startedAt: string; endedAt?: string; samples: CollectorGazeSample[] }>,
+  sessions: Array<{
+    sessionId: string;
+    startedAt: string;
+    endedAt?: string;
+    samples: CollectorGazeSample[];
+  }>,
   isApplicable: (aoi: AoiRectangle, sessionId: string) => boolean = () => true,
 ): AggregateAoiMetric[] {
   return aois.map((aoi) => {
@@ -105,9 +151,13 @@ export function aggregateAoiMetrics(
         sessionEndedAt: session.endedAt,
       }));
     const noticed = sessionMetrics.filter((metric) => metric.sampleCount > 0);
-    const ttff = noticed.flatMap((metric) => metric.ttffMs == null ? [] : [metric.ttffMs]);
-    const latency = noticed.flatMap((metric) => metric.firstMeaningfulLatencyMs == null ? [] : [metric.firstMeaningfulLatencyMs]);
-    const duration = noticed.flatMap((metric) => metric.firstMeaningfulDurationMs == null ? [] : [metric.firstMeaningfulDurationMs]);
+    const ttff = noticed.flatMap((metric) => (metric.ttffMs == null ? [] : [metric.ttffMs]));
+    const latency = noticed.flatMap((metric) =>
+      metric.firstMeaningfulLatencyMs == null ? [] : [metric.firstMeaningfulLatencyMs],
+    );
+    const duration = noticed.flatMap((metric) =>
+      metric.firstMeaningfulDurationMs == null ? [] : [metric.firstMeaningfulDurationMs],
+    );
     return {
       aoi,
       applicableSessions: sessionMetrics.length,
@@ -118,7 +168,9 @@ export function aggregateAoiMetrics(
       medianTtffMs: median(ttff),
       medianFirstMeaningfulLatencyMs: median(latency),
       averageFirstMeaningfulDurationMs: duration.length ? average(duration) : null,
-      revisitRate: sessionMetrics.length ? sessionMetrics.filter((metric) => metric.revisitCount > 0).length / sessionMetrics.length : 0,
+      revisitRate: sessionMetrics.length
+        ? sessionMetrics.filter((metric) => metric.revisitCount > 0).length / sessionMetrics.length
+        : 0,
       sessionMetrics,
     };
   });

@@ -18,6 +18,9 @@
     "generate:openapi": ".venv/bin/python apps/api/scripts/export_openapi.py",
     "generate:types": "openapi-typescript packages/api-contract/openapi.json -o packages/api-contract/src/schema.d.ts",
     "generate:contract": "npm run generate:openapi && npm run generate:types",
+    "lint": "eslint .",
+    "format:check": "prettier --check \"{apps,collector-extension,e2e,test,scripts}/**/*.{js,mjs,ts,tsx}\" \"*.{js,mjs,json,md}\"",
+    "format": "prettier --write \"{apps,collector-extension,e2e,test,scripts}/**/*.{js,mjs,ts,tsx}\" \"*.{js,mjs,json,md}\"",
     "test:extension": "node --test test/session.test.js test/collector-artifact.test.js test/study-session.test.js test/boundary-calibration.test.js test/production-smoke.test.js",
     "test:web": "vitest run --config apps/web/vite.config.ts",
     "test:api": ".venv/bin/pytest apps/api/tests -q --cov=webgaze_api --cov-report=term-missing",
@@ -28,6 +31,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
@@ -35,9 +39,14 @@
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
     "jsdom": "^26.1.0",
     "openapi-typescript": "^7.10.1",
+    "prettier": "^3.9.7",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.70.0",
     "vite": "^7.1.4",
     "vitest": "^3.2.4"
   },

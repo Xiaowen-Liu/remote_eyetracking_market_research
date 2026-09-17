@@ -52,7 +52,10 @@ test("connects a participant link and arms the study page after consent", async 
       return;
     }
 
-    await route.fulfill({ status: 404, json: { error: { message: "Unexpected E2E API request" } } });
+    await route.fulfill({
+      status: 404,
+      json: { error: { message: "Unexpected E2E API request" } },
+    });
   });
   await context.route("https://study-target.test/**", async (route) => {
     await route.fulfill({
@@ -66,16 +69,22 @@ test("connects a participant link and arms the study page after consent", async 
 
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html`);
-  await popup.getByLabel("Participant link").fill(`https://webgaze-research.vercel.app/participate/${participantToken}`);
+  await popup
+    .getByLabel("Participant link")
+    .fill(`https://webgaze-research.vercel.app/participate/${participantToken}`);
   await popup.getByLabel("API base").fill(apiBase);
   await popup.getByRole("button", { name: "Connect study" }).click();
 
   await expect(popup.getByRole("heading", { name: "Extension E2E study" })).toBeVisible();
-  await expect(popup.getByText("I consent to coordinate-only gaze estimation for this automated test.")).toBeVisible();
+  await expect(
+    popup.getByText("I consent to coordinate-only gaze estimation for this automated test."),
+  ).toBeVisible();
   await popup.getByLabel("I have read and accept this consent.").check();
 
   await target.bringToFront();
-  const accepted = await popup.evaluate(() => chrome.runtime.sendMessage({ type: "ACCEPT_CONSENT" }));
+  const accepted = await popup.evaluate(() =>
+    chrome.runtime.sendMessage({ type: "ACCEPT_CONSENT" }),
+  );
   expect(accepted.ok).toBe(true);
 
   await expect(target.locator("#webgaze-collector-overlay")).toBeVisible();
@@ -130,12 +139,14 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
             screenshots_enabled: false,
             sample_interval_ms: 100,
           },
-          tasks: [{
-            position: 1,
-            title: "Inspect navigation",
-            prompt: "Find the navigation landmark.",
-            start_url: targetUrl,
-          }],
+          tasks: [
+            {
+              position: 1,
+              title: "Inspect navigation",
+              prompt: "Find the navigation landmark.",
+              start_url: targetUrl,
+            },
+          ],
         },
       });
       return;
@@ -161,8 +172,10 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
       });
       return;
     }
-    if (path === `/api/v1/participant-sessions/${sessionId}/task-runs`
-      && request.method() === "POST") {
+    if (
+      path === `/api/v1/participant-sessions/${sessionId}/task-runs` &&
+      request.method() === "POST"
+    ) {
       await route.fulfill({ json: { id: taskRunId, task_position: 1, lifecycle: "running" } });
       return;
     }
@@ -170,7 +183,10 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
       gazeBodies.push(request.postDataJSON());
       if (failFirstGazeRequest) {
         failFirstGazeRequest = false;
-        await route.fulfill({ status: 503, json: { error: { message: "Temporary ingestion failure" } } });
+        await route.fulfill({
+          status: 503,
+          json: { error: { message: "Temporary ingestion failure" } },
+        });
       } else {
         await route.fulfill({ json: { accepted: true } });
       }
@@ -184,7 +200,10 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
       await route.fulfill({ json: { lifecycle: "submitted", analysis_job_id: "analysis-e2e" } });
       return;
     }
-    await route.fulfill({ status: 404, json: { error: { message: `Unexpected E2E API request: ${path}` } } });
+    await route.fulfill({
+      status: 404,
+      json: { error: { message: `Unexpected E2E API request: ${path}` } },
+    });
   });
   await context.route("https://lifecycle-target.test/**", async (route) => {
     await route.fulfill({
@@ -202,20 +221,24 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
   await popup.getByRole("button", { name: "Connect study" }).click();
   await popup.getByLabel("I have read and accept this consent.").check();
   await target.bringToFront();
-  expect((await popup.evaluate(() => chrome.runtime.sendMessage({ type: "ACCEPT_CONSENT" }))).ok).toBe(true);
+  expect(
+    (await popup.evaluate(() => chrome.runtime.sendMessage({ type: "ACCEPT_CONSENT" }))).ok,
+  ).toBe(true);
   await expect(target.locator("#webgaze-collector-overlay")).toBeVisible();
 
-  const calibration = await popup.evaluate(() => chrome.runtime.sendMessage({
-    type: "CALIBRATION_COMPLETED",
-    calibration: {
-      startedAt: "2026-09-13T12:00:00.000Z",
-      completedAt: "2026-09-13T12:00:08.000Z",
-      observedSampleCount: 45,
-      errorPx: 38,
-      qualityGrade: "strong",
-      rms: 0.03,
-    },
-  }));
+  const calibration = await popup.evaluate(() =>
+    chrome.runtime.sendMessage({
+      type: "CALIBRATION_COMPLETED",
+      calibration: {
+        startedAt: "2026-09-13T12:00:00.000Z",
+        completedAt: "2026-09-13T12:00:08.000Z",
+        observedSampleCount: 45,
+        errorPx: 38,
+        qualityGrade: "strong",
+        rms: 0.03,
+      },
+    }),
+  );
   expect(calibration).toMatchObject({ ok: true, accepted: true, state: { phase: "ready" } });
   expect(calibrationBodies[0]).toMatchObject({
     attempt: 1,
@@ -224,22 +247,33 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
   });
 
   await target.bringToFront();
-  const started = await popup.evaluate(() => chrome.runtime.sendMessage({ type: "START_STUDY_TASK" }));
+  const started = await popup.evaluate(() =>
+    chrome.runtime.sendMessage({ type: "START_STUDY_TASK" }),
+  );
   expect(started).toMatchObject({ ok: true, state: { phase: "running" } });
-  await expect(target.getByText("Collecting coordinate estimates for Inspect navigation.")).toBeVisible();
+  await expect(
+    target.getByText("Collecting coordinate estimates for Inspect navigation."),
+  ).toBeVisible();
 
-  const sampleBatch = (offset: number) => Array.from({ length: 12 }, (_, index) => ({
-    x: 0.25 + index * 0.02,
-    y: 0.35 + index * 0.015,
-    confidence: 0.88,
-    at: new Date(Date.parse("2026-09-13T12:00:10.000Z") + (offset + index) * 100).toISOString(),
-    url: targetUrl,
-    viewport: { width: 1280, height: 720 },
-    scroll: { x: 0, y: 0 },
-  }));
-  const firstBatch = await popup.evaluate((samples) => chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }), sampleBatch(0));
+  const sampleBatch = (offset: number) =>
+    Array.from({ length: 12 }, (_, index) => ({
+      x: 0.25 + index * 0.02,
+      y: 0.35 + index * 0.015,
+      confidence: 0.88,
+      at: new Date(Date.parse("2026-09-13T12:00:10.000Z") + (offset + index) * 100).toISOString(),
+      url: targetUrl,
+      viewport: { width: 1280, height: 720 },
+      scroll: { x: 0, y: 0 },
+    }));
+  const firstBatch = await popup.evaluate(
+    (samples) => chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }),
+    sampleBatch(0),
+  );
   expect(firstBatch).toMatchObject({ ok: false, error: "Temporary ingestion failure" });
-  const secondBatch = await popup.evaluate((samples) => chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }), sampleBatch(12));
+  const secondBatch = await popup.evaluate(
+    (samples) => chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }),
+    sampleBatch(12),
+  );
   expect(secondBatch).toMatchObject({ ok: true });
 
   expect(gazeBodies.map((body) => body.sequence)).toEqual([0, 0, 1]);
@@ -247,12 +281,21 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
   expect(gazeBodies[2].client_batch_id).not.toBe(gazeBodies[1].client_batch_id);
 
   await target.bringToFront();
-  const completed = await popup.evaluate(() => chrome.runtime.sendMessage({ type: "COMPLETE_STUDY_TASK" }));
-  expect(completed).toMatchObject({ ok: true, state: { phase: "ready", completedTasks: 1, nextTask: null } });
-  const submitted = await popup.evaluate(() => chrome.runtime.sendMessage({ type: "SUBMIT_STUDY" }));
+  const completed = await popup.evaluate(() =>
+    chrome.runtime.sendMessage({ type: "COMPLETE_STUDY_TASK" }),
+  );
+  expect(completed).toMatchObject({
+    ok: true,
+    state: { phase: "ready", completedTasks: 1, nextTask: null },
+  });
+  const submitted = await popup.evaluate(() =>
+    chrome.runtime.sendMessage({ type: "SUBMIT_STUDY" }),
+  );
   expect(submitted).toMatchObject({ ok: true, state: { phase: "submitted" } });
 
-  const downloaded = await popup.evaluate(() => chrome.runtime.sendMessage({ type: "DOWNLOAD_ARTIFACT" }));
+  const downloaded = await popup.evaluate(() =>
+    chrome.runtime.sendMessage({ type: "DOWNLOAD_ARTIFACT" }),
+  );
   expect(downloaded).toMatchObject({ ok: true, state: { phase: "submitted" } });
   expect(downloaded.artifact).toMatchObject({
     schemaVersion: "1.0",
@@ -262,16 +305,26 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
     privacy: { rawCameraVideo: false, eventCollection: true, visibleTabSnapshots: false },
   });
   expect(downloaded.artifact.gazeSamples).toHaveLength(24);
-  for (const secret of ["apiBase", "accessToken", "participantToken", "protocol", "pendingBatches", "taskRun", "lastError"]) {
+  for (const secret of [
+    "apiBase",
+    "accessToken",
+    "participantToken",
+    "protocol",
+    "pendingBatches",
+    "taskRun",
+    "lastError",
+  ]) {
     expect(downloaded.artifact).not.toHaveProperty(secret);
   }
 
-  expect(authorizedPaths).toEqual(expect.arrayContaining([
-    `/api/v1/participant-sessions/${sessionId}/consent`,
-    `/api/v1/participant-sessions/${sessionId}/calibrations`,
-    `/api/v1/participant-sessions/${sessionId}/task-runs`,
-    `/api/v1/participant-sessions/${sessionId}/gaze-batches`,
-    `/api/v1/participant-sessions/${sessionId}/task-runs/${taskRunId}/complete`,
-    `/api/v1/participant-sessions/${sessionId}/submit`,
-  ]));
+  expect(authorizedPaths).toEqual(
+    expect.arrayContaining([
+      `/api/v1/participant-sessions/${sessionId}/consent`,
+      `/api/v1/participant-sessions/${sessionId}/calibrations`,
+      `/api/v1/participant-sessions/${sessionId}/task-runs`,
+      `/api/v1/participant-sessions/${sessionId}/gaze-batches`,
+      `/api/v1/participant-sessions/${sessionId}/task-runs/${taskRunId}/complete`,
+      `/api/v1/participant-sessions/${sessionId}/submit`,
+    ]),
+  );
 });

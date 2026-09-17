@@ -24,7 +24,12 @@ function checkoutSnapshot(step: "plans" | "payment"): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(body)}`;
 }
 
-function sampleCluster(centerX: number, centerY: number, count: number, offsetMs: number): CollectorGazeSample[] {
+function sampleCluster(
+  centerX: number,
+  centerY: number,
+  count: number,
+  offsetMs: number,
+): CollectorGazeSample[] {
   return Array.from({ length: count }, (_, index) => ({
     x: Math.min(0.98, Math.max(0.02, centerX + ((index % 5) - 2) * 0.012)),
     y: Math.min(0.98, Math.max(0.02, centerY + ((Math.floor(index / 5) % 5) - 2) * 0.012)),
@@ -44,12 +49,36 @@ export const syntheticCollectorReplay: CollectorArtifact = {
   captureSnapshots: true,
   events: [
     { type: "page-open", url, at: new Date(start).toISOString() },
-    { type: "scroll-settled", url, at: new Date(start + 6_000).toISOString(), detail: { value: { x: 0, y: 0 } } },
-    { type: "dom-change", url, at: new Date(start + 10_000).toISOString(), detail: { value: { count: 3 } } },
+    {
+      type: "scroll-settled",
+      url,
+      at: new Date(start + 6_000).toISOString(),
+      detail: { value: { x: 0, y: 0 } },
+    },
+    {
+      type: "dom-change",
+      url,
+      at: new Date(start + 10_000).toISOString(),
+      detail: { value: { count: 3 } },
+    },
   ],
   snapshots: [
-    { at: new Date(start + 1_000).toISOString(), url, reason: "page-open", dataUrl: checkoutSnapshot("plans"), viewport: { width: 1280, height: 720 }, scroll: { x: 0, y: 0 } },
-    { at: new Date(start + 8_000).toISOString(), url, reason: "scroll-settled", dataUrl: checkoutSnapshot("payment"), viewport: { width: 1280, height: 720 }, scroll: { x: 0, y: 0 } },
+    {
+      at: new Date(start + 1_000).toISOString(),
+      url,
+      reason: "page-open",
+      dataUrl: checkoutSnapshot("plans"),
+      viewport: { width: 1280, height: 720 },
+      scroll: { x: 0, y: 0 },
+    },
+    {
+      at: new Date(start + 8_000).toISOString(),
+      url,
+      reason: "scroll-settled",
+      dataUrl: checkoutSnapshot("payment"),
+      viewport: { width: 1280, height: 720 },
+      scroll: { x: 0, y: 0 },
+    },
   ],
   gazeSamples: [...sampleCluster(0.39, 0.53, 34, 1_200), ...sampleCluster(0.8, 0.7, 29, 8_100)],
   privacy: { rawCameraVideo: false, eventCollection: true, visibleTabSnapshots: true },

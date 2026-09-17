@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  enqueueBatch,
-  flushPendingBatches,
-  pendingBatches,
-} from "./collection";
+import { enqueueBatch, flushPendingBatches, pendingBatches } from "./collection";
 import type { GazeBatchCreate } from "./api";
 
 function batch(sequence: number): GazeBatchCreate {
@@ -14,16 +10,18 @@ function batch(sequence: number): GazeBatchCreate {
     schema_version: "1.0",
     captured_from: "2026-09-07T00:00:00Z",
     captured_to: "2026-09-07T00:00:00Z",
-    samples: [{
-      timestamp: "2026-09-07T00:00:00Z",
-      x_normalized: 0.2,
-      y_normalized: 0.8,
-      confidence: 0.9,
-      scroll_x: 0,
-      scroll_y: 0,
-      viewport_width: 1280,
-      viewport_height: 720,
-    }],
+    samples: [
+      {
+        timestamp: "2026-09-07T00:00:00Z",
+        x_normalized: 0.2,
+        y_normalized: 0.8,
+        confidence: 0.9,
+        scroll_x: 0,
+        scroll_y: 0,
+        viewport_width: 1280,
+        viewport_height: 720,
+      },
+    ],
   };
 }
 

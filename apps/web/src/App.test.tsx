@@ -37,7 +37,10 @@ const authMocks = vi.hoisted(() => ({
 vi.mock("./api", () => ({
   api: apiMocks,
   ApiClientError: class ApiClientError extends Error {
-    constructor(message: string, readonly code: string) {
+    constructor(
+      message: string,
+      readonly code: string,
+    ) {
       super(message);
     }
   },
@@ -102,7 +105,9 @@ describe("Study Builder", () => {
     });
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Sign in to your studies" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Sign in to your studies" }),
+    ).toBeInTheDocument();
     await user.type(screen.getByLabelText("Email"), "researcher@example.com");
     await user.type(screen.getByLabelText("Password"), "a-secure-demo-password");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
@@ -162,7 +167,9 @@ describe("Study Builder", () => {
     await user.click(screen.getByRole("button", { name: "Projects" }));
 
     expect(screen.getByRole("heading", { name: "Projects" })).toBeInTheDocument();
-    expect(screen.getByText("Organize studies, participant protocols, and analysis work in one place.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Organize studies, participant protocols, and analysis work in one place."),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Open project" })).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Team & access" })).not.toBeInTheDocument();
   });
@@ -199,33 +206,41 @@ describe("Study Builder", () => {
   it("lets an owner inspect project members and audit activity", async () => {
     const user = userEvent.setup();
     authMocks.hasResearcherToken.mockReturnValue(true);
-    apiMocks.getCurrentResearcher.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000001", email: "owner@example.com", display_name: "Project Owner" });
+    apiMocks.getCurrentResearcher.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000001",
+      email: "owner@example.com",
+      display_name: "Project Owner",
+    });
     apiMocks.listProjectMembers.mockResolvedValue({
-      items: [{
-        id: "00000000-0000-4000-8000-000000000030",
-        project_id: "00000000-0000-4000-8000-000000000010",
-        researcher: {
-          id: "00000000-0000-4000-8000-000000000001",
-          email: "owner@example.com",
-          display_name: "Project Owner",
+      items: [
+        {
+          id: "00000000-0000-4000-8000-000000000030",
+          project_id: "00000000-0000-4000-8000-000000000010",
+          researcher: {
+            id: "00000000-0000-4000-8000-000000000001",
+            email: "owner@example.com",
+            display_name: "Project Owner",
+          },
+          role: "owner",
+          invited_by: "00000000-0000-4000-8000-000000000001",
+          created_at: "2026-09-07T00:00:00Z",
+          updated_at: "2026-09-07T00:00:00Z",
         },
-        role: "owner",
-        invited_by: "00000000-0000-4000-8000-000000000001",
-        created_at: "2026-09-07T00:00:00Z",
-        updated_at: "2026-09-07T00:00:00Z",
-      }],
+      ],
       total: 1,
     });
     apiMocks.listProjectAuditEvents.mockResolvedValue({
-      items: [{
-        id: "00000000-0000-4000-8000-000000000040",
-        actor_id: "00000000-0000-4000-8000-000000000001",
-        action: "project.created",
-        resource_type: "project",
-        resource_id: "00000000-0000-4000-8000-000000000010",
-        occurred_at: "2026-09-07T00:00:00Z",
-        event_metadata: {},
-      }],
+      items: [
+        {
+          id: "00000000-0000-4000-8000-000000000040",
+          actor_id: "00000000-0000-4000-8000-000000000001",
+          action: "project.created",
+          resource_type: "project",
+          resource_id: "00000000-0000-4000-8000-000000000010",
+          occurred_at: "2026-09-07T00:00:00Z",
+          event_metadata: {},
+        },
+      ],
       total: 1,
     });
     render(<App />);
@@ -242,7 +257,11 @@ describe("Study Builder", () => {
   it("shows an unknown researcher as a pending invitation", async () => {
     const user = userEvent.setup();
     authMocks.hasResearcherToken.mockReturnValue(true);
-    apiMocks.getCurrentResearcher.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000001", email: "owner@example.com", display_name: "Project Owner" });
+    apiMocks.getCurrentResearcher.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000001",
+      email: "owner@example.com",
+      display_name: "Project Owner",
+    });
     apiMocks.inviteProjectMember.mockResolvedValue({
       outcome: "invitation_pending",
       membership: null,
@@ -263,19 +282,21 @@ describe("Study Builder", () => {
     apiMocks.listProjectInvitations
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValue({
-        items: [{
-          id: "00000000-0000-4000-8000-000000000050",
-          project_id: "00000000-0000-4000-8000-000000000010",
-          email: "future@example.com",
-          role: "viewer",
-          invited_by: "00000000-0000-4000-8000-000000000001",
-          status: "pending",
-          expires_at: "2026-09-30T00:00:00Z",
-          accepted_at: null,
-          cancelled_at: null,
-          created_at: "2026-09-16T00:00:00Z",
-          updated_at: "2026-09-16T00:00:00Z",
-        }],
+        items: [
+          {
+            id: "00000000-0000-4000-8000-000000000050",
+            project_id: "00000000-0000-4000-8000-000000000010",
+            email: "future@example.com",
+            role: "viewer",
+            invited_by: "00000000-0000-4000-8000-000000000001",
+            status: "pending",
+            expires_at: "2026-09-30T00:00:00Z",
+            accepted_at: null,
+            cancelled_at: null,
+            created_at: "2026-09-16T00:00:00Z",
+            updated_at: "2026-09-16T00:00:00Z",
+          },
+        ],
         total: 1,
       });
     render(<App />);
@@ -286,7 +307,9 @@ describe("Study Builder", () => {
     await user.type(await screen.findByLabelText("Email"), "future@example.com");
     await user.click(screen.getByRole("button", { name: "Invite member" }));
 
-    expect(await screen.findByText("Invitation pending for future@example.com.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Invitation pending for future@example.com."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Waiting for 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel invitation" })).toBeInTheDocument();
   });
@@ -294,21 +317,27 @@ describe("Study Builder", () => {
   it("requires the project name before transferring ownership", async () => {
     const user = userEvent.setup();
     authMocks.hasResearcherToken.mockReturnValue(true);
-    apiMocks.getCurrentResearcher.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000001", email: "owner@example.com", display_name: "Project Owner" });
+    apiMocks.getCurrentResearcher.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000001",
+      email: "owner@example.com",
+      display_name: "Project Owner",
+    });
     apiMocks.listProjectMembers.mockResolvedValue({
-      items: [{
-        id: "00000000-0000-4000-8000-000000000031",
-        project_id: "00000000-0000-4000-8000-000000000010",
-        researcher: {
-          id: "00000000-0000-4000-8000-000000000002",
-          email: "editor@example.com",
-          display_name: "Study Editor",
+      items: [
+        {
+          id: "00000000-0000-4000-8000-000000000031",
+          project_id: "00000000-0000-4000-8000-000000000010",
+          researcher: {
+            id: "00000000-0000-4000-8000-000000000002",
+            email: "editor@example.com",
+            display_name: "Study Editor",
+          },
+          role: "editor",
+          invited_by: "00000000-0000-4000-8000-000000000001",
+          created_at: "2026-09-07T00:00:00Z",
+          updated_at: "2026-09-07T00:00:00Z",
         },
-        role: "editor",
-        invited_by: "00000000-0000-4000-8000-000000000001",
-        created_at: "2026-09-07T00:00:00Z",
-        updated_at: "2026-09-07T00:00:00Z",
-      }],
+      ],
       total: 1,
     });
     render(<App />);
@@ -334,7 +363,9 @@ describe("Study Builder", () => {
     });
     render(<App />);
 
-    expect(await screen.findByText("Viewer access is read-only. An owner can change your project role.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Viewer access is read-only. An owner can change your project role."),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Study title")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Publish study" })).not.toBeInTheDocument();
   });
@@ -386,7 +417,9 @@ describe("Study Builder", () => {
       "title",
       "Edit study to add tasks",
     );
-    expect(screen.getByText("This version is live. Select Edit study to change its tasks.")).toBeInTheDocument();
+    expect(
+      screen.getByText("This version is live. Select Edit study to change its tasks."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Publish study" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Copy participant link" }));

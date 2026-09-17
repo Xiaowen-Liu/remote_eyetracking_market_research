@@ -1,8 +1,7 @@
 import { pathToFileURL } from "node:url";
 
 export const DEFAULT_WEB_URL = "https://webgaze-research.vercel.app";
-export const DEFAULT_API_URL =
-  "https://remoteeyetrackingmarketresearch-production.up.railway.app";
+export const DEFAULT_API_URL = "https://remoteeyetrackingmarketresearch-production.up.railway.app";
 
 function normalizedUrl(value) {
   return value.replace(/\/$/, "");

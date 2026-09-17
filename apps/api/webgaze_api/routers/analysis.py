@@ -164,7 +164,7 @@ def create_synthetic_study_results(
         },
         task_metrics={"tasks": metrics},
         fixations=[],
-        aoi_metrics={},
+        aoi_metrics=[],
         diagnostics={
             "source": "synthetic-demo",
             "disclosure": "Generated demo data; not collected from a person or camera.",
