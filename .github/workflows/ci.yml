@@ -25,6 +25,7 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
+      - run: npm run check:collector-bundle
       - run: npm run build:web:budget
       - run: npm run generate:contract
       - name: Verify generated API contract is committed

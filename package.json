@@ -6,6 +6,7 @@
   "scripts": {
     "dev:web": "vite --config apps/web/vite.config.ts",
     "build:collector": "vite build --config collector-extension/vite.config.ts && WEBGAZE_CAMERA_RUNTIME=1 vite build --config collector-extension/vite.config.ts && mkdir -p collector-extension/wasm && cp node_modules/@mediapipe/tasks-vision/wasm/* collector-extension/wasm/",
+    "check:collector-bundle": "npm run build:collector && git diff --exit-code -- collector-extension/dist/content.js collector-extension/dist/camera.js",
     "build:web": "tsc -p apps/web/tsconfig.json && vite build --config apps/web/vite.config.ts",
     "check:bundle-budget": "node scripts/check-web-bundle-budget.mjs",
     "build:web:budget": "npm run build:web && npm run check:bundle-budget",
