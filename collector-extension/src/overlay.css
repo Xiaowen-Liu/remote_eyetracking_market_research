@@ -37,7 +37,7 @@
 #webgaze-collector-overlay[data-mode="calibration-intro"] button{display:inline-block;margin:12px 6px 0;width:auto}
 #webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-secondary]{background:#e5eaf0;border-color:#e5eaf0;color:#102038}
 #webgaze-collector-overlay[data-mode="calibration-intro"] button:disabled{cursor:not-allowed;opacity:.45}
-#webgaze-collector-overlay[data-mode="calibration"][data-calibration-step="accuracy"] [data-webgaze-target]{background:#ffe24a;border-color:#18221c;box-shadow:0 0 0 7px #9bd8ff99,0 8px 26px #20362022;height:54px;width:54px}
+#webgaze-collector-overlay[data-mode="calibration"][data-calibration-step="accuracy"] [data-webgaze-target]{background:radial-gradient(circle,#ffe24a 0 57%,transparent 60%),conic-gradient(#67b7e8 var(--webgaze-accuracy-progress,0%),#d9edf9 0);border-color:#18221c;box-shadow:0 0 0 7px #9bd8ff55,0 8px 26px #20362022;height:54px;width:54px}
 /* Keep the granted camera runtime mounted and processing, but never expose its
    preview once the participant leaves camera check. */
 #webgaze-collector-overlay[data-mode="calibration-intro"] [data-webgaze-camera-canvas],
