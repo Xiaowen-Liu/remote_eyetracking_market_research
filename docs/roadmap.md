@@ -20,6 +20,7 @@ gaze estimation has laboratory-grade accuracy.
 - [x] Headless Chromium journeys for extension consent/overlay arming and researcher artifact replay
 - [x] Extension lifecycle E2E across calibration acceptance, task execution, retry-safe ingestion, submission, and credential-free export
 - [x] Vercel web deployment, Railway API/PostgreSQL deployment, OpenAPI contract generation, and CI migration checks
+- [x] Read-only production smoke automation across the web shell, API/database health, deployed contract, and CORS boundary
 
 ## Next engineering milestones
 

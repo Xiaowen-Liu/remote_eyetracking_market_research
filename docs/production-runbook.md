@@ -40,6 +40,17 @@ VITE_API_URL=https://your-api.up.railway.app
 5. Smoke-test project creation, publishing, participant-link resolution, synthetic flow, results, and export.
 6. Confirm the UI labels synthetic data as synthetic.
 
+The first four checks have a non-mutating automated counterpart:
+
+```bash
+npm run smoke:production
+npm run smoke:production -- --json
+```
+
+This command verifies the web shell, API liveness, PostgreSQL readiness, deployed
+OpenAPI paths, and the browser-to-API CORS preflight. It deliberately does not create
+projects, participant sessions, or telemetry, so it is safe to run after every deploy.
+
 ## Enabling researcher sign-in
 
 Enable authentication as a staged migration so the deployed workspace is never
