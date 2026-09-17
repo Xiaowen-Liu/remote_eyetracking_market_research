@@ -21,7 +21,7 @@
     "lint": "eslint .",
     "format:check": "prettier --check \"{apps,collector-extension,e2e,test,scripts}/**/*.{js,mjs,ts,tsx}\" \"*.{js,mjs,json,md}\"",
     "format": "prettier --write \"{apps,collector-extension,e2e,test,scripts}/**/*.{js,mjs,ts,tsx}\" \"*.{js,mjs,json,md}\"",
-    "test:extension": "node --test test/session.test.js test/collector-artifact.test.js test/study-session.test.js test/boundary-calibration.test.js test/production-smoke.test.js",
+    "test:extension": "node --test test/session.test.js test/collector-artifact.test.js test/study-session.test.js test/boundary-calibration.test.js test/content-context.test.js test/production-smoke.test.js",
     "test:web": "vitest run --config apps/web/vite.config.ts",
     "test:api": ".venv/bin/pytest apps/api/tests -q --cov=webgaze_api --cov-report=term-missing",
     "test:e2e": "npm run build:collector && playwright test",
