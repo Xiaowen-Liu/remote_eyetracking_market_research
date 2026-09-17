@@ -1,4 +1,5 @@
 export const defaultApiBase = "https://remoteeyetrackingmarketresearch-production.up.railway.app";
+export const defaultDemoTaskUrl = "https://webgaze-research.vercel.app/demo/pricing";
 
 const reservedExampleHosts = new Set(["example.com", "demo.example.com"]);
 
@@ -9,6 +10,10 @@ export function usableStudyUrl(value) {
   } catch {
     return false;
   }
+}
+
+export function resolveStudyUrl(value, fallback = defaultDemoTaskUrl) {
+  return usableStudyUrl(value) ? value : fallback;
 }
 
 export function participantToken(value) {

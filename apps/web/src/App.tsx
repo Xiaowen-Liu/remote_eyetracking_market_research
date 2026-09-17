@@ -19,6 +19,7 @@ import {
 } from "./api";
 import { ParticipantRunner, participantTokenFromPath } from "./ParticipantRunner";
 import { ExperimentalEyeTracking } from "./ExperimentalEyeTracking";
+import { DemoTaskPage } from "./DemoTaskPage";
 import { buildHeatmap, domProposalStates, gazeSamplesForSnapshot, parseCollectorArtifact, type CollectorArtifact } from "./collectorArtifact";
 import { syntheticCollectorReplay } from "./demoCollectorArtifact";
 import { AOI_MEANINGFUL_VISIT_MS, aggregateAoiMetrics, calculateAoiMetrics } from "./aoiMetrics";
@@ -35,7 +36,7 @@ const emptyDraft: StudyDraft = {
   consent_version: "v1",
   consent_text:
     "I consent to webcam-based gaze estimation for this research study.",
-  target_origins: [""],
+  target_origins: ["https://webgaze-research.vercel.app"],
   calibration_policy: {
     minimum_quality: "variable",
     allow_retry: true,
@@ -46,10 +47,10 @@ const emptyDraft: StudyDraft = {
   tasks: [
     {
       position: 1,
-      title: "Task 1",
-      prompt: "",
-      start_url: "",
-      success_url_pattern: "",
+      title: "Find pricing",
+      prompt: "Find the plan that best fits a small research team.",
+      start_url: "https://webgaze-research.vercel.app/demo/pricing",
+      success_url_pattern: "/demo/checkout",
       time_limit_ms: 120000,
       areas_of_interest: [],
     },
@@ -125,6 +126,7 @@ function aggregateTaskMetrics(results: AnalysisResult[]): TaskAggregate[] {
 }
 
 export function App() {
+  if (window.location.pathname.startsWith("/demo/")) return <DemoTaskPage />;
   if (window.location.pathname === "/experimental/eye-tracking") return <ExperimentalEyeTracking />;
   const token = participantTokenFromPath();
   if (token) return <ParticipantRunner token={token} />;
