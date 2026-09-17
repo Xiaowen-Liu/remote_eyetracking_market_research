@@ -2,11 +2,21 @@ const pageContext = () => ({
   viewport: { width: innerWidth, height: innerHeight },
   scroll: { x: scrollX, y: scrollY },
 });
-const send = (type, detail = null) =>
-  chrome.runtime.sendMessage({
-    type: "PAGE_EVENT",
-    event: { type, detail: { ...pageContext(), value: detail }, url: location.href },
-  });
+const send = (type, detail = null) => {
+  if (!chrome.runtime?.id) return Promise.resolve(null);
+  try {
+    return chrome.runtime
+      .sendMessage({
+        type: "PAGE_EVENT",
+        event: { type, detail: { ...pageContext(), value: detail }, url: location.href },
+      })
+      .catch(() => null);
+  } catch {
+    // Reloading an unpacked extension invalidates scripts already injected into
+    // open tabs. Ignore passive telemetry until the participant refreshes.
+    return Promise.resolve(null);
+  }
+};
 const domProposals = () =>
   [
     ...document.querySelectorAll(
