@@ -131,6 +131,16 @@ committed, and applies/reverses/reapplies the production migration path against
 PostgreSQL. Camera hardware, permission prompts, and gaze accuracy remain a
 documented manual smoke test because CI has no representative participant setup.
 
+After deployment, run the read-only cross-service smoke check:
+
+```bash
+npm run smoke:production
+```
+
+It verifies the Vercel application shell, Railway liveness and database readiness,
+the deployed OpenAPI contract, and the production CORS boundary. Override either
+origin with `--web-url` and `--api-url`; add `--json` for machine-readable evidence.
+
 ## Deployment
 
 The app is deliberately split by trust boundary:
