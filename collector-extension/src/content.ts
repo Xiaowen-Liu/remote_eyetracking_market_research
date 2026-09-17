@@ -214,6 +214,7 @@ function showCalibrationModal(
 ) {
   runtime.calibrationStage = options.stage;
   root.dataset.mode = "calibration-intro";
+  root.dataset.calibrationStep = options.stage;
   root.querySelector<HTMLElement>("[data-webgaze-phase]")!.textContent = options.phase;
   root.querySelector<HTMLElement>("[data-webgaze-title]")!.textContent = options.title;
   root.querySelector<HTMLElement>("[data-webgaze-status]")!.textContent = options.status;

@@ -53,3 +53,15 @@ test("removes a stale overlay and offers recovery when the extension context is 
   assert.equal(appended.length, 1);
   assert.match(appended[0].innerHTML, /Refresh page/);
 });
+
+test("moves the calibration-step marker away from boundary before showing the accuracy intro", async () => {
+  const source = await readFile(
+    new URL("../collector-extension/src/content.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /runtime\.calibrationStage = options\.stage;\s+root\.dataset\.mode = "calibration-intro";\s+root\.dataset\.calibrationStep = options\.stage;/,
+  );
+});
