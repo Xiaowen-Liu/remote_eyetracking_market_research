@@ -46,9 +46,9 @@ gaze estimation has laboratory-grade accuracy.
    reduced-motion mode, keyboard-complete replay shortcuts, and screen-reader
    playback announcements, CI-enforced gzip bundle budgets, and bounded replay
    rendering for large gaze datasets are implemented. A 100k-sample runtime gate
-   and browser-native containment for off-screen raw rows now cover the primary
-   interaction path. Remaining work: full DOM row virtualization if raw inspection
-   grows beyond the current 250-row safety cap.
+   and browser-native containment for off-screen replay elements now cover the primary
+   interaction path. Raw AOI inspection uses fixed-height row virtualization, retaining
+   every recorded sample while bounding the number of table rows mounted in the DOM.
 
 ## Deliberate boundaries
 

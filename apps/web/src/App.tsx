@@ -4,6 +4,7 @@ import {
   useState,
   type FormEvent,
   type PointerEvent as ReactPointerEvent,
+  type UIEvent,
 } from "react";
 
 import {
@@ -32,6 +33,8 @@ import {
   gazeSamplesForSnapshot,
   parseCollectorArtifact,
   type CollectorArtifact,
+  type CollectorGazeSample,
+  type CollectorSnapshot,
   type DomProposal,
 } from "./collectorArtifact";
 import { syntheticCollectorReplay } from "./demoCollectorArtifact";
@@ -42,10 +45,12 @@ import {
   insertReplaySnapshot,
   projectReplaySample,
   snapshotDocumentStyle,
+  type DocumentExtent,
   type ReplayCoordinateMode,
 } from "./replayCoordinates";
 import { isEditableReplayTarget, replayKeyboardAction } from "./replayAccessibility";
 import { windowReplaySamples } from "./replayWindow";
+import { virtualRowRange } from "./virtualRows";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import {
   clearStoredArtifacts,
@@ -194,6 +199,82 @@ function aggregateTaskMetrics(results: AnalysisResult[]): TaskAggregate[] {
         ? bucket.confidenceTotal / bucket.confidenceWeight
         : null,
     }));
+}
+
+function VirtualSampleTable({
+  samples,
+  documentExtent,
+  activeSnapshot,
+}: {
+  samples: CollectorGazeSample[];
+  documentExtent: DocumentExtent;
+  activeSnapshot?: CollectorSnapshot;
+}) {
+  const rowHeight = 44;
+  const [viewport, setViewport] = useState({ scrollTop: 0, height: 430 });
+  const range = virtualRowRange(samples.length, viewport.scrollTop, viewport.height, rowHeight);
+  const rows = samples.slice(range.start, range.end);
+
+  function updateViewport(event: UIEvent<HTMLDivElement>) {
+    setViewport({
+      scrollTop: event.currentTarget.scrollTop,
+      height: event.currentTarget.clientHeight,
+    });
+  }
+
+  return (
+    <div
+      className="session-table-wrap raw-sample-table"
+      onScroll={updateViewport}
+      aria-label={`${samples.length} raw gaze samples`}
+    >
+      <table className="session-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Viewport x/y</th>
+            <th>Document x/y</th>
+            <th>Scroll x/y</th>
+          </tr>
+        </thead>
+        <tbody>
+          {range.paddingTop > 0 && (
+            <tr className="virtual-spacer" aria-hidden="true">
+              <td colSpan={4} style={{ height: range.paddingTop }} />
+            </tr>
+          )}
+          {rows.map((sample, offset) => {
+            const index = range.start + offset;
+            const projected = projectReplaySample(
+              sample,
+              "document",
+              documentExtent,
+              activeSnapshot,
+            );
+            return (
+              <tr key={`${sample.at ?? "sample"}-${index}`} style={{ height: rowHeight }}>
+                <td>{sample.at ? new Date(sample.at).toLocaleTimeString() : "—"}</td>
+                <td>
+                  {sample.x.toFixed(3)}, {sample.y.toFixed(3)}
+                </td>
+                <td>
+                  {projected.x.toFixed(3)}, {projected.y.toFixed(3)}
+                </td>
+                <td>
+                  {sample.scroll?.x ?? 0}, {sample.scroll?.y ?? 0}
+                </td>
+              </tr>
+            );
+          })}
+          {range.paddingBottom > 0 && (
+            <tr className="virtual-spacer" aria-hidden="true">
+              <td colSpan={4} style={{ height: range.paddingBottom }} />
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export function App() {
@@ -2525,48 +2606,15 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                     {aoiDetailView === "samples" && (
                       <>
                         <p className="drilldown-copy">
-                          {selectedAoiMetric.samples.length} matching rows.{" "}
-                          {selectedAoiMetric.samples.length > 250 &&
-                            "Showing the first 250 matching raw rows to keep the dashboard readable."}
+                          {selectedAoiMetric.samples.length} matching rows. Scroll to inspect the
+                          full raw sample set.
                         </p>
-                        <div className="session-table-wrap raw-sample-table">
-                          <table className="session-table">
-                            <thead>
-                              <tr>
-                                <th>Time</th>
-                                <th>Viewport x/y</th>
-                                <th>Document x/y</th>
-                                <th>Scroll x/y</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedAoiMetric.samples.slice(0, 250).map((sample, index) => {
-                                const projected = projectReplaySample(
-                                  sample,
-                                  "document",
-                                  documentExtent,
-                                  activeSnapshot,
-                                );
-                                return (
-                                  <tr key={`${sample.at}-${index}`}>
-                                    <td>
-                                      {sample.at ? new Date(sample.at).toLocaleTimeString() : "—"}
-                                    </td>
-                                    <td>
-                                      {sample.x.toFixed(3)}, {sample.y.toFixed(3)}
-                                    </td>
-                                    <td>
-                                      {projected.x.toFixed(3)}, {projected.y.toFixed(3)}
-                                    </td>
-                                    <td>
-                                      {sample.scroll?.x ?? 0}, {sample.scroll?.y ?? 0}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                        <VirtualSampleTable
+                          key={selectedAoiMetric.aoi.id}
+                          samples={selectedAoiMetric.samples}
+                          documentExtent={documentExtent}
+                          activeSnapshot={activeSnapshot}
+                        />
                       </>
                     )}
                   </section>
