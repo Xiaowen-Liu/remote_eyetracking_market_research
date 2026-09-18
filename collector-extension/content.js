@@ -51,6 +51,24 @@ const canonicalKey = (element, label) => {
   if (name) return `${tag}[name=${name}]`;
   return `${tag}:${label.trim().toLowerCase().slice(0, 64)}`;
 };
+const interactiveProposalTags = new Set(["button", "a", "input", "textarea", "select"]);
+const proposalLabel = (element, index) => {
+  const tag = element.tagName.toLowerCase();
+  const explicit = element.getAttribute("aria-label") || element.getAttribute("title");
+  if (explicit) return explicit.trim().replace(/\s+/g, " ").slice(0, 80);
+  if (interactiveProposalTags.has(tag)) {
+    return (
+      element.getAttribute("placeholder") ||
+      element.textContent?.trim().replace(/\s+/g, " ").slice(0, 80) ||
+      `${tag} ${index + 1}`
+    );
+  }
+  return element
+    .querySelector(":scope > h1, :scope > h2, :scope > h3")
+    ?.textContent?.trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+};
 const domProposals = () =>
   [
     ...document.querySelectorAll(
@@ -60,14 +78,12 @@ const domProposals = () =>
     .filter((element) => !element.closest("#webgaze-collector-overlay"))
     .map((element, index) => {
       const rect = element.getBoundingClientRect();
-      const label =
-        element.getAttribute("aria-label") ||
-        element.getAttribute("title") ||
-        element.textContent?.trim().replace(/\s+/g, " ").slice(0, 80) ||
-        `${element.tagName.toLowerCase()} ${index + 1}`;
+      const tag = element.tagName.toLowerCase();
+      const label = proposalLabel(element, index);
+      if (!label || tag === "main") return null;
       return {
         label,
-        tag: element.tagName.toLowerCase(),
+        tag,
         role: element.getAttribute("role"),
         canonicalKey: canonicalKey(element, label),
         x: rect.left / innerWidth,
@@ -78,8 +94,13 @@ const domProposals = () =>
     })
     .filter(
       (proposal) =>
+        proposal &&
         proposal.width >= 0.03 &&
         proposal.height >= 0.025 &&
+        (interactiveProposalTags.has(proposal.tag) ||
+          (proposal.width <= 0.9 &&
+            proposal.height <= 0.65 &&
+            proposal.width * proposal.height <= 0.45)) &&
         proposal.x < 1 &&
         proposal.y < 1 &&
         proposal.x + proposal.width > 0 &&

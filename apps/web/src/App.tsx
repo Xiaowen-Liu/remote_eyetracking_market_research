@@ -1960,22 +1960,21 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         </button>
       </nav>
       <main>
-        <section className="page-heading results-heading">
-          <div>
-            <p className="eyebrow">
-              {workspaceView === "analysis" ? "Analysis workspace" : "Session archive"}
-            </p>
-            <h1>{workspaceView === "analysis" ? "Research results" : "Saved sessions"}</h1>
-            <p>
-              {workspaceView === "analysis"
-                ? "Replay a participant journey, inspect task metrics, and review captured page context."
-                : "Archive is separate from analysis so selection and management do not compete with visualization."}
-            </p>
-          </div>
-          <span className={`status ${selectedJob?.status ?? "draft"}`}>
-            {selectedJob ? selectedJob.status : "No sessions"}
-          </span>
-        </section>
+        {workspaceView === "sessions" && (
+          <section className="page-heading results-heading">
+            <div>
+              <p className="eyebrow">Session archive</p>
+              <h1>Saved sessions</h1>
+              <p>
+                Archive is separate from analysis so selection and management do not compete with
+                visualization.
+              </p>
+            </div>
+            <span className={`status ${selectedJob?.status ?? "draft"}`}>
+              {selectedJob ? selectedJob.status : "No sessions"}
+            </span>
+          </section>
+        )}
         {notice && (
           <div className={`notice ${notice.kind}`} role="alert">
             {notice.text}
@@ -2800,7 +2799,10 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
               </section>
             )}
             {analysisView === "replay" && (
-              <section className="collector-review" aria-label="Collector session review">
+              <section
+                className="collector-review minimal-replay"
+                aria-label="Participant replay canvas"
+              >
                 <details className="replay-help">
                   <summary>Keyboard shortcuts</summary>
                   <p className="replay-shortcut-help">
