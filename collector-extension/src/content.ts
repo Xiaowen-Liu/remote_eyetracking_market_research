@@ -934,6 +934,13 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
       );
     return true;
   }
+  if (message.type === "COLLECTOR_PAGE_CONTEXT") {
+    respond({
+      viewport: { width: innerWidth, height: innerHeight },
+      scroll: { x: scrollX, y: scrollY },
+    });
+    return;
+  }
   if (message.type === "COLLECTOR_RETRY_CALIBRATION") retryCalibration(overlay());
   if (message.type === "COLLECTOR_STOP") stop();
 });
