@@ -121,6 +121,8 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .drilldown-note .secondary-button { width: auto; margin: 0 0 0 auto; }
 .drilldown-copy { color: #67736b; font-size: 12px; }
 .raw-sample-table { max-height: 430px; overflow: auto; }
+.raw-sample-table thead { position: sticky; z-index: 2; top: 0; background: #fff; }
+.raw-sample-table .virtual-spacer td { padding: 0; border: 0; }
 .dom-proposals-panel { padding: 28px 30px; background: #fff; border: 1px solid #d9ded8; border-radius: 12px; }
 .dom-proposals-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
 .dom-proposals-header h2 { margin: 5px 0 7px; font: 500 28px/1.2 Georgia, serif; }
