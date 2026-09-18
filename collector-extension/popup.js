@@ -59,7 +59,6 @@ $("#connect").onclick = async () => {
     await invoke("CONNECT_STUDY", {
       participantLink: $("#participant-link").value,
       apiBase: $("#api-base").value,
-      captureSnapshots: $("#snapshots").checked,
     });
   } catch (error) {
     showStatus(error.message, true);
