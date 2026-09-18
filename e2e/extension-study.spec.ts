@@ -110,6 +110,7 @@ test("connects a participant link and arms the study page after consent", async 
 test("completes calibration, retries ordered gaze batches, submits, and exports safely", async ({
   context,
   extensionId,
+  extensionWorker,
 }) => {
   const apiBase = "http://localhost:8000";
   const participantToken = "lifecycle-capability-token";
@@ -265,15 +266,18 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
       viewport: { width: 1280, height: 720 },
       scroll: { x: 0, y: 0 },
     }));
-  const firstBatch = await popup.evaluate(
-    (samples) => chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }),
-    sampleBatch(0),
-  );
+  const sendFromCollectorTab = (batch: ReturnType<typeof sampleBatch>) =>
+    extensionWorker.evaluate(
+      async ({ samples, url }) => {
+        const [tab] = await chrome.tabs.query({ url });
+        if (!tab?.id) throw new Error("Collector task tab not found");
+        return chrome.tabs.sendMessage(tab.id, { type: "COLLECTOR_INGEST_SAMPLES", samples });
+      },
+      { samples: batch, url: targetUrl },
+    );
+  const firstBatch = await sendFromCollectorTab(sampleBatch(0));
   expect(firstBatch).toMatchObject({ ok: false, error: "Temporary ingestion failure" });
-  const secondBatch = await popup.evaluate(
-    (samples) => chrome.runtime.sendMessage({ type: "GAZE_SAMPLES", samples }),
-    sampleBatch(12),
-  );
+  const secondBatch = await sendFromCollectorTab(sampleBatch(12));
   expect(secondBatch).toMatchObject({ ok: true });
 
   expect(gazeBodies.map((body) => body.sequence)).toEqual([0, 0, 1]);
