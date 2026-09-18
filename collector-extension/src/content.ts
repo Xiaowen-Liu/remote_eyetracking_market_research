@@ -924,8 +924,27 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     });
     return true;
   }
+  if (message.type === "COLLECTOR_INGEST_SAMPLES") {
+    const incoming = Array.isArray(message.samples) ? message.samples : [];
+    void chrome.runtime
+      .sendMessage({ type: "GAZE_SAMPLES", samples: incoming })
+      .then(respond)
+      .catch((error) =>
+        respond({ ok: false, error: error instanceof Error ? error.message : "Ingestion failed" }),
+      );
+    return true;
+  }
   if (message.type === "COLLECTOR_RETRY_CALIBRATION") retryCalibration(overlay());
   if (message.type === "COLLECTOR_STOP") stop();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!collecting) return;
+  const root = document.querySelector<HTMLDivElement>("#webgaze-collector-overlay");
+  if (!root) return;
+  root.querySelector<HTMLElement>("[data-webgaze-status]")!.textContent = document.hidden
+    ? "Collection is paused by the browser while this task tab is in the background. Return to this tab to continue."
+    : "Task tab active. Collecting coordinate estimates.";
 });
 
 window.addEventListener("message", (event) => {

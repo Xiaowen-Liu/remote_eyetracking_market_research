@@ -84,11 +84,16 @@ export function projectReplaySample(
 export function snapshotDocumentStyle(snapshot: CollectorSnapshot, extent: DocumentExtent) {
   const viewport = snapshot.viewport ?? extent;
   const scroll = snapshot.scroll ?? { x: 0, y: 0 };
+  const cropTop = scroll.y > 0 ? 4 : 0;
+  const cropRight = scroll.x + viewport.width < extent.width ? 4 : 0;
+  const cropBottom = scroll.y + viewport.height < extent.height ? 4 : 0;
+  const cropLeft = scroll.x > 0 ? 4 : 0;
   return {
     left: `${(scroll.x / extent.width) * 100}%`,
     top: `${(scroll.y / extent.height) * 100}%`,
     width: `${(viewport.width / extent.width) * 100}%`,
     height: `${(viewport.height / extent.height) * 100}%`,
+    clipPath: `inset(${cropTop}% ${cropRight}% ${cropBottom}% ${cropLeft}%)`,
   };
 }
 

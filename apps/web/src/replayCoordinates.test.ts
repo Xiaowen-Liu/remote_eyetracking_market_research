@@ -6,6 +6,7 @@ import {
   inferDocumentExtent,
   insertReplaySnapshot,
   projectReplaySample,
+  snapshotDocumentStyle,
 } from "./replayCoordinates";
 
 const artifact = parseCollectorArtifact({
@@ -53,5 +54,17 @@ describe("replay coordinate tools", () => {
       reason: "researcher-inserted",
       viewport: { width: 1000, height: 500 },
     });
+  });
+
+  it("crops fixed edges only where a document screenshot is away from a boundary", () => {
+    expect(
+      snapshotDocumentStyle(artifact.snapshots[0], { width: 1000, height: 1000 }).clipPath,
+    ).toBe("inset(0% 0% 4% 0%)");
+    expect(
+      snapshotDocumentStyle(
+        { ...artifact.snapshots[0], scroll: { x: 0, y: 500 } },
+        { width: 1000, height: 1000 },
+      ).clipPath,
+    ).toBe("inset(4% 0% 0% 0%)");
   });
 });

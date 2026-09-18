@@ -32,6 +32,7 @@ import {
   gazeSamplesForSnapshot,
   parseCollectorArtifact,
   type CollectorArtifact,
+  type DomProposal,
 } from "./collectorArtifact";
 import { syntheticCollectorReplay } from "./demoCollectorArtifact";
 import { AOI_MEANINGFUL_VISIT_MS, aggregateAoiMetrics, calculateAoiMetrics } from "./aoiMetrics";
@@ -95,8 +96,38 @@ type ReplayAoi = {
   source: "manual" | "dom";
   sessionIds?: string[];
   allSessions?: boolean;
+  canonicalKey?: string;
+  sourcePath?: string;
 };
 type SessionPreference = { name?: string; hidden?: boolean };
+
+function urlPath(value?: string) {
+  if (!value) return null;
+  try {
+    return new URL(value).pathname;
+  } catch {
+    return null;
+  }
+}
+
+function sameProposalGeometry(
+  left: Pick<ReplayAoi, "x" | "y" | "width" | "height">,
+  right: Pick<DomProposal, "x" | "y" | "width" | "height">,
+) {
+  return (
+    Math.abs(left.x - right.x) < 0.04 &&
+    Math.abs(left.y - right.y) < 0.04 &&
+    Math.abs(left.width - right.width) < 0.04 &&
+    Math.abs(left.height - right.height) < 0.04
+  );
+}
+
+function proposalWasAdopted(aoi: ReplayAoi, proposal: DomProposal) {
+  return (
+    aoi.label.localeCompare(proposal.label, undefined, { sensitivity: "accent" }) === 0 &&
+    sameProposalGeometry(aoi, proposal)
+  );
+}
 
 type TaskAggregate = {
   position: number;
@@ -1234,12 +1265,8 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     localStorage.setItem(`webgaze.aois.${study.id}`, JSON.stringify(next));
   }
 
-  function addProposal(
-    label: string,
-    proposal: { x: number; y: number; width: number; height: number },
-  ) {
-    if (replayAois.some((aoi) => aoi.label.toLocaleLowerCase() === label.toLocaleLowerCase()))
-      return;
+  function addProposal(label: string, proposal: DomProposal) {
+    if (replayAois.some((aoi) => proposalWasAdopted(aoi, proposal))) return;
     persistAois([
       ...replayAois,
       {
@@ -1248,6 +1275,8 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         label,
         source: "dom",
         sessionIds: collectorArtifact ? [collectorArtifact.sessionId] : [],
+        canonicalKey: proposal.canonicalKey,
+        sourcePath: urlPath(proposalState?.url) ?? undefined,
       },
     ]);
     setNotice({
@@ -1654,15 +1683,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const scanpathNodes = displayReplaySamples
     .filter((_, index) => index % Math.max(1, Math.floor(displayReplaySamples.length / 12)) === 0)
     .slice(-12);
-  const aoiOrder = replayAois.filter((aoi) =>
-    visibleReplaySamples.some(
-      (sample) =>
-        sample.x >= aoi.x &&
-        sample.x <= aoi.x + aoi.width &&
-        sample.y >= aoi.y &&
-        sample.y <= aoi.y + aoi.height,
-    ),
-  );
   const displayAois = replayAois.map((aoi) => {
     if (coordinateMode === "viewport" || !activeSnapshot) return aoi;
     const viewport = activeSnapshot.viewport ?? documentExtent;
@@ -1682,6 +1702,18 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         collectorArtifact.startedAt,
       )
     : [];
+  const aoiOrder = aoiMetrics
+    .flatMap((metric) =>
+      metric.visits
+        .filter(
+          (visit) =>
+            (visit.meaningful && visit.samples.length >= 6) ||
+            (visit.fixation && visit.samples.length >= 3),
+        )
+        .map((visit) => ({ aoi: metric.aoi, startedAt: visit.startedAt })),
+    )
+    .sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt))
+    .map(({ aoi }) => aoi);
   const selectedAoiMetric = aoiMetrics.find((metric) => metric.aoi.id === selectedAoiId) ?? null;
   const visibleCollectorArtifacts = collectorArtifacts.filter(
     (artifact) => !sessionPreferences[artifact.sessionId]?.hidden,
@@ -1689,6 +1721,9 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const hiddenCollectorArtifactCount = collectorArtifacts.length - visibleCollectorArtifacts.length;
   const archivedCollectorArtifacts = collectorArtifacts.filter(
     (artifact) => showHiddenSessions || !sessionPreferences[artifact.sessionId]?.hidden,
+  );
+  const artifactsBySessionId = new Map(
+    visibleCollectorArtifacts.map((artifact) => [artifact.sessionId, artifact]),
   );
   const aggregateAoiResults = aggregateAoiMetrics(
     replayAois,
@@ -1700,12 +1735,24 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     })),
     (aoi, sessionId) => {
       const configured = replayAois.find((candidate) => candidate.id === aoi.id);
-      return (
-        configured?.source === "manual" ||
-        configured?.allSessions === true ||
-        !configured?.sessionIds?.length ||
-        configured.sessionIds.includes(sessionId)
+      if (!configured || configured.source === "manual" || configured.allSessions === true)
+        return true;
+      const artifact = artifactsBySessionId.get(sessionId);
+      if (!artifact) return false;
+      const states = domProposalStates(artifact);
+      if (configured.canonicalKey) {
+        return states.some((state) =>
+          state.proposals.some((proposal) => proposal.canonicalKey === configured.canonicalKey),
+        );
+      }
+      if (configured.sourcePath) {
+        return states.some((state) => urlPath(state.url) === configured.sourcePath);
+      }
+      const fuzzyMatch = states.some((state) =>
+        state.proposals.some((proposal) => proposalWasAdopted(configured, proposal)),
       );
+      if (fuzzyMatch) return true;
+      return Boolean(configured.sessionIds?.includes(sessionId));
     },
   );
   const selectedAggregateAoi =
@@ -1715,15 +1762,11 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const selectedProposal = proposalState?.proposals[selectedProposalIndex] ?? null;
   const newProposals =
     proposalState?.proposals
-      .filter(
-        (proposal) =>
-          !replayAois.some(
-            (aoi) => aoi.label.toLocaleLowerCase() === proposal.label.toLocaleLowerCase(),
-          ),
-      )
+      .filter((proposal) => !replayAois.some((aoi) => proposalWasAdopted(aoi, proposal)))
       .map((proposal) => ({
         ...proposal,
         sessionIds: collectorArtifact ? [collectorArtifact.sessionId] : [],
+        sourcePath: urlPath(proposalState?.url) ?? undefined,
       })) ?? [];
   const proposalSnapshotIndex =
     collectorArtifact && proposalState
@@ -2685,23 +2728,40 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
             )}
             {analysisView === "replay" && (
               <section className="collector-review" aria-label="Collector session review">
-                <p className="replay-shortcut-help">
-                  Keyboard: Space or K play/pause · J/← back 5 seconds · L/→ forward 5 seconds ·
-                  Home/End jump to boundary.
-                </p>
+                <details className="replay-help">
+                  <summary>Keyboard shortcuts</summary>
+                  <p className="replay-shortcut-help">
+                    Space or K play/pause · J/← back 5 seconds · L/→ forward 5 seconds · Home/End
+                    jump to boundary.
+                  </p>
+                </details>
                 <p className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
                   {replayAnnouncement}
                 </p>
                 <div className="collector-review-heading">
                   <div>
-                    <p className="eyebrow">Local collector review</p>
-                    <h2>Open an extension session</h2>
+                    <p className="eyebrow">Real session analysis</p>
+                    <h2>
+                      {collectorArtifact ? "Participant replay" : "Import a participant session"}
+                    </h2>
                     <p>
-                      Use this for a private researcher-side review of the exported artifact. The
-                      JSON stays in this browser and is not submitted to the API.
+                      Import the JSON or ZIP exported by the extension. It remains in this browser
+                      and is recalculated against the study's current AOIs.
                     </p>
                   </div>
                   <div className="collector-actions">
+                    <label className="secondary-button collector-import">
+                      Import real session
+                      <input
+                        type="file"
+                        multiple
+                        accept="application/json,.json,.zip,application/zip"
+                        onChange={(event) => {
+                          void importCollectorArtifacts(event.target.files);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
                     {collectorArtifacts.length > 1 && (
                       <select
                         aria-label="Replay session"
@@ -2726,13 +2786,16 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                         ))}
                       </select>
                     )}
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      onClick={loadSyntheticCollectorReplay}
-                    >
-                      Load synthetic replay
-                    </button>
+                    <details className="demo-data-menu">
+                      <summary>Demo data</summary>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={loadSyntheticCollectorReplay}
+                      >
+                        Load synthetic fixture
+                      </button>
+                    </details>
                   </div>
                 </div>
                 {collectorArtifact && (
@@ -2873,7 +2936,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                                 return (
                                   <i
                                     className="aoi-order-node"
-                                    key={aoi.id}
+                                    key={`${aoi.id}-${index}`}
                                     style={{
                                       left: `${(display.x + display.width / 2) * 100}%`,
                                       top: `${(display.y + display.height / 2) * 100}%`,
@@ -3378,18 +3441,12 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                           <button
                             className="primary-button"
                             type="button"
-                            disabled={replayAois.some(
-                              (aoi) =>
-                                aoi.label.toLocaleLowerCase() ===
-                                selectedProposal.label.toLocaleLowerCase(),
+                            disabled={replayAois.some((aoi) =>
+                              proposalWasAdopted(aoi, selectedProposal),
                             )}
                             onClick={() => addProposal(selectedProposal.label, selectedProposal)}
                           >
-                            {replayAois.some(
-                              (aoi) =>
-                                aoi.label.toLocaleLowerCase() ===
-                                selectedProposal.label.toLocaleLowerCase(),
-                            )
+                            {replayAois.some((aoi) => proposalWasAdopted(aoi, selectedProposal))
                               ? "Added"
                               : "Add to Study"}
                           </button>
@@ -3398,10 +3455,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                     </div>
                     <ol className="proposal-list">
                       {proposalState.proposals.map((proposal, index) => {
-                        const added = replayAois.some(
-                          (aoi) =>
-                            aoi.label.toLocaleLowerCase() === proposal.label.toLocaleLowerCase(),
-                        );
+                        const added = replayAois.some((aoi) => proposalWasAdopted(aoi, proposal));
                         return (
                           <li
                             className={selectedProposalIndex === index ? "selected" : ""}
