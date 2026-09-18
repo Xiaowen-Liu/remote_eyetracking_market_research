@@ -67,7 +67,7 @@ const emptyDraft: StudyDraft = {
     maximum_attempts: 3,
   },
   collection_policy: {
-    screenshots_enabled: false,
+    screenshots_enabled: true,
     sample_interval_ms: 100,
     webcam_gaze_enabled: false,
   },
@@ -675,6 +675,31 @@ function StudyBuilder() {
                     <small>
                       Participant frames stay in-browser; only consented coordinate samples are sent
                       to this study API.
+                    </small>
+                  </span>
+                </label>
+                <label className="capture-mode-toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.collection_policy?.screenshots_enabled ?? true}
+                    onChange={(event) =>
+                      updateDraft({
+                        collection_policy: {
+                          ...(draft.collection_policy ?? {
+                            screenshots_enabled: true,
+                            sample_interval_ms: 100,
+                            webcam_gaze_enabled: false,
+                          }),
+                          screenshots_enabled: event.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  <span>
+                    <strong>Capture consented task snapshots for replay</strong>
+                    <small>
+                      Saves visible task-tab frames and page context. Camera frames are never
+                      captured or uploaded.
                     </small>
                   </span>
                 </label>
