@@ -22,6 +22,7 @@ export type CollectorGazeSample = {
   url?: string;
   viewport?: { width: number; height: number };
   scroll?: { x: number; y: number };
+  aoiId?: string;
 };
 
 export type CollectorCalibration = {
@@ -41,6 +42,7 @@ export type DomProposal = {
   y: number;
   width: number;
   height: number;
+  canonicalKey?: string;
 };
 export type DomProposalState = {
   at: string;
@@ -159,22 +161,58 @@ export function gazeSamplesForSnapshot(
   });
 }
 
-export function buildHeatmap(samples: CollectorGazeSample[], gridSize = 14): HeatCell[] {
-  const buckets = new Map<string, { x: number; y: number; count: number }>();
-  for (const sample of samples) {
-    const column = Math.min(gridSize - 1, Math.floor(sample.x * gridSize));
-    const row = Math.min(gridSize - 1, Math.floor(sample.y * gridSize));
-    const key = `${column}:${row}`;
-    const bucket = buckets.get(key) ?? {
-      x: (column + 0.5) / gridSize,
-      y: (row + 0.5) / gridSize,
-      count: 0,
-    };
-    bucket.count += 1;
-    buckets.set(key, bucket);
+export function buildHeatmap(samples: CollectorGazeSample[], _gridSize = 14): HeatCell[] {
+  if (!samples.length) return [];
+  const fallbackIntervalMs = 100;
+  const ordered = samples
+    .map((sample, index) => ({
+      sample,
+      time: sample.at ? Date.parse(sample.at) : index * fallbackIntervalMs,
+    }))
+    .sort((left, right) => left.time - right.time);
+  const fixations: Array<{
+    samples: CollectorGazeSample[];
+    started: number;
+    ended: number;
+  }> = [];
+  for (const item of ordered) {
+    const active = fixations.at(-1);
+    const viewportWidth = item.sample.viewport?.width ?? 1280;
+    const viewportHeight = item.sample.viewport?.height ?? 720;
+    const centroid = active
+      ? {
+          x: active.samples.reduce((sum, sample) => sum + sample.x, 0) / active.samples.length,
+          y: active.samples.reduce((sum, sample) => sum + sample.y, 0) / active.samples.length,
+        }
+      : null;
+    const distancePx = centroid
+      ? Math.hypot(
+          (item.sample.x - centroid.x) * viewportWidth,
+          (item.sample.y - centroid.y) * viewportHeight,
+        )
+      : Number.POSITIVE_INFINITY;
+    if (active && distancePx <= 36) {
+      active.samples.push(item.sample);
+      active.ended = item.time;
+    } else {
+      fixations.push({ samples: [item.sample], started: item.time, ended: item.time });
+    }
   }
-  const maximum = Math.max(1, ...[...buckets.values()].map((bucket) => bucket.count));
-  return [...buckets.values()].map((bucket) => ({ ...bucket, intensity: bucket.count / maximum }));
+  const weighted = fixations.map((fixation) => {
+    const count = fixation.samples.length;
+    const durationMs = Math.max(80, fixation.ended - fixation.started + fallbackIntervalMs);
+    return {
+      x: fixation.samples.reduce((sum, sample) => sum + sample.x, 0) / count,
+      y: fixation.samples.reduce((sum, sample) => sum + sample.y, 0) / count,
+      count,
+      weight: Math.max(0.2, durationMs / 250),
+    };
+  });
+  const maximum = Math.max(Number.EPSILON, ...weighted.map((fixation) => fixation.weight));
+  return weighted.map(({ weight, ...fixation }) => ({
+    ...fixation,
+    intensity: weight / maximum,
+  }));
 }
 
 export function domProposalStates(artifact: CollectorArtifact): DomProposalState[] {

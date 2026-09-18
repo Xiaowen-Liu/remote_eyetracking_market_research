@@ -40,6 +40,17 @@ const send = (type, detail = null) =>
     type: "PAGE_EVENT",
     event: { type, detail: { ...pageContext(), value: detail }, url: location.href },
   });
+const canonicalKey = (element, label) => {
+  const tag = element.tagName.toLowerCase();
+  if (element.id) return `${tag}#${element.id}`;
+  const testId = element.getAttribute("data-testid");
+  if (testId) return `${tag}[data-testid=${testId}]`;
+  const aria = element.getAttribute("aria-label");
+  if (aria) return `${tag}[aria-label=${aria.trim().toLowerCase()}]`;
+  const name = element.getAttribute("name");
+  if (name) return `${tag}[name=${name}]`;
+  return `${tag}:${label.trim().toLowerCase().slice(0, 64)}`;
+};
 const domProposals = () =>
   [
     ...document.querySelectorAll(
@@ -58,6 +69,7 @@ const domProposals = () =>
         label,
         tag: element.tagName.toLowerCase(),
         role: element.getAttribute("role"),
+        canonicalKey: canonicalKey(element, label),
         x: rect.left / innerWidth,
         y: rect.top / innerHeight,
         width: rect.width / innerWidth,

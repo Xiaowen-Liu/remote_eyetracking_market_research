@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WebGaze Research Collector (Experimental)",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Clean-room browser collector for consented UX-research session events and optional visible-tab snapshots.",
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"

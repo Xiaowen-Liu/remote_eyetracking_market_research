@@ -928,6 +928,15 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.type === "COLLECTOR_STOP") stop();
 });
 
+document.addEventListener("visibilitychange", () => {
+  if (!collecting) return;
+  const root = document.querySelector<HTMLDivElement>("#webgaze-collector-overlay");
+  if (!root) return;
+  root.querySelector<HTMLElement>("[data-webgaze-status]")!.textContent = document.hidden
+    ? "Collection is paused by the browser while this task tab is in the background. Return to this tab to continue."
+    : "Task tab active. Collecting coordinate estimates.";
+});
+
 window.addEventListener("message", (event) => {
   const root = document.querySelector<HTMLDivElement>("#webgaze-collector-overlay");
   const canvas = root?.querySelector<HTMLIFrameElement>("[data-webgaze-camera-canvas]");

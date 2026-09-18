@@ -47,6 +47,16 @@ async function activeTab() {
   if (!tab?.id) throw new Error("Open the study target page before continuing");
   return tab;
 }
+async function collectorTab(session) {
+  if (session?.collectorTabId) {
+    const tab = await chrome.tabs.get(session.collectorTabId).catch(() => null);
+    if (tab?.id) return tab;
+  }
+  return activeTab();
+}
+function isCollectorTab(session, sender) {
+  return Boolean(session?.collectorTabId && sender.tab?.id === session.collectorTabId);
+}
 async function navigateAndMessage(tabId, url, message) {
   const listener = (updatedId, change) => {
     if (updatedId !== tabId || change.status !== "complete") return;
@@ -125,6 +135,7 @@ async function startStudy(session) {
     nextSequence: 0,
     pendingBatches: [],
     lastError: null,
+    collectorTabId: tab.id,
   };
   await write(next);
   await navigateAndMessage(tab.id, firstTaskUrl, { type: "COLLECTOR_ARM" });
@@ -139,8 +150,24 @@ async function startTask(session) {
     `/participant-sessions/${session.sessionId}/task-runs`,
     { method: "POST", body: JSON.stringify({ task_position: task.position }) },
   );
-  const tab = await activeTab(),
-    next = { ...session, taskRun: run, phase: "running", lastError: null };
+  const tab = await collectorTab(session);
+  await chrome.tabs.update(tab.id, { active: true });
+  const firstTask = session.completedTasks === 0;
+  const startedAt = new Date().toISOString();
+  const next = {
+    ...session,
+    ...(firstTask ? { startedAt, events: [], snapshots: [], gazeSamples: [] } : {}),
+    collectorTabId: tab.id,
+    taskRun: run,
+    phase: "running",
+    lastError: null,
+  };
+  next.events = addEvent(next, {
+    type: "task-start",
+    url: taskUrl,
+    at: startedAt,
+    detail: { taskPosition: task.position, taskTitle: task.title },
+  }).events;
   await write(next);
   if (tab.url !== taskUrl)
     await navigateAndMessage(tab.id, taskUrl, {
@@ -153,7 +180,7 @@ async function startTask(session) {
 }
 async function finishTask(session) {
   if (!session.taskRun) throw new Error("No task is running");
-  const tab = await activeTab(),
+  const tab = await collectorTab(session),
     drained = await chrome.tabs
       .sendMessage(tab.id, { type: "COLLECTOR_DRAIN_SAMPLES" })
       .catch(() => ({ samples: [] }));
@@ -252,6 +279,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         return;
       }
       if (message.type === "GAZE_SAMPLES") {
+        if (!isCollectorTab(session, sender) || session.phase !== "running" || !session.taskRun) {
+          respond({ ok: true, ignored: true });
+          return;
+        }
         session.gazeSamples = [...(session.gazeSamples ?? []), ...message.samples];
         await write(session);
         session = await enqueueSamples(session, message.samples);
@@ -281,12 +312,21 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         return;
       }
       if (message.type === "PAGE_EVENT") {
+        if (!isCollectorTab(session, sender) || session.phase !== "running" || !session.taskRun) {
+          respond({ ok: true, ignored: true });
+          return;
+        }
         let next = addEvent(session, message.event);
         if (
           next.captureSnapshots &&
           ["page-open", "history-navigation", "scroll-settled"].includes(message.event.type)
         ) {
-          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab?.windowId, {
+          if (!sender.tab?.active) {
+            await write(next);
+            respond({ ok: true, snapshotSkipped: true });
+            return;
+          }
+          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {
             format: "jpeg",
             quality: 72,
           });
