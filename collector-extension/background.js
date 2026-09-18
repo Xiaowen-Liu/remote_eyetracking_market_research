@@ -154,7 +154,7 @@ async function startTask(session) {
   await chrome.tabs.update(tab.id, { active: true });
   const firstTask = session.completedTasks === 0;
   const startedAt = new Date().toISOString();
-  const next = {
+  let next = {
     ...session,
     ...(firstTask ? { startedAt, events: [], snapshots: [], gazeSamples: [] } : {}),
     collectorTabId: tab.id,
@@ -174,8 +174,37 @@ async function startTask(session) {
       type: "COLLECTOR_START_TASK",
       taskTitle: task.title,
     });
-  else
+  else {
     await chrome.tabs.sendMessage(tab.id, { type: "COLLECTOR_START_TASK", taskTitle: task.title });
+    if (next.captureSnapshots) {
+      try {
+        const context = await chrome.tabs
+          .sendMessage(tab.id, { type: "COLLECTOR_PAGE_CONTEXT" })
+          .catch(() => null);
+        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+          format: "jpeg",
+          quality: 72,
+        });
+        next = addSnapshot(next, {
+          dataUrl,
+          url: tab.url,
+          reason: "task-start",
+          viewport: context?.viewport ?? { width: tab.width ?? 1280, height: tab.height ?? 720 },
+          scroll: context?.scroll ?? { x: 0, y: 0 },
+        });
+      } catch (error) {
+        next = addEvent(next, {
+          type: "snapshot-unavailable",
+          url: tab.url,
+          detail: {
+            reason: "task-start",
+            message: error instanceof Error ? error.message : "Snapshot permission unavailable",
+          },
+        });
+      }
+      await write(next);
+    }
+  }
   return next;
 }
 async function finishTask(session) {
@@ -236,7 +265,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         session = {
           ...newSession({
             sessionId: crypto.randomUUID(),
-            captureSnapshots: Boolean(message.captureSnapshots),
+            captureSnapshots: Boolean(protocol.collection_policy?.screenshots_enabled),
           }),
           apiBase,
           participantToken: token,
