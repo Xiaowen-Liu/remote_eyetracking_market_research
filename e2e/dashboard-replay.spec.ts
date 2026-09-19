@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("imports a real extension artifact and exposes replay health", async ({ page }) => {
+test("imports a real extension artifact and renders the minimal replay canvas", async ({
+  page,
+}) => {
   const projectId = "00000000-0000-4000-8000-000000000010";
   const studyId = "00000000-0000-4000-8000-000000000020";
   const createdAt = "2026-09-13T12:00:00.000Z";
@@ -103,7 +105,7 @@ test("imports a real extension artifact and exposes replay health", async ({ pag
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Extension E2E study" })).toBeVisible();
   await page.getByRole("button", { name: "View results" }).click();
-  await expect(page.getByRole("heading", { name: "Research results" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Analysis" })).toHaveClass(/active/);
 
   const startedAt = Date.parse(createdAt);
   const artifact = {
@@ -156,9 +158,9 @@ test("imports a real extension artifact and exposes replay health", async ({ pag
     buffer: Buffer.from(JSON.stringify(artifact)),
   });
 
-  await expect(page.getByText("Tracking health: good")).toBeVisible();
-  await expect(page.getByText("Calibration strong")).toBeVisible();
-  await expect(page.getByText("80 estimated samples")).toBeVisible();
-  await expect(page.getByText("1 timeline events")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Replay canvas" })).toBeVisible();
+  await expect(
+    page.getByText("1 collector session imported locally and merged by session ID."),
+  ).toBeVisible();
+  await expect(page.locator("section[aria-label='Participant replay canvas']")).toBeVisible();
+  await expect(page.locator(".snapshot-stage")).toBeVisible();
 });
