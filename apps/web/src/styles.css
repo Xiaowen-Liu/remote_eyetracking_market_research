@@ -123,6 +123,23 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .raw-sample-table { max-height: 430px; overflow: auto; }
 .raw-sample-table thead { position: sticky; z-index: 2; top: 0; background: #fff; }
 .raw-sample-table .virtual-spacer td { padding: 0; border: 0; }
+.minimal-replay { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.minimal-replay > .replay-help,
+.minimal-replay > .collector-review-heading,
+.minimal-replay .collector-summary,
+.minimal-replay .collector-timeline,
+.minimal-replay .snapshot-title,
+.minimal-replay .replay-analysis-tools,
+.minimal-replay .aoi-editor,
+.minimal-replay .replay-toolbar,
+.minimal-replay .replay-scrubber,
+.minimal-replay .replay-view-settings,
+.minimal-replay .heatmap-editor,
+.minimal-replay .snapshot-controls,
+.minimal-replay .replay-video-export { display: none; }
+.minimal-replay .collector-artifact-grid { display: block; }
+.minimal-replay .collector-snapshot { width: 100%; padding: 0; border: 0; background: transparent; }
+.minimal-replay .snapshot-stage { width: 100%; margin: 0; }
 .dom-proposals-panel { padding: 28px 30px; background: #fff; border: 1px solid #d9ded8; border-radius: 12px; }
 .dom-proposals-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
 .dom-proposals-header h2 { margin: 5px 0 7px; font: 500 28px/1.2 Georgia, serif; }

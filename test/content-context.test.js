@@ -92,3 +92,13 @@ test("records a stable canonical DOM key with every proposal", async () => {
   assert.match(source, /const canonicalKey = \(element, label\) =>/);
   assert.match(source, /canonicalKey: canonicalKey\(element, label\)/);
 });
+
+test("excludes full-page main containers from DOM proposals", async () => {
+  const source = await readFile(
+    new URL("../collector-extension/content.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /if \(!label \|\| tag === "main"\) return null/);
+  assert.match(source, /proposal\.width \* proposal\.height <= 0\.45/);
+});
