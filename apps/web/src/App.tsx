@@ -73,7 +73,7 @@ const emptyDraft: StudyDraft = {
   },
   collection_policy: {
     screenshots_enabled: true,
-    sample_interval_ms: 100,
+    sample_interval_ms: 50,
     webcam_gaze_enabled: false,
   },
   retention_days: 30,
@@ -743,7 +743,7 @@ function StudyBuilder() {
                         collection_policy: {
                           ...(draft.collection_policy ?? {
                             screenshots_enabled: false,
-                            sample_interval_ms: 100,
+                            sample_interval_ms: 50,
                             webcam_gaze_enabled: false,
                           }),
                           webcam_gaze_enabled: event.target.checked,
@@ -768,7 +768,7 @@ function StudyBuilder() {
                         collection_policy: {
                           ...(draft.collection_policy ?? {
                             screenshots_enabled: true,
-                            sample_interval_ms: 100,
+                            sample_interval_ms: 50,
                             webcam_gaze_enabled: false,
                           }),
                           screenshots_enabled: event.target.checked,

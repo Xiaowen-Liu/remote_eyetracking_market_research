@@ -557,7 +557,7 @@
       "CollectionPolicy": {
         "properties": {
           "sample_interval_ms": {
-            "default": 100,
+            "default": 50,
             "maximum": 1000.0,
             "minimum": 25.0,
             "title": "Sample Interval Ms",

@@ -160,6 +160,7 @@ async function startTask(session) {
   await chrome.tabs.update(tab.id, { active: true });
   const firstTask = session.completedTasks === 0;
   const startedAt = new Date().toISOString();
+  const sampleIntervalMs = session.protocol.collection_policy?.sample_interval_ms ?? 50;
   let next = {
     ...session,
     ...(firstTask ? { startedAt, events: [], snapshots: [], gazeSamples: [] } : {}),
@@ -179,9 +180,14 @@ async function startTask(session) {
     await navigateAndMessage(tab.id, taskUrl, {
       type: "COLLECTOR_START_TASK",
       taskTitle: task.title,
+      sampleIntervalMs,
     });
   else {
-    await chrome.tabs.sendMessage(tab.id, { type: "COLLECTOR_START_TASK", taskTitle: task.title });
+    await chrome.tabs.sendMessage(tab.id, {
+      type: "COLLECTOR_START_TASK",
+      taskTitle: task.title,
+      sampleIntervalMs,
+    });
     if (next.captureSnapshots) {
       try {
         const context = await chrome.tabs

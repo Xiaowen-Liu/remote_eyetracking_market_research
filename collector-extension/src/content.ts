@@ -66,7 +66,7 @@ const targets: Point[] = [
   [0.5, 0.8],
   [0.84, 0.8],
 ];
-const sampleIntervalMs = 100;
+const defaultSampleIntervalMs = 50;
 const checkWindowSize = 18;
 const samplesPerTarget = 3;
 const accuracyDurationMs = 5_000;
@@ -86,6 +86,8 @@ let cameraReady = false;
 let collecting = false;
 let samples: CapturedSample[] = [];
 let lastSampleAt = 0;
+let sampleIntervalMs = defaultSampleIntervalMs;
+const heatPoints: HTMLElement[] = [];
 let latestFeature: Point | null = null;
 let featureWindow: Point[] = [];
 let model: GazeModel | null = null;
@@ -825,7 +827,7 @@ function processFeature(root: HTMLDivElement, value: Point | null, frameData?: F
   if (latestFeature)
     featureWindow = [...featureWindow.slice(-(checkWindowSize - 1)), latestFeature];
   else featureWindow = [];
-  updateCameraCheck(root);
+  if (runtime.calibrationStage === "camera") updateCameraCheck(root);
   const predicted = latestFeature && model ? predictGaze(model, latestFeature) : null;
   if (runtime.calibrationStage === "accuracy" && predicted)
     runtime.accuracyPredictions = [
@@ -838,15 +840,6 @@ function processFeature(root: HTMLDivElement, value: Point | null, frameData?: F
     const point = root.querySelector<HTMLElement>("[data-webgaze-dot]")!;
     point.style.left = `${x * 100}%`;
     point.style.top = `${y * 100}%`;
-    if (collecting) {
-      const heat = document.createElement("i");
-      heat.className = "webgaze-heat-point";
-      heat.style.left = `${x * 100}%`;
-      heat.style.top = `${y * 100}%`;
-      root.querySelector("[data-webgaze-heat]")!.append(heat);
-      if (root.querySelectorAll(".webgaze-heat-point").length > 90)
-        heat.parentElement!.firstElementChild?.remove();
-    }
     const now = performance.now();
     if (collecting && now - lastSampleAt >= sampleIntervalMs) {
       lastSampleAt = now;
@@ -858,6 +851,13 @@ function processFeature(root: HTMLDivElement, value: Point | null, frameData?: F
         viewport: { width: innerWidth, height: innerHeight },
         scroll: { x: scrollX, y: scrollY },
       });
+      const heat = document.createElement("i");
+      heat.className = "webgaze-heat-point";
+      heat.style.left = `${x * 100}%`;
+      heat.style.top = `${y * 100}%`;
+      root.querySelector("[data-webgaze-heat]")!.append(heat);
+      heatPoints.push(heat);
+      if (heatPoints.length > 48) heatPoints.shift()?.remove();
       if (samples.length >= 10) void flushSamples();
     }
   }
@@ -903,6 +903,12 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.type === "COLLECTOR_ARM") overlay();
   if (message.type === "COLLECTOR_START_TASK") {
     collecting = true;
+    const requestedInterval = Number(message.sampleIntervalMs);
+    sampleIntervalMs = Number.isFinite(requestedInterval)
+      ? Math.min(1000, Math.max(25, requestedInterval))
+      : defaultSampleIntervalMs;
+    lastSampleAt = 0;
+    while (heatPoints.length) heatPoints.pop()?.remove();
     const root = overlay();
     root.dataset.mode = "task";
     root.querySelector("[data-webgaze-phase]")!.textContent = "Collecting";

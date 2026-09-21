@@ -894,7 +894,7 @@ export interface components {
         CollectionPolicy: {
             /**
              * Sample Interval Ms
-             * @default 100
+             * @default 50
              */
             sample_interval_ms: number;
             /**

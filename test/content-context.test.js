@@ -102,3 +102,32 @@ test("excludes full-page main containers from DOM proposals", async () => {
   assert.match(source, /if \(!label \|\| tag === "main"\) return null/);
   assert.match(source, /proposal\.width \* proposal\.height <= 0\.45/);
 });
+
+test("uses the study sampling policy without rendering a heat node on every camera frame", async () => {
+  const contentSource = await readFile(
+    new URL("../collector-extension/src/content.ts", import.meta.url),
+    "utf8",
+  );
+  const backgroundSource = await readFile(
+    new URL("../collector-extension/background.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(backgroundSource, /sample_interval_ms \?\? 50/);
+  assert.match(backgroundSource, /type: "COLLECTOR_START_TASK",[\s\S]*sampleIntervalMs/);
+  assert.match(contentSource, /Math\.min\(1000, Math\.max\(25, requestedInterval\)\)/);
+  assert.match(
+    contentSource,
+    /if \(collecting && now - lastSampleAt >= sampleIntervalMs\) \{[\s\S]*heatPoints\.push\(heat\)/,
+  );
+  assert.doesNotMatch(contentSource, /querySelectorAll\("\.webgaze-heat-point"\)/);
+});
+
+test("avoids hidden camera diagnostics work while a task is collecting", async () => {
+  const source = await readFile(
+    new URL("../collector-extension/src/content.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /if \(runtime\.calibrationStage === "camera"\) updateCameraCheck\(root\)/);
+});
