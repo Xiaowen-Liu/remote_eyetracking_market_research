@@ -5,6 +5,7 @@ import {
   addSnapshot,
   exportArtifact,
   newSession,
+  replayContextPayload,
 } from "../collector-extension/core/session-artifact.js";
 
 test("collector artifact excludes camera video and gates snapshots by consented policy", () => {
@@ -70,4 +71,16 @@ test("collector export whitelists research data and excludes session credentials
   assert.equal("protocol" in artifact, false);
   assert.equal("pendingBatches" in artifact, false);
   assert.equal("lastError" in artifact, false);
+});
+
+test("automatic replay upload excludes gaze duplicates and credentials", () => {
+  const session = {
+    ...newSession({ sessionId: "session-4", captureSnapshots: false }),
+    accessToken: "participant-access-secret",
+    gazeSamples: [{ x: 0.4, y: 0.6 }],
+  };
+  const payload = replayContextPayload(session, "2026-01-01T00:00:02Z");
+  assert.equal(payload.endedAt, "2026-01-01T00:00:02Z");
+  assert.equal("gazeSamples" in payload, false);
+  assert.equal("accessToken" in payload, false);
 });

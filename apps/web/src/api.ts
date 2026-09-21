@@ -250,6 +250,8 @@ export const api = {
     researcherRequest<{ items: ParticipantSessionSummary[]; total: number }>(
       `/studies/${studyId}/participant-sessions`,
     ),
+  getParticipantSessionReplay: (studyId: string, sessionId: string) =>
+    researcherRequest<unknown>(`/studies/${studyId}/participant-sessions/${sessionId}/replay`),
   runAnalysisJob: (jobId: string) =>
     researcherRequest<AnalysisResult>(`/analysis-jobs/${jobId}/run`, { method: "POST" }),
   getAnalysisResult: (jobId: string) =>

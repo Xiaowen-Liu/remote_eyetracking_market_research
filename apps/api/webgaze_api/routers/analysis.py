@@ -27,11 +27,13 @@ from ..models import (
     AnalysisStatus,
     AuditEvent,
     CalibrationResult,
+    GazeSample,
     GazeSampleBatch,
     ParticipantSession,
     ProjectRole,
     SessionEvent,
     SessionLifecycle,
+    SessionReplayContext,
     Study,
     StudyVersion,
     Task,
@@ -44,6 +46,11 @@ from ..schemas import (
     ErrorResponse,
     ParticipantSessionSummary,
     ParticipantSessionSummaryListResponse,
+    ReplayCalibration,
+    ReplayEvent,
+    ReplayGazeSample,
+    ReplaySnapshot,
+    SessionReplayArtifact,
     SessionTimelineEvent,
 )
 
@@ -228,17 +235,19 @@ def list_study_participant_sessions(
             .where(CalibrationResult.session_id == session.id)
             .order_by(CalibrationResult.attempt.desc())
         )
-        completed_task_count = db.scalar(
-            select(func.count()).select_from(TaskRun).where(
-                TaskRun.session_id == session.id, TaskRun.ended_at.is_not(None)
+        completed_task_count = (
+            db.scalar(
+                select(func.count())
+                .select_from(TaskRun)
+                .where(TaskRun.session_id == session.id, TaskRun.ended_at.is_not(None))
             )
-        ) or 0
+            or 0
+        )
         gaze_batch_count, gaze_sample_count = db.execute(
             select(
                 func.count(GazeSampleBatch.id),
                 func.coalesce(func.sum(GazeSampleBatch.sample_count), 0),
-            )
-            .where(GazeSampleBatch.session_id == session.id)
+            ).where(GazeSampleBatch.session_id == session.id)
         ).one()
         job = db.scalar(
             select(AnalysisJob)
@@ -253,34 +262,110 @@ def list_study_participant_sessions(
                 .limit(6)
             )
         )
-        items.append(ParticipantSessionSummary(
-            id=session.id,
-            participant_alias=session.participant_alias,
-            lifecycle=session.lifecycle,
-            created_at=session.created_at,
-            consented_at=session.consented_at,
-            submitted_at=session.submitted_at,
-            calibration_quality=calibration.quality_grade if calibration else None,
-            calibration_error_px=(
-                float(calibration.error_px)
-                if calibration and calibration.error_px is not None
-                else None
-            ),
-            completed_task_count=completed_task_count,
-            gaze_batch_count=gaze_batch_count,
-            gaze_sample_count=gaze_sample_count,
-            analysis_status=job.status if job else None,
-            source=(
-                "synthetic-demo"
-                if session.participant_alias == "Synthetic demo participant"
-                else "participant-session"
-            ),
-            events=[
-                SessionTimelineEvent(kind=event.kind, occurred_at=event.occurred_at)
-                for event in events
-            ],
-        ))
+        items.append(
+            ParticipantSessionSummary(
+                id=session.id,
+                participant_alias=session.participant_alias,
+                lifecycle=session.lifecycle,
+                created_at=session.created_at,
+                consented_at=session.consented_at,
+                submitted_at=session.submitted_at,
+                calibration_quality=calibration.quality_grade if calibration else None,
+                calibration_error_px=(
+                    float(calibration.error_px)
+                    if calibration and calibration.error_px is not None
+                    else None
+                ),
+                completed_task_count=completed_task_count,
+                gaze_batch_count=gaze_batch_count,
+                gaze_sample_count=gaze_sample_count,
+                analysis_status=job.status if job else None,
+                source=(
+                    "synthetic-demo"
+                    if session.participant_alias == "Synthetic demo participant"
+                    else "participant-session"
+                ),
+                events=[
+                    SessionTimelineEvent(kind=event.kind, occurred_at=event.occurred_at)
+                    for event in events
+                ],
+            )
+        )
     return ParticipantSessionSummaryListResponse(items=items, total=len(items))
+
+
+@router.get(
+    "/studies/{study_id}/participant-sessions/{session_id}/replay",
+    response_model=SessionReplayArtifact,
+    responses={404: {"model": ErrorResponse}},
+    operation_id="getParticipantSessionReplay",
+)
+def get_participant_session_replay(
+    study_id: uuid.UUID,
+    session_id: uuid.UUID,
+    owner_id: CurrentOwnerId,
+    db: Session = DbSession,
+) -> SessionReplayArtifact:
+    study, _ = require_study_access(db, study_id, owner_id)
+    participant_session = db.scalar(
+        select(ParticipantSession)
+        .join(StudyVersion, StudyVersion.id == ParticipantSession.study_version_id)
+        .where(ParticipantSession.id == session_id, StudyVersion.study_id == study.id)
+    )
+    if not participant_session:
+        raise ApiError(404, "SESSION_NOT_FOUND", "Participant session was not found")
+    context = db.get(SessionReplayContext, participant_session.id)
+    if not context:
+        raise ApiError(404, "REPLAY_NOT_FOUND", "This session has no uploaded replay context")
+    samples = list(
+        db.scalars(
+            select(GazeSample)
+            .join(GazeSampleBatch, GazeSampleBatch.id == GazeSample.batch_id)
+            .where(GazeSampleBatch.session_id == participant_session.id)
+            .order_by(GazeSample.timestamp, GazeSample.id)
+        )
+    )
+    calibration = db.scalar(
+        select(CalibrationResult)
+        .where(CalibrationResult.session_id == participant_session.id)
+        .order_by(CalibrationResult.attempt.desc())
+    )
+    return SessionReplayArtifact(
+        schemaVersion="1.0",
+        sessionId=participant_session.id,
+        startedAt=context.started_at,
+        endedAt=context.ended_at,
+        captureSnapshots=context.capture_snapshots,
+        events=[ReplayEvent.model_validate(item) for item in context.events],
+        snapshots=[ReplaySnapshot.model_validate(item) for item in context.snapshots],
+        gazeSamples=[
+            ReplayGazeSample(
+                x=float(sample.x_normalized),
+                y=float(sample.y_normalized),
+                at=sample.timestamp,
+                confidence=float(sample.confidence) if sample.confidence is not None else None,
+                viewport={"width": sample.viewport_width, "height": sample.viewport_height},
+                scroll={"x": float(sample.scroll_x), "y": float(sample.scroll_y)},
+            )
+            for sample in samples
+        ],
+        calibration=(
+            ReplayCalibration(
+                attempt=calibration.attempt,
+                observed_sample_count=calibration.observed_sample_count,
+                error_px=float(calibration.error_px) if calibration.error_px is not None else None,
+                quality_grade=calibration.quality_grade,
+                accepted=participant_session.lifecycle == SessionLifecycle.SUBMITTED,
+            )
+            if calibration
+            else None
+        ),
+        privacy={
+            "rawCameraVideo": False,
+            "eventCollection": True,
+            "visibleTabSnapshots": context.capture_snapshots,
+        },
+    )
 
 
 @router.get(

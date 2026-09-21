@@ -119,6 +119,7 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
   const taskRunId = "00000000-0000-4000-8000-000000000302";
   const calibrationBodies: Array<Record<string, unknown>> = [];
   const gazeBodies: Array<Record<string, unknown>> = [];
+  const replayBodies: Array<Record<string, unknown>> = [];
   const authorizedPaths: string[] = [];
   let failFirstGazeRequest = true;
 
@@ -199,6 +200,13 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
     }
     if (path === `/api/v1/participant-sessions/${sessionId}/submit`) {
       await route.fulfill({ json: { lifecycle: "submitted", analysis_job_id: "analysis-e2e" } });
+      return;
+    }
+    if (path === `/api/v1/participant-sessions/${sessionId}/replay-context`) {
+      replayBodies.push(request.postDataJSON());
+      await route.fulfill({
+        json: { sessionId, eventCount: 1, snapshotCount: 0 },
+      });
       return;
     }
     await route.fulfill({
@@ -296,6 +304,14 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
     chrome.runtime.sendMessage({ type: "SUBMIT_STUDY" }),
   );
   expect(submitted).toMatchObject({ ok: true, state: { phase: "submitted" } });
+  expect(replayBodies).toHaveLength(1);
+  expect(replayBodies[0]).toMatchObject({
+    schemaVersion: "1.0",
+    captureSnapshots: false,
+    events: expect.any(Array),
+    snapshots: [],
+  });
+  expect(replayBodies[0]).not.toHaveProperty("gazeSamples");
 
   const downloaded = await popup.evaluate(() =>
     chrome.runtime.sendMessage({ type: "DOWNLOAD_ARTIFACT" }),
@@ -328,6 +344,7 @@ test("completes calibration, retries ordered gaze batches, submits, and exports 
       `/api/v1/participant-sessions/${sessionId}/task-runs`,
       `/api/v1/participant-sessions/${sessionId}/gaze-batches`,
       `/api/v1/participant-sessions/${sessionId}/task-runs/${taskRunId}/complete`,
+      `/api/v1/participant-sessions/${sessionId}/replay-context`,
       `/api/v1/participant-sessions/${sessionId}/submit`,
     ]),
   );

@@ -3,14 +3,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from test_studies import create_project, study_payload
 
-from webgaze_api.models import GazeSample, SessionEvent
+from webgaze_api.models import GazeSample, SessionEvent, SessionReplayContext
 
 
 def published_link(client: TestClient) -> tuple[str, str]:
     project_id = create_project(client)
-    study = client.post(
-        f"/api/v1/projects/{project_id}/studies", json=study_payload()
-    ).json()
+    study = client.post(f"/api/v1/projects/{project_id}/studies", json=study_payload()).json()
     published = client.post(
         f"/api/v1/studies/{study['id']}/publish",
         headers={"Idempotency-Key": "participant-flow"},
@@ -123,6 +121,66 @@ def ready_session(client: TestClient) -> tuple[dict, dict[str, str]]:
     )
     assert response.status_code == 201
     return session, headers
+
+
+def replay_context() -> dict:
+    return {
+        "schemaVersion": "1.0",
+        "startedAt": "2026-09-07T18:02:00Z",
+        "endedAt": "2026-09-07T18:03:00Z",
+        "captureSnapshots": True,
+        "events": [
+            {
+                "type": "page-open",
+                "url": "https://example.test/pricing",
+                "at": "2026-09-07T18:02:00Z",
+                "detail": {"value": {"trigger": "page-open", "proposals": []}},
+            }
+        ],
+        "snapshots": [
+            {
+                "at": "2026-09-07T18:02:00Z",
+                "url": "https://example.test/pricing",
+                "reason": "page-open",
+                "dataUrl": "data:image/jpeg;base64,abc",
+                "viewport": {"width": 1280, "height": 720},
+                "scroll": {"x": 0, "y": 0},
+            }
+        ],
+    }
+
+
+def test_replay_context_is_private_idempotent_and_consent_gated(
+    client: TestClient, db_session: Session
+) -> None:
+    session, headers = ready_session(client)
+    endpoint = f"/api/v1/participant-sessions/{session['id']}/replay-context"
+
+    missing_token = client.put(endpoint, json=replay_context())
+    assert missing_token.status_code == 401
+
+    saved = client.put(endpoint, headers=headers, json=replay_context())
+    assert saved.status_code == 200
+    assert saved.json()["eventCount"] == 1
+    assert saved.json()["snapshotCount"] == 1
+
+    replacement = replay_context()
+    replacement["events"].append(
+        {
+            "type": "scroll-settled",
+            "url": "https://example.test/pricing",
+            "at": "2026-09-07T18:02:30Z",
+        }
+    )
+    repeated = client.put(endpoint, headers=headers, json=replacement)
+    assert repeated.status_code == 200
+    assert repeated.json()["eventCount"] == 2
+    assert db_session.scalar(select(func.count()).select_from(SessionReplayContext)) == 1
+
+    without_consent = replay_context()
+    without_consent["captureSnapshots"] = False
+    rejected = client.put(endpoint, headers=headers, json=without_consent)
+    assert rejected.status_code == 422
 
 
 def test_calibration_records_failed_retry_then_accepts_quality(client: TestClient) -> None:

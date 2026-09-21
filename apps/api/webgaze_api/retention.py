@@ -17,6 +17,7 @@ from .models import (
     ParticipantSession,
     RetentionTombstone,
     SessionEvent,
+    SessionReplayContext,
     Study,
     StudyVersion,
     TaskRun,
@@ -75,13 +76,14 @@ def delete_expired_session(
             db, GazeSampleBatch, GazeSampleBatch.session_id == session_id
         ),
         "session_events": _count(db, SessionEvent, SessionEvent.session_id == session_id),
+        "session_replay_contexts": _count(
+            db, SessionReplayContext, SessionReplayContext.session_id == session_id
+        ),
         "task_runs": _count(db, TaskRun, TaskRun.session_id == session_id),
         "calibration_results": _count(
             db, CalibrationResult, CalibrationResult.session_id == session_id
         ),
-        "analysis_results": _count(
-            db, AnalysisResult, AnalysisResult.session_id == session_id
-        ),
+        "analysis_results": _count(db, AnalysisResult, AnalysisResult.session_id == session_id),
         "analysis_jobs": _count(db, AnalysisJob, AnalysisJob.session_id == session_id),
         "participant_sessions": 1,
     }
@@ -89,6 +91,7 @@ def delete_expired_session(
     for model in (
         AnalysisResult,
         AnalysisJob,
+        SessionReplayContext,
         SessionEvent,
         TaskRun,
         CalibrationResult,

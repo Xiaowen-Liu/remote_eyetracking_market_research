@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import func, select
-from test_participants import gaze_batch, ready_session
+from test_participants import gaze_batch, ready_session, replay_context
 
 from webgaze_api.models import (
     GazeSample,
@@ -29,6 +29,12 @@ def test_retention_dry_run_then_deletes_expired_session_data(client, db_session)
         json=gaze_batch("893cb9aa-da8f-40c7-90a8-8e18ef265aad", 1),
     )
     assert ingested.status_code == 201
+    replay = client.put(
+        f"/api/v1/participant-sessions/{session_id}/replay-context",
+        headers=participant_headers,
+        json=replay_context(),
+    )
+    assert replay.status_code == 200
 
     participant_session = db_session.get(ParticipantSession, session_uuid)
     participant_session.retention_expires_at = datetime.now(timezone.utc) - timedelta(days=1)
@@ -55,6 +61,7 @@ def test_retention_dry_run_then_deletes_expired_session_data(client, db_session)
     assert executed.status_code == 200
     assert executed.json()["deleted_sessions"] == 1
     assert executed.json()["deleted_counts"]["gaze_samples"] == 1
+    assert executed.json()["deleted_counts"]["session_replay_contexts"] == 1
     db_session.expire_all()
     assert db_session.get(ParticipantSession, session_uuid) is None
     assert db_session.scalar(select(func.count()).select_from(GazeSample)) == 0

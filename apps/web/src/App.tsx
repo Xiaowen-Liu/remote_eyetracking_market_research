@@ -1136,6 +1136,39 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       const sessionResponse = await api.listStudyParticipantSessions(study.id);
       setJobs(response.items);
       setSessions(sessionResponse.items);
+      const uploadedArtifacts = (
+        await Promise.all(
+          sessionResponse.items
+            .filter((session) => session.source === "participant-session")
+            .map(async (session) => {
+              try {
+                return parseCollectorArtifact(
+                  await api.getParticipantSessionReplay(study.id, session.id),
+                );
+              } catch (error) {
+                if (error instanceof ApiClientError && error.code === "REPLAY_NOT_FOUND")
+                  return null;
+                throw error;
+              }
+            }),
+        )
+      ).filter((artifact): artifact is CollectorArtifact => artifact !== null);
+      if (uploadedArtifacts.length) {
+        setCollectorArtifacts((current) => {
+          const uploadedIds = new Set(uploadedArtifacts.map((artifact) => artifact.sessionId));
+          return [
+            ...uploadedArtifacts,
+            ...current.filter((artifact) => !uploadedIds.has(artifact.sessionId)),
+          ];
+        });
+        setCollectorArtifact((current) => {
+          const replacement = current
+            ? uploadedArtifacts.find((artifact) => artifact.sessionId === current.sessionId)
+            : null;
+          return replacement ?? current ?? uploadedArtifacts[0];
+        });
+        void storeArtifacts(study.id, uploadedArtifacts).catch(() => undefined);
+      }
       const latest = response.items[0];
       const completed = response.items.filter((job) => job.status === "succeeded");
       const loaded = await Promise.all(

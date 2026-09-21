@@ -3,12 +3,12 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
-from test_participants import gaze_batch, ready_session
+from test_participants import gaze_batch, ready_session, replay_context
 from test_studies import create_project, study_payload
 
 from webgaze_api import analysis_worker
 from webgaze_api.analysis_worker import claim_analysis_job, process_claimed_job
-from webgaze_api.models import AnalysisJob, AnalysisStatus
+from webgaze_api.models import AnalysisJob, AnalysisStatus, ParticipantSession, StudyVersion
 
 
 def complete_study_with_samples(client: TestClient) -> tuple[dict, dict[str, str]]:
@@ -91,11 +91,55 @@ def test_submission_queues_idempotent_analysis_and_task_metrics(client: TestClie
     assert "Find pricing" in exported_csv.text
 
 
+def test_researcher_can_fetch_automatically_uploaded_replay(client: TestClient, db_session) -> None:
+    session, headers = complete_study_with_samples(client)
+    uploaded = client.put(
+        f"/api/v1/participant-sessions/{session['id']}/replay-context",
+        headers=headers,
+        json=replay_context(),
+    )
+    assert uploaded.status_code == 200
+    submitted = client.post(f"/api/v1/participant-sessions/{session['id']}/submit", headers=headers)
+    assert submitted.status_code == 200
+
+    participant_session = db_session.get(ParticipantSession, UUID(session["id"]))
+    version = db_session.get(StudyVersion, participant_session.study_version_id)
+    replay = client.get(
+        f"/api/v1/studies/{version.study_id}/participant-sessions/{session['id']}/replay"
+    )
+    assert replay.status_code == 200
+    artifact = replay.json()
+    assert artifact["schemaVersion"] == "1.0"
+    assert artifact["sessionId"] == session["id"]
+    assert len(artifact["events"]) == 1
+    assert len(artifact["snapshots"]) == 1
+    assert len(artifact["gazeSamples"]) == 2
+    assert artifact["gazeSamples"][0]["x"] == 0.25
+    assert artifact["privacy"] == {
+        "rawCameraVideo": False,
+        "eventCollection": True,
+        "visibleTabSnapshots": True,
+    }
+    replayed_upload = client.put(
+        f"/api/v1/participant-sessions/{session['id']}/replay-context",
+        headers=headers,
+        json=replay_context(),
+    )
+    assert replayed_upload.status_code == 200
+    changed = replay_context()
+    changed["events"] = []
+    rejected_change = client.put(
+        f"/api/v1/participant-sessions/{session['id']}/replay-context",
+        headers=headers,
+        json=changed,
+    )
+    assert rejected_change.status_code == 409
+    assert rejected_change.json()["error"]["code"] == "REPLAY_ALREADY_FINAL"
+
+
 def test_worker_claims_and_processes_a_queued_analysis_job(client, db_session) -> None:
     session, headers = complete_study_with_samples(client)
-    submitted = client.post(
-        f"/api/v1/participant-sessions/{session['id']}/submit", headers=headers
-    )
+    submitted = client.post(f"/api/v1/participant-sessions/{session['id']}/submit", headers=headers)
     assert submitted.status_code == 200
 
     claimed = claim_analysis_job(db_session)
@@ -115,9 +159,7 @@ def test_worker_claims_and_processes_a_queued_analysis_job(client, db_session) -
 
 def test_worker_retries_then_dead_letters_a_failed_job(client, db_session, monkeypatch) -> None:
     session, headers = complete_study_with_samples(client)
-    submitted = client.post(
-        f"/api/v1/participant-sessions/{session['id']}/submit", headers=headers
-    )
+    submitted = client.post(f"/api/v1/participant-sessions/{session['id']}/submit", headers=headers)
     job_id = UUID(submitted.json()["analysis_job"]["id"])
 
     def fail_analysis(*_args, **_kwargs):
@@ -141,9 +183,7 @@ def test_worker_retries_then_dead_letters_a_failed_job(client, db_session, monke
 
 def test_synthetic_results_are_disclosed_and_idempotent(client: TestClient) -> None:
     project_id = create_project(client)
-    study = client.post(
-        f"/api/v1/projects/{project_id}/studies", json=study_payload()
-    ).json()
+    study = client.post(f"/api/v1/projects/{project_id}/studies", json=study_payload()).json()
     published = client.post(
         f"/api/v1/studies/{study['id']}/publish",
         headers={"Idempotency-Key": "synthetic-results"},

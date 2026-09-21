@@ -1,4 +1,10 @@
-import { addEvent, addSnapshot, exportArtifact, newSession } from "./core/session-artifact.js";
+import {
+  addEvent,
+  addSnapshot,
+  exportArtifact,
+  newSession,
+  replayContextPayload,
+} from "./core/session-artifact.js";
 import {
   apiUrl,
   calibrationPayload,
@@ -237,6 +243,10 @@ async function finishTask(session) {
 async function submitStudy(session) {
   if (session.taskRun || session.completedTasks !== session.protocol.tasks.length)
     throw new Error("Complete every task before submitting");
+  await participantRequest(session, `/participant-sessions/${session.sessionId}/replay-context`, {
+    method: "PUT",
+    body: JSON.stringify(replayContextPayload(session)),
+  });
   const submitted = await participantRequest(
     session,
     `/participant-sessions/${session.sessionId}/submit`,

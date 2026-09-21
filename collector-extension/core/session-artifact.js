@@ -61,3 +61,15 @@ export function exportArtifact(session, endedAt = new Date().toISOString()) {
     },
   };
 }
+
+export function replayContextPayload(session, endedAt = new Date().toISOString()) {
+  const artifact = exportArtifact(session, endedAt);
+  return {
+    schemaVersion: artifact.schemaVersion,
+    startedAt: artifact.startedAt,
+    endedAt: artifact.endedAt,
+    captureSnapshots: artifact.captureSnapshots,
+    events: artifact.events,
+    snapshots: artifact.snapshots,
+  };
+}

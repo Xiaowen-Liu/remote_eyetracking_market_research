@@ -174,6 +174,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/participant-sessions/{session_id}/replay-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Upsert Replay Context */
+        put: operations["upsertParticipantReplayContext"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/participant-sessions/{session_id}/submit": {
         parameters: {
             query?: never;
@@ -531,6 +548,23 @@ export interface paths {
         };
         /** List Study Participant Sessions */
         get: operations["listStudyParticipantSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studies/{study_id}/participant-sessions/{session_id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Participant Session Replay */
+        get: operations["getParticipantSessionReplay"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1376,6 +1410,121 @@ export interface components {
              */
             status: "ready";
         };
+        /** ReplayCalibration */
+        ReplayCalibration: {
+            /** Accepted */
+            accepted: boolean;
+            /** Attempt */
+            attempt: number;
+            /** Error Px */
+            error_px: number | null;
+            /** Observed Sample Count */
+            observed_sample_count: number;
+            quality_grade: components["schemas"]["QualityGrade"];
+        };
+        /** ReplayContextCreate */
+        ReplayContextCreate: {
+            /**
+             * Capturesnapshots
+             * @default false
+             */
+            captureSnapshots: boolean;
+            /**
+             * Endedat
+             * Format: date-time
+             */
+            endedAt: string;
+            /** Events */
+            events?: components["schemas"]["ReplayEvent"][];
+            /**
+             * Schemaversion
+             * @default 1.0
+             * @constant
+             */
+            schemaVersion: "1.0";
+            /** Snapshots */
+            snapshots?: components["schemas"]["ReplaySnapshot"][];
+            /**
+             * Startedat
+             * Format: date-time
+             */
+            startedAt: string;
+        };
+        /** ReplayContextResponse */
+        ReplayContextResponse: {
+            /** Eventcount */
+            eventCount: number;
+            /**
+             * Sessionid
+             * Format: uuid
+             */
+            sessionId: string;
+            /** Snapshotcount */
+            snapshotCount: number;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** ReplayEvent */
+        ReplayEvent: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Detail */
+            detail?: unknown;
+            /** Type */
+            type: string;
+            /** Url */
+            url: string;
+        };
+        /** ReplayGazeSample */
+        ReplayGazeSample: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Confidence */
+            confidence?: number | null;
+            /** Scroll */
+            scroll: {
+                [key: string]: number;
+            };
+            /** Viewport */
+            viewport: {
+                [key: string]: number;
+            };
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+        };
+        /** ReplaySnapshot */
+        ReplaySnapshot: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Dataurl */
+            dataUrl: string;
+            /** Reason */
+            reason?: string | null;
+            /** Scroll */
+            scroll?: {
+                [key: string]: number;
+            } | null;
+            /** Url */
+            url?: string | null;
+            /** Viewport */
+            viewport?: {
+                [key: string]: number;
+            } | null;
+        };
         /** ResearcherLogin */
         ResearcherLogin: {
             /** Email */
@@ -1471,6 +1620,43 @@ export interface components {
          * @enum {string}
          */
         SessionLifecycle: "created" | "consented" | "calibrating" | "ready" | "running" | "paused" | "submitted" | "withdrawn" | "expired" | "abandoned";
+        /** SessionReplayArtifact */
+        SessionReplayArtifact: {
+            calibration?: components["schemas"]["ReplayCalibration"] | null;
+            /** Capturesnapshots */
+            captureSnapshots: boolean;
+            /**
+             * Endedat
+             * Format: date-time
+             */
+            endedAt: string;
+            /** Events */
+            events: components["schemas"]["ReplayEvent"][];
+            /** Gazesamples */
+            gazeSamples: components["schemas"]["ReplayGazeSample"][];
+            /** Privacy */
+            privacy: {
+                [key: string]: boolean;
+            };
+            /**
+             * Schemaversion
+             * @default 1.0
+             * @constant
+             */
+            schemaVersion: "1.0";
+            /**
+             * Sessionid
+             * Format: uuid
+             */
+            sessionId: string;
+            /** Snapshots */
+            snapshots: components["schemas"]["ReplaySnapshot"][];
+            /**
+             * Startedat
+             * Format: date-time
+             */
+            startedAt: string;
+        };
         /** SessionSubmitResponse */
         SessionSubmitResponse: {
             analysis_job: components["schemas"]["AnalysisJobResponse"];
@@ -2189,6 +2375,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GazeBatchResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsertParticipantReplayContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayContextCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayContextResponse"];
                 };
             };
             /** @description Unauthorized */
@@ -3611,6 +3852,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParticipantSessionSummaryListResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getParticipantSessionReplay: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "x-demo-owner-id"?: string | null;
+            };
+            path: {
+                study_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionReplayArtifact"];
                 };
             };
             /** @description Not Found */

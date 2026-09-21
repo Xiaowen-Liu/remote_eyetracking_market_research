@@ -467,6 +467,78 @@ class SessionTimelineEvent(ApiModel):
     occurred_at: datetime
 
 
+class ReplayEvent(ApiModel):
+    type: str = Field(min_length=1, max_length=80)
+    url: str = Field(min_length=1, max_length=4000)
+    at: datetime
+    detail: Any = None
+
+
+class ReplaySnapshot(ApiModel):
+    at: datetime
+    url: str | None = Field(default=None, max_length=4000)
+    reason: str | None = Field(default=None, max_length=80)
+    dataUrl: str = Field(min_length=1, max_length=2_000_000)
+    viewport: dict[str, int] | None = None
+    scroll: dict[str, float] | None = None
+
+
+class ReplayContextCreate(ApiModel):
+    schemaVersion: Literal["1.0"] = "1.0"
+    startedAt: datetime
+    endedAt: datetime
+    captureSnapshots: bool = False
+    events: list[ReplayEvent] = Field(default_factory=list, max_length=500)
+    snapshots: list[ReplaySnapshot] = Field(default_factory=list, max_length=12)
+
+    @model_validator(mode="after")
+    def validate_replay_context(self) -> "ReplayContextCreate":
+        if self.endedAt < self.startedAt:
+            raise ValueError("Replay end cannot precede its start")
+        if self.snapshots and not self.captureSnapshots:
+            raise ValueError("Snapshots require participant snapshot consent")
+        if sum(len(snapshot.dataUrl) for snapshot in self.snapshots) > 8_000_000:
+            raise ValueError("Replay snapshots exceed the 8 MB session limit")
+        return self
+
+
+class ReplayContextResponse(ApiModel):
+    sessionId: UUID
+    eventCount: int
+    snapshotCount: int
+    updatedAt: datetime
+
+
+class ReplayGazeSample(ApiModel):
+    x: float
+    y: float
+    at: datetime
+    confidence: float | None = None
+    viewport: dict[str, int]
+    scroll: dict[str, float]
+
+
+class ReplayCalibration(ApiModel):
+    attempt: int
+    observed_sample_count: int
+    error_px: float | None
+    quality_grade: QualityGrade
+    accepted: bool
+
+
+class SessionReplayArtifact(ApiModel):
+    schemaVersion: Literal["1.0"] = "1.0"
+    sessionId: UUID
+    startedAt: datetime
+    endedAt: datetime
+    captureSnapshots: bool
+    events: list[ReplayEvent]
+    snapshots: list[ReplaySnapshot]
+    gazeSamples: list[ReplayGazeSample]
+    calibration: ReplayCalibration | None = None
+    privacy: dict[str, bool]
+
+
 class ParticipantSessionSummary(ApiModel):
     id: UUID
     participant_alias: str

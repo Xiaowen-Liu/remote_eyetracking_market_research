@@ -334,6 +334,23 @@ class ParticipantSession(Base):
     study_version: Mapped[StudyVersion] = relationship()
 
 
+class SessionReplayContext(Base):
+    __tablename__ = "session_replay_contexts"
+
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("participant_sessions.id", ondelete="CASCADE"), primary_key=True
+    )
+    schema_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    capture_snapshots: Mapped[bool] = mapped_column(nullable=False, default=False)
+    events: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    snapshots: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class CalibrationResult(Base):
     __tablename__ = "calibration_results"
     __table_args__ = (UniqueConstraint("session_id", "attempt"),)
