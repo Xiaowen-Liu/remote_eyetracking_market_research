@@ -47,15 +47,18 @@ function faceFrame(landmarks: NormalizedLandmark[]): FaceFrame {
     size = Math.max(width, height);
   const centerX = (minX + maxX) / 2,
     centerY = (minY + maxY) / 2;
-  const centered = Math.abs(centerX - 0.5) < 0.18 && Math.abs(centerY - 0.5) < 0.2;
+  // Face landmarks include hair/jaw outliers and the preview is mirrored. Keep
+  // this check instructional, not pixel-perfect: calibration itself handles
+  // the remaining offset.
+  const centered = Math.abs(centerX - 0.5) < 0.27 && Math.abs(centerY - 0.5) < 0.28;
   const inBounds =
     centered &&
-    minX > 0.035 &&
-    maxX < 0.965 &&
-    minY > 0.035 &&
-    maxY < 0.965 &&
-    size > 0.17 &&
-    size < 0.78;
+    minX > 0.01 &&
+    maxX < 0.99 &&
+    minY > 0.01 &&
+    maxY < 0.99 &&
+    size > 0.14 &&
+    size < 0.85;
   return { detected: true, centered, inBounds, size };
 }
 
@@ -67,12 +70,12 @@ function updateEmbeddedDiagnostics(value: FaceFrame) {
   if (!detection || !distance || !framing) return;
   detection.textContent = value.detected ? "✓ Face found" : "○ Looking for a face";
   detection.dataset.passed = String(value.detected);
-  const distanceOkay = value.detected && value.size >= 0.17 && value.size <= 0.78;
+  const distanceOkay = value.detected && value.size >= 0.14 && value.size <= 0.85;
   distance.textContent = !value.detected
     ? "○ Distance unavailable"
     : distanceOkay
       ? "✓ Distance looks good"
-      : value.size < 0.17
+      : value.size < 0.14
         ? "○ Move closer to the screen"
         : "○ Move farther from the screen";
   distance.dataset.passed = String(distanceOkay);
