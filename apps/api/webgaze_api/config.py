@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = Field(default="postgresql+psycopg://webgaze:webgaze@localhost:5432/webgaze")
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
+    cors_origin_regex: str | None = None
     sql_echo: bool = False
     researcher_auth_required: bool = False
     researcher_session_hours: int = Field(default=12, ge=1, le=168)

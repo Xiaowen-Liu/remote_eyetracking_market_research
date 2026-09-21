@@ -13,6 +13,7 @@ Railway:
 WEBGAZE_ENVIRONMENT=production
 WEBGAZE_DATABASE_URL=${{Postgres.DATABASE_URL}}
 WEBGAZE_CORS_ORIGINS=["https://your-project.vercel.app"]
+WEBGAZE_CORS_ORIGIN_REGEX=https://your-project-[a-z0-9]+-your-team\.vercel\.app
 WEBGAZE_SQL_ECHO=false
 WEBGAZE_RESEARCHER_AUTH_REQUIRED=true
 WEBGAZE_RESEARCHER_SESSION_HOURS=12
@@ -36,7 +37,10 @@ VITE_API_URL=https://your-api.up.railway.app
 1. Run `npm test`, `npm run build:web`, `npm run generate:contract`, and Ruff.
 2. Confirm migrations apply against PostgreSQL.
 3. Deploy Railway first and verify `/healthz`, `/readyz`, and `/api/docs`.
-4. Set the Vercel API origin, deploy the web app, then lock Railway CORS to the exact Vercel production origin.
+4. Set the Vercel API origin and deploy the web app. Lock Railway's explicit CORS list to
+   the exact Vercel production origin. If PR previews need API access, set the optional
+   regex to the project's generated deployment hostname and team slug; do not use a
+   broad `.*\.vercel\.app` pattern.
 5. Smoke-test project creation, publishing, participant-link resolution, synthetic flow, results, and export.
 6. Confirm the UI labels synthetic data as synthetic.
 

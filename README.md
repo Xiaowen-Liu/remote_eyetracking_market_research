@@ -169,7 +169,7 @@ Vercel React/Vite app
             └─ private Railway PostgreSQL network
 ```
 
-Vercel receives only `VITE_API_URL`. Railway owns database credentials and permits browser requests only from the Vercel production origin. See the [production runbook](docs/production-runbook.md) before deploying a fresh copy.
+Vercel receives only `VITE_API_URL`. Railway owns database credentials and permits browser requests from the exact Vercel production origin plus an optional, project-scoped Preview hostname pattern. See the [production runbook](docs/production-runbook.md) before deploying a fresh copy.
 
 ## Responsible-use and clean-room boundary
 
