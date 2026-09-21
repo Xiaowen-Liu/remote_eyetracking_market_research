@@ -67,7 +67,7 @@ const targets: Point[] = [
   [0.84, 0.8],
 ];
 const defaultSampleIntervalMs = 50;
-const checkWindowSize = 18;
+const checkWindowSize = 12;
 const samplesPerTarget = 3;
 const accuracyDurationMs = 5_000;
 const accuracyTickMs = 70;
@@ -279,7 +279,7 @@ function updateCameraCheck(root: HTMLDivElement) {
   const hasCamera = cameraReady;
   const hasFace = Boolean(latestFeature);
   const stable =
-    featureWindow.length >= checkWindowSize && motion(featureWindow) < 0.03 && faceFrame.inBounds;
+    featureWindow.length >= checkWindowSize && motion(featureWindow) < 0.045 && faceFrame.inBounds;
   setCheck(root, "camera", hasCamera, hasCamera ? "Camera ready" : "Camera permission");
   setCheck(root, "face", hasFace, hasFace ? "Face landmarks detected" : "Face landmarks");
   setCheck(root, "steady", stable, stable ? "Position looks stable" : "Hold still briefly");

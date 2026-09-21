@@ -54,11 +54,21 @@ const canonicalKey = (element, label) => {
 const interactiveProposalTags = new Set(["button", "a", "input", "textarea", "select"]);
 const proposalLabel = (element, index) => {
   const tag = element.tagName.toLowerCase();
-  const explicit = element.getAttribute("aria-label") || element.getAttribute("title");
+  const labelledBy = element.getAttribute("aria-labelledby");
+  const labelledText = labelledBy
+    ? labelledBy
+        .split(/\s+/)
+        .map((id) => document.getElementById(id)?.textContent || "")
+        .join(" ")
+        .trim()
+    : "";
+  const explicit =
+    element.getAttribute("aria-label") || labelledText || element.getAttribute("title");
   if (explicit) return explicit.trim().replace(/\s+/g, " ").slice(0, 80);
   if (interactiveProposalTags.has(tag)) {
     return (
       element.getAttribute("placeholder") ||
+      element.getAttribute("name") ||
       element.textContent?.trim().replace(/\s+/g, " ").slice(0, 80) ||
       `${tag} ${index + 1}`
     );
@@ -95,8 +105,9 @@ const domProposals = () =>
     .filter(
       (proposal) =>
         proposal &&
-        proposal.width >= 0.03 &&
-        proposal.height >= 0.025 &&
+        (interactiveProposalTags.has(proposal.tag)
+          ? proposal.width >= 0.01 && proposal.height >= 0.012
+          : proposal.width >= 0.03 && proposal.height >= 0.025) &&
         (interactiveProposalTags.has(proposal.tag) ||
           (proposal.width <= 0.9 &&
             proposal.height <= 0.65 &&
@@ -132,6 +143,14 @@ new MutationObserver((entries) => {
   );
 }).observe(document.documentElement, { childList: true, subtree: true });
 send("page-open", screenState("page-open"));
+const captureReadyState = (trigger) => send(trigger, screenState(trigger));
+if (document.readyState === "loading") {
+  addEventListener("DOMContentLoaded", () => captureReadyState("dom-ready"), { once: true });
+} else {
+  setTimeout(() => captureReadyState("dom-ready"), 0);
+}
+addEventListener("load", () => captureReadyState("page-loaded"), { once: true });
+setTimeout(() => captureReadyState("page-settled"), 1200);
 
 const participantMatch = location.pathname.match(/^\/(?:api\/v1\/)?participate\/([^/]+)$/);
 if (participantMatch) {

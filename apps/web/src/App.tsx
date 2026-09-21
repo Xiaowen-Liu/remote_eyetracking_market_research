@@ -38,7 +38,7 @@ import {
   type DomProposal,
 } from "./collectorArtifact";
 import { syntheticCollectorReplay } from "./demoCollectorArtifact";
-import { AOI_MEANINGFUL_VISIT_MS, aggregateAoiMetrics, calculateAoiMetrics } from "./aoiMetrics";
+import { aggregateAoiMetrics, calculateAoiMetrics } from "./aoiMetrics";
 import {
   detectScrollSegments,
   inferDocumentExtent,
@@ -149,6 +149,45 @@ function numberValue(value: unknown): number | null {
 function formatReplayTime(milliseconds: number) {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+const metricDescriptions = {
+  exposure: "Share of applicable sessions with dwell above zero.",
+  dwell: "Average total dwell among sessions that noticed this AOI.",
+  proportion: "Average per-session share of dwell across applicable AOIs.",
+  ttff: "Median delay before this AOI was first noticed.",
+  meaningfulLatency: "Median delay before the first visit lasting at least 500 ms.",
+  meaningfulDuration: "Average duration of the first meaningful visit.",
+  revisit: "Share of applicable sessions containing a meaningful revisit.",
+};
+
+function MetricHeading({ label, description }: { label: string; description: string }) {
+  return (
+    <span>
+      {label}{" "}
+      <button
+        type="button"
+        className="metric-info"
+        aria-label={`${label}: ${description}`}
+        data-tip={description}
+      >
+        i
+      </button>
+    </span>
+  );
+}
+
+function SpectrumMeter({ value }: { value: number }) {
+  const percent = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  const tone = percent >= 72 ? "high" : percent >= 38 ? "medium" : percent > 0 ? "low" : "zero";
+  return (
+    <span className={`spectrum-meter ${tone}`}>
+      <b>{percent}%</b>
+      <span>
+        <i style={{ width: `${percent}%` }} />
+      </span>
+    </span>
+  );
 }
 
 function aggregateTaskMetrics(results: AnalysisResult[]): TaskAggregate[] {
@@ -1002,6 +1041,8 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const [aoiDetailView, setAoiDetailView] = useState<"summary" | "sessions" | "visits" | "samples">(
     "summary",
   );
+  const [aoiSessionId, setAoiSessionId] = useState<string | null>(null);
+  const [selectedVisitIndex, setSelectedVisitIndex] = useState<number | null>(null);
   const [proposalStateIndex, setProposalStateIndex] = useState(0);
   const [selectedProposalIndex, setSelectedProposalIndex] = useState(0);
   const [heatCuts, setHeatCuts] = useState<number[]>([]);
@@ -1896,6 +1937,16 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   );
   const selectedAggregateAoi =
     aggregateAoiResults.find((metric) => metric.aoi.id === selectedAoiId) ?? null;
+  const activeAoiSessionId = aoiSessionId ?? collectorArtifact?.sessionId ?? null;
+  const drilldownSessionMetric =
+    selectedAggregateAoi?.sessionMetrics.find(
+      (metric) => metric.sessionId === activeAoiSessionId,
+    ) ?? null;
+  const drilldownVisit =
+    selectedVisitIndex == null
+      ? null
+      : (drilldownSessionMetric?.visits[selectedVisitIndex] ?? null);
+  const drilldownSamples = drilldownVisit?.samples ?? drilldownSessionMetric?.samples ?? [];
   const proposalStates = collectorArtifact ? domProposalStates(collectorArtifact) : [];
   const proposalState = proposalStates[proposalStateIndex] ?? null;
   const selectedProposal = proposalState?.proposals[selectedProposalIndex] ?? null;
@@ -2427,10 +2478,12 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                   <div>
                     <p className="eyebrow">AOI metrics</p>
                     <h2>AOI Performance Table</h2>
+                    <p>Metrics deserve their own surface. They are not side notes to replay.</p>
                     <p>
-                      Metrics are recomputed from saved raw gaze samples across all visible imported
-                      sessions. Meaningful visits require {AOI_MEANINGFUL_VISIT_MS}ms.
+                      These metrics are recomputed from saved raw gaze samples using the current
+                      study AOIs, so newly added AOIs can appear for older sessions too.
                     </p>
+                    <p>Scope: aggregated across all sessions stored in this analysis workspace.</p>
                   </div>
                   <span className="context-chip">
                     {visibleCollectorArtifacts.length} visible session
@@ -2442,12 +2495,45 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                     <thead>
                       <tr>
                         <th>Area of interest</th>
-                        <th>Exposure</th>
-                        <th>Avg dwell</th>
-                        <th>Avg proportion</th>
-                        <th>Median TTFF</th>
-                        <th>Median meaningful latency</th>
-                        <th>Revisit rate</th>
+                        <th>
+                          <MetricHeading
+                            label="Exposure %"
+                            description={metricDescriptions.exposure}
+                          />
+                        </th>
+                        <th>
+                          <MetricHeading label="Avg dwell" description={metricDescriptions.dwell} />
+                        </th>
+                        <th>
+                          <MetricHeading
+                            label="Avg proportion dwell"
+                            description={metricDescriptions.proportion}
+                          />
+                        </th>
+                        <th>
+                          <MetricHeading
+                            label="Median TTFF"
+                            description={metricDescriptions.ttff}
+                          />
+                        </th>
+                        <th>
+                          <MetricHeading
+                            label="Meaningful latency"
+                            description={metricDescriptions.meaningfulLatency}
+                          />
+                        </th>
+                        <th>
+                          <MetricHeading
+                            label="Meaningful duration"
+                            description={metricDescriptions.meaningfulDuration}
+                          />
+                        </th>
+                        <th>
+                          <MetricHeading
+                            label="Revisit rate"
+                            description={metricDescriptions.revisit}
+                          />
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2460,12 +2546,16 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                               onClick={() => {
                                 setSelectedAoiId(metric.aoi.id);
                                 setAoiDetailView("summary");
+                                setAoiSessionId(collectorArtifact?.sessionId ?? null);
+                                setSelectedVisitIndex(null);
                               }}
                             >
-                              {metric.aoi.label}
+                              › {metric.aoi.label}
                             </button>
                           </td>
-                          <td>{Math.round(metric.exposureRate * 100)}%</td>
+                          <td>
+                            <SpectrumMeter value={metric.exposureRate} />
+                          </td>
                           <td>{formatReplayTime(metric.averageDwellMs)}</td>
                           <td>{Math.round(metric.averageDwellProportion * 100)}%</td>
                           <td>
@@ -2477,6 +2567,11 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                             {metric.medianFirstMeaningfulLatencyMs == null
                               ? "—"
                               : formatReplayTime(metric.medianFirstMeaningfulLatencyMs)}
+                          </td>
+                          <td>
+                            {metric.averageFirstMeaningfulDurationMs == null
+                              ? "—"
+                              : formatReplayTime(metric.averageFirstMeaningfulDurationMs)}
                           </td>
                           <td>{Math.round(metric.revisitRate * 100)}%</td>
                         </tr>
@@ -2507,32 +2602,135 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                       ))}
                     </nav>
                     {aoiDetailView === "summary" && (
-                      <div className="aoi-summary-grid">
-                        <article>
-                          <strong>Applicable sessions</strong>
-                          <b>{selectedAggregateAoi.applicableSessions}</b>
-                          <span>included in this AOI</span>
-                        </article>
-                        <article>
-                          <strong>Sessions noticed</strong>
-                          <b>{selectedAggregateAoi.noticedSessions}</b>
-                          <span>had dwell above zero</span>
-                        </article>
-                        <article>
-                          <strong>Total visits</strong>
-                          <b>
-                            {selectedAggregateAoi.sessionMetrics.reduce(
-                              (sum, metric) => sum + metric.visits.length,
-                              0,
-                            )}
-                          </b>
-                          <span>initial visits plus revisits</span>
-                        </article>
-                        <article>
-                          <strong>Current replay samples</strong>
-                          <b>{selectedAoiMetric.sampleCount}</b>
-                          <span>inside this rectangle</span>
-                        </article>
+                      <div className="aoi-summary-stack">
+                        <div className="aoi-summary-grid">
+                          <article>
+                            <strong>Applicable sessions</strong>
+                            <b>{selectedAggregateAoi.applicableSessions}</b>
+                            <span>included in this AOI</span>
+                          </article>
+                          <article>
+                            <strong>Sessions noticed</strong>
+                            <b>{selectedAggregateAoi.noticedSessions}</b>
+                            <span>had dwell above zero</span>
+                          </article>
+                          <article>
+                            <strong>Total visits</strong>
+                            <b>
+                              {selectedAggregateAoi.sessionMetrics.reduce(
+                                (sum, metric) => sum + metric.visits.length,
+                                0,
+                              )}
+                            </b>
+                            <span>initial visits plus revisits</span>
+                          </article>
+                          <article>
+                            <strong>Current replay session</strong>
+                            <b>
+                              {drilldownSessionMetric?.sessionEndedAt
+                                ? new Date(
+                                    drilldownSessionMetric.sessionEndedAt,
+                                  ).toLocaleTimeString()
+                                : "—"}
+                            </b>
+                            <span>
+                              {activeAoiSessionId
+                                ? sessionPreferences[activeAoiSessionId]?.name ||
+                                  activeAoiSessionId.slice(0, 8)
+                                : "No session selected"}
+                            </span>
+                          </article>
+                        </div>
+                        <div className="aoi-visual-summary">
+                          <article className="exposure-card">
+                            <strong>Exposure rate</strong>
+                            <b>{Math.round(selectedAggregateAoi.exposureRate * 100)}%</b>
+                            <SpectrumMeter value={selectedAggregateAoi.exposureRate} />
+                            <span>
+                              {selectedAggregateAoi.noticedSessions} of{" "}
+                              {selectedAggregateAoi.applicableSessions} sessions exposed
+                            </span>
+                          </article>
+                          <article className="summary-kpi-grid">
+                            <span>
+                              <strong>Exposure count</strong>
+                              <b>{selectedAggregateAoi.noticedSessions}</b>
+                            </span>
+                            <span>
+                              <strong>Avg dwell</strong>
+                              <b>{formatReplayTime(selectedAggregateAoi.averageDwellMs)}</b>
+                            </span>
+                            <span>
+                              <strong>Meaningful sessions</strong>
+                              <b>
+                                {
+                                  selectedAggregateAoi.sessionMetrics.filter(
+                                    (metric) => metric.firstMeaningfulLatencyMs != null,
+                                  ).length
+                                }
+                              </b>
+                            </span>
+                            <span>
+                              <strong>Total visits</strong>
+                              <b>
+                                {selectedAggregateAoi.sessionMetrics.reduce(
+                                  (sum, metric) => sum + metric.visits.length,
+                                  0,
+                                )}
+                              </b>
+                            </span>
+                          </article>
+                        </div>
+                        <dl className="metric-key-values">
+                          <div>
+                            <dt>Exposure %</dt>
+                            <dd>
+                              <SpectrumMeter value={selectedAggregateAoi.exposureRate} />
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Avg dwell</dt>
+                            <dd>{formatReplayTime(selectedAggregateAoi.averageDwellMs)}</dd>
+                          </div>
+                          <div>
+                            <dt>Avg proportion dwell</dt>
+                            <dd>
+                              {Math.round(selectedAggregateAoi.averageDwellProportion * 100)}%
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Median TTFF</dt>
+                            <dd>
+                              {selectedAggregateAoi.medianTtffMs == null
+                                ? "—"
+                                : formatReplayTime(selectedAggregateAoi.medianTtffMs)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Meaningful latency</dt>
+                            <dd>
+                              {selectedAggregateAoi.medianFirstMeaningfulLatencyMs == null
+                                ? "—"
+                                : formatReplayTime(
+                                    selectedAggregateAoi.medianFirstMeaningfulLatencyMs,
+                                  )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Meaningful duration</dt>
+                            <dd>
+                              {selectedAggregateAoi.averageFirstMeaningfulDurationMs == null
+                                ? "—"
+                                : formatReplayTime(
+                                    selectedAggregateAoi.averageFirstMeaningfulDurationMs,
+                                  )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Revisit rate</dt>
+                            <dd>{Math.round(selectedAggregateAoi.revisitRate * 100)}%</dd>
+                          </div>
+                        </dl>
                       </div>
                     )}
                     {aoiDetailView === "sessions" && (
@@ -2541,10 +2739,15 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                           <thead>
                             <tr>
                               <th>Session</th>
+                              <th>Applicable</th>
                               <th>Noticed</th>
                               <th>Dwell</th>
+                              <th>Proportion</th>
                               <th>TTFF</th>
+                              <th>Meaningful latency</th>
+                              <th>Meaningful duration</th>
                               <th>Revisits</th>
+                              <th>Fixations</th>
                               <th></th>
                             </tr>
                           </thead>
@@ -2554,13 +2757,31 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                                 <td>
                                   {sessionPreferences[metric.sessionId]?.name ||
                                     metric.sessionId.slice(0, 8)}
+                                  <small>
+                                    {metric.sessionEndedAt
+                                      ? new Date(metric.sessionEndedAt).toLocaleString()
+                                      : "In progress"}
+                                  </small>
                                 </td>
+                                <td>Yes</td>
                                 <td>{metric.sampleCount ? "Yes" : "No"}</td>
                                 <td>{formatReplayTime(metric.dwellMs)}</td>
+                                <td>{Math.round(metric.dwellProportion * 100)}%</td>
                                 <td>
                                   {metric.ttffMs == null ? "—" : formatReplayTime(metric.ttffMs)}
                                 </td>
+                                <td>
+                                  {metric.firstMeaningfulLatencyMs == null
+                                    ? "—"
+                                    : formatReplayTime(metric.firstMeaningfulLatencyMs)}
+                                </td>
+                                <td>
+                                  {metric.firstMeaningfulDurationMs == null
+                                    ? "—"
+                                    : formatReplayTime(metric.firstMeaningfulDurationMs)}
+                                </td>
                                 <td>{metric.revisitCount}</td>
+                                <td>{metric.fixationCount}</td>
                                 <td>
                                   <button
                                     type="button"
@@ -2571,7 +2792,12 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                                       );
                                       if (artifact) {
                                         setCollectorArtifact(artifact);
+                                        setAoiSessionId(metric.sessionId);
+                                        setSelectedVisitIndex(null);
                                         setReplayTimeMs(0);
+                                        setReplayPlaying(false);
+                                        setScrollScope("all");
+                                        setSelectedHeatSegment(0);
                                         restoreHeatPreferences(artifact);
                                         setAnalysisView("replay");
                                       }
@@ -2588,38 +2814,86 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                     )}
                     {aoiDetailView === "visits" && (
                       <div className="session-table-wrap">
+                        <p className="drilldown-copy">
+                          {drilldownSessionMetric?.sessionEndedAt
+                            ? new Date(drilldownSessionMetric.sessionEndedAt).toLocaleString()
+                            : "Select a session in the Sessions view."}
+                        </p>
                         <table className="session-table">
                           <thead>
                             <tr>
+                              <th>Visit</th>
                               <th>Start</th>
+                              <th>End</th>
                               <th>Duration</th>
                               <th>Samples</th>
+                              <th>Fixation</th>
                               <th>Meaningful</th>
                               <th></th>
                             </tr>
                           </thead>
                           <tbody>
-                            {selectedAoiMetric.visits.map((visit, index) => (
+                            {(drilldownSessionMetric?.visits ?? []).map((visit, index) => (
                               <tr key={visit.startedAt}>
-                                <td>
-                                  Visit {index + 1} ·{" "}
-                                  {new Date(visit.startedAt).toLocaleTimeString()}
-                                </td>
-                                <td>{formatReplayTime(visit.durationMs)}</td>
-                                <td>{visit.samples.length}</td>
-                                <td>{visit.meaningful ? "Yes" : "No"}</td>
                                 <td>
                                   <button
                                     type="button"
                                     className="text-button"
                                     onClick={() => {
+                                      setSelectedVisitIndex(index);
+                                      setAoiDetailView("samples");
+                                    }}
+                                  >
+                                    Visit {index + 1}
+                                  </button>
+                                </td>
+                                <td>
+                                  {formatReplayTime(
+                                    Math.max(
+                                      0,
+                                      Date.parse(visit.startedAt) -
+                                        Date.parse(
+                                          drilldownSessionMetric?.sessionStartedAt ??
+                                            visit.startedAt,
+                                        ),
+                                    ),
+                                  )}
+                                </td>
+                                <td>
+                                  {formatReplayTime(
+                                    Math.max(
+                                      0,
+                                      Date.parse(visit.endedAt) -
+                                        Date.parse(
+                                          drilldownSessionMetric?.sessionStartedAt ?? visit.endedAt,
+                                        ),
+                                    ),
+                                  )}
+                                </td>
+                                <td>{formatReplayTime(visit.durationMs)}</td>
+                                <td>{visit.samples.length}</td>
+                                <td>{visit.fixation ? "Reached" : "No"}</td>
+                                <td>{visit.meaningful ? "Reached" : "No"}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="text-button"
+                                    onClick={() => {
+                                      const artifact = collectorArtifacts.find(
+                                        (candidate) => candidate.sessionId === activeAoiSessionId,
+                                      );
+                                      if (artifact) setCollectorArtifact(artifact);
                                       setReplayTimeMs(
                                         Math.max(
                                           0,
                                           Date.parse(visit.startedAt) -
-                                            Date.parse(collectorArtifact.startedAt),
+                                            Date.parse(
+                                              drilldownSessionMetric?.sessionStartedAt ??
+                                                visit.startedAt,
+                                            ),
                                         ),
                                       );
+                                      setReplayPlaying(false);
                                       setAnalysisView("replay");
                                     }}
                                   >
@@ -2630,7 +2904,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                             ))}
                           </tbody>
                         </table>
-                        {selectedAoiMetric.visits.length === 0 && (
+                        {(drilldownSessionMetric?.visits.length ?? 0) === 0 && (
                           <p>This AOI was not visited in the selected session.</p>
                         )}
                       </div>
@@ -2638,15 +2912,28 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                     {aoiDetailView === "samples" && (
                       <>
                         <p className="drilldown-copy">
-                          {selectedAoiMetric.samples.length} matching rows. Scroll to inspect the
-                          full raw sample set.
+                          {drilldownVisit
+                            ? `Showing raw samples inside ${selectedAoiMetric.aoi.label} for the selected visit.`
+                            : `Showing all raw samples that fall inside ${selectedAoiMetric.aoi.label} for the selected session.`}{" "}
+                          {drilldownSamples.length} rows.
                         </p>
-                        <VirtualSampleTable
-                          key={selectedAoiMetric.aoi.id}
-                          samples={selectedAoiMetric.samples}
-                          documentExtent={documentExtent}
-                          activeSnapshot={activeSnapshot}
-                        />
+                        {drilldownSamples.length > 0 ? (
+                          <VirtualSampleTable
+                            key={`${selectedAoiMetric.aoi.id}-${activeAoiSessionId}-${selectedVisitIndex}`}
+                            samples={drilldownSamples.slice(0, 250)}
+                            documentExtent={documentExtent}
+                            activeSnapshot={activeSnapshot}
+                          />
+                        ) : (
+                          <p>
+                            No raw sample rows matched this AOI in the selected session or visit.
+                          </p>
+                        )}
+                        {drilldownSamples.length > 250 && (
+                          <p className="drilldown-copy">
+                            Showing the first 250 matching raw rows to keep the dashboard readable.
+                          </p>
+                        )}
                       </>
                     )}
                   </section>

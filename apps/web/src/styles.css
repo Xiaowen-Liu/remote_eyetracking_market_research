@@ -107,6 +107,14 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .aoi-metrics-heading h2 { margin: 5px 0 8px; font: 500 28px/1.2 Georgia, serif; }
 .aoi-metrics-heading p:not(.eyebrow), .aoi-drilldown p { max-width: 720px; margin: 0; color: #68746c; font-size: 12px; line-height: 1.5; }
 .aoi-name-button { padding: 0; color: #365b28; background: transparent; border: 0; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.aoi-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.metric-info { position: relative; width: 16px; height: 16px; margin-left: 3px; padding: 0; border: 1px solid #87938b; border-radius: 50%; color: #5d6a62; background: #fff; font: 700 10px/14px Georgia, serif; text-transform: none; }
+.metric-info::after { position: absolute; z-index: 20; left: 50%; bottom: calc(100% + 7px); width: 210px; padding: 8px 10px; transform: translateX(-50%); border-radius: 6px; color: #fff; background: #1d3026; content: attr(data-tip); font: 400 11px/1.4 system-ui, sans-serif; letter-spacing: 0; opacity: 0; pointer-events: none; text-align: left; }
+.metric-info:hover::after, .metric-info:focus-visible::after { opacity: 1; }
+.spectrum-meter { display: grid; min-width: 80px; gap: 5px; color: #415048; font-variant-numeric: tabular-nums; }
+.spectrum-meter > span { display: block; height: 6px; overflow: hidden; border-radius: 99px; background: #e7ebe6; }
+.spectrum-meter i { display: block; height: 100%; border-radius: inherit; background: #9ca99e; }
+.spectrum-meter.low i { background: #c5a85a; } .spectrum-meter.medium i { background: #83a94f; } .spectrum-meter.high i { background: #4e7b31; }
 .aoi-drilldown { margin-top: 28px; padding-top: 24px; border-top: 1px solid #dfe4de; }
 .aoi-drilldown h3 { margin: 4px 0 7px; font: 500 25px/1.2 Georgia, serif; }
 .drilldown-tabs { display: flex; gap: 8px; margin: 18px 0; }
@@ -116,6 +124,13 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .aoi-summary-grid article { display: grid; gap: 6px; padding: 15px; background: #f5f7f2; border-radius: 8px; }
 .aoi-summary-grid strong, .aoi-summary-grid span { color: #67736b; font-size: 10px; }
 .aoi-summary-grid b { font: 500 25px/1 Georgia, serif; }
+.aoi-summary-stack { display: grid; gap: 14px; }
+.aoi-visual-summary { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+.aoi-visual-summary > article, .metric-key-values { padding: 18px; border: 1px solid #e0e5df; border-radius: 9px; background: #fbfcfa; }
+.exposure-card { display: grid; gap: 10px; } .exposure-card > b { font: 500 42px/1 Georgia, serif; } .exposure-card > span:last-child { color: #6d786f; font-size: 11px; }
+.summary-kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .summary-kpi-grid span { display: grid; gap: 5px; } .summary-kpi-grid strong { color: #69766d; font-size: 10px; text-transform: uppercase; } .summary-kpi-grid b { font: 500 21px/1 Georgia, serif; }
+.metric-key-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0; margin: 0; }
+.metric-key-values div { display: grid; gap: 7px; padding: 12px; border-bottom: 1px solid #e8ece7; } .metric-key-values dt { color: #6b776f; font-size: 10px; font-weight: 800; text-transform: uppercase; } .metric-key-values dd { margin: 0; color: #27372e; font-variant-numeric: tabular-nums; }
 .drilldown-note { display: flex; align-items: center; gap: 16px; padding: 14px; background: #f5f7f2; border-radius: 8px; }
 .drilldown-note span { color: #667269; font-size: 12px; }
 .drilldown-note .secondary-button { width: auto; margin: 0 0 0 auto; }
@@ -131,10 +146,7 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .minimal-replay .snapshot-title,
 .minimal-replay .replay-analysis-tools,
 .minimal-replay .aoi-editor,
-.minimal-replay .replay-toolbar,
-.minimal-replay .replay-scrubber,
 .minimal-replay .replay-view-settings,
-.minimal-replay .heatmap-editor,
 .minimal-replay .snapshot-controls,
 .minimal-replay .replay-video-export { display: none; }
 .minimal-replay .collector-artifact-grid { display: block; }
