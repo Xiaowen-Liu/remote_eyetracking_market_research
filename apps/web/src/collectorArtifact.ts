@@ -29,7 +29,7 @@ export type CollectorCalibration = {
   attempt: number;
   observed_sample_count: number;
   error_px: number | null;
-  quality_grade: "strong" | "variable" | "failed";
+  quality_grade: "strong" | "variable" | "limited" | "failed";
   accepted: boolean;
 };
 
@@ -121,7 +121,7 @@ export function parseCollectorArtifact(value: unknown): CollectorArtifact {
     Number.isFinite(rawCalibration.attempt) &&
     Number.isFinite(rawCalibration.observed_sample_count) &&
     (rawCalibration.error_px === null || Number.isFinite(rawCalibration.error_px)) &&
-    ["strong", "variable", "failed"].includes(String(rawCalibration.quality_grade)) &&
+    ["strong", "variable", "limited", "failed"].includes(String(rawCalibration.quality_grade)) &&
     typeof rawCalibration.accepted === "boolean"
       ? (rawCalibration as CollectorCalibration)
       : undefined;

@@ -557,7 +557,7 @@
       "CollectionPolicy": {
         "properties": {
           "sample_interval_ms": {
-            "default": 100,
+            "default": 50,
             "maximum": 1000.0,
             "minimum": 25.0,
             "title": "Sample Interval Ms",
@@ -1754,6 +1754,277 @@
         "title": "ReadinessResponse",
         "type": "object"
       },
+      "ReplayCalibration": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "error_px": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Px"
+          },
+          "observed_sample_count": {
+            "title": "Observed Sample Count",
+            "type": "integer"
+          },
+          "quality_grade": {
+            "$ref": "#/components/schemas/QualityGrade"
+          }
+        },
+        "required": [
+          "attempt",
+          "observed_sample_count",
+          "error_px",
+          "quality_grade",
+          "accepted"
+        ],
+        "title": "ReplayCalibration",
+        "type": "object"
+      },
+      "ReplayContextCreate": {
+        "properties": {
+          "captureSnapshots": {
+            "default": false,
+            "title": "Capturesnapshots",
+            "type": "boolean"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "title": "Endedat",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayEvent"
+            },
+            "maxItems": 500,
+            "title": "Events",
+            "type": "array"
+          },
+          "schemaVersion": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/ReplaySnapshot"
+            },
+            "maxItems": 12,
+            "title": "Snapshots",
+            "type": "array"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "title": "Startedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "startedAt",
+          "endedAt"
+        ],
+        "title": "ReplayContextCreate",
+        "type": "object"
+      },
+      "ReplayContextResponse": {
+        "properties": {
+          "eventCount": {
+            "title": "Eventcount",
+            "type": "integer"
+          },
+          "sessionId": {
+            "format": "uuid",
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "snapshotCount": {
+            "title": "Snapshotcount",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "eventCount",
+          "snapshotCount",
+          "updatedAt"
+        ],
+        "title": "ReplayContextResponse",
+        "type": "object"
+      },
+      "ReplayEvent": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail"
+          },
+          "type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "url",
+          "at"
+        ],
+        "title": "ReplayEvent",
+        "type": "object"
+      },
+      "ReplayGazeSample": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "scroll": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Scroll",
+            "type": "object"
+          },
+          "viewport": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Viewport",
+            "type": "object"
+          },
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "at",
+          "viewport",
+          "scroll"
+        ],
+        "title": "ReplayGazeSample",
+        "type": "object"
+      },
+      "ReplaySnapshot": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "dataUrl": {
+            "maxLength": 2000000,
+            "minLength": 1,
+            "title": "Dataurl",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "scroll": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scroll"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "viewport": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewport"
+          }
+        },
+        "required": [
+          "at",
+          "dataUrl"
+        ],
+        "title": "ReplaySnapshot",
+        "type": "object"
+      },
       "ResearcherLogin": {
         "properties": {
           "email": {
@@ -1934,6 +2205,85 @@
         ],
         "title": "SessionLifecycle",
         "type": "string"
+      },
+      "SessionReplayArtifact": {
+        "properties": {
+          "calibration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplayCalibration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "captureSnapshots": {
+            "title": "Capturesnapshots",
+            "type": "boolean"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "title": "Endedat",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "gazeSamples": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayGazeSample"
+            },
+            "title": "Gazesamples",
+            "type": "array"
+          },
+          "privacy": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Privacy",
+            "type": "object"
+          },
+          "schemaVersion": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "sessionId": {
+            "format": "uuid",
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/ReplaySnapshot"
+            },
+            "title": "Snapshots",
+            "type": "array"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "title": "Startedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "startedAt",
+          "endedAt",
+          "captureSnapshots",
+          "events",
+          "snapshots",
+          "gazeSamples",
+          "privacy"
+        ],
+        "title": "SessionReplayArtifact",
+        "type": "object"
       },
       "SessionSubmitResponse": {
         "properties": {
@@ -3488,6 +3838,95 @@
           }
         },
         "summary": "Ingest Gaze Batch",
+        "tags": [
+          "participant sessions"
+        ]
+      }
+    },
+    "/api/v1/participant-sessions/{session_id}/replay-context": {
+      "put": {
+        "operationId": "upsertParticipantReplayContext",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayContextCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayContextResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Replay Context",
         "tags": [
           "participant sessions"
         ]
@@ -6085,6 +6524,101 @@
           }
         },
         "summary": "List Study Participant Sessions",
+        "tags": [
+          "analysis"
+        ]
+      }
+    },
+    "/api/v1/studies/{study_id}/participant-sessions/{session_id}/replay": {
+      "get": {
+        "operationId": "getParticipantSessionReplay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "study_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Study Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-demo-owner-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Owner-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionReplayArtifact"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Participant Session Replay",
         "tags": [
           "analysis"
         ]

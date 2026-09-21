@@ -73,7 +73,7 @@ const emptyDraft: StudyDraft = {
   },
   collection_policy: {
     screenshots_enabled: true,
-    sample_interval_ms: 100,
+    sample_interval_ms: 50,
     webcam_gaze_enabled: false,
   },
   retention_days: 30,
@@ -743,7 +743,7 @@ function StudyBuilder() {
                         collection_policy: {
                           ...(draft.collection_policy ?? {
                             screenshots_enabled: false,
-                            sample_interval_ms: 100,
+                            sample_interval_ms: 50,
                             webcam_gaze_enabled: false,
                           }),
                           webcam_gaze_enabled: event.target.checked,
@@ -768,7 +768,7 @@ function StudyBuilder() {
                         collection_policy: {
                           ...(draft.collection_policy ?? {
                             screenshots_enabled: true,
-                            sample_interval_ms: 100,
+                            sample_interval_ms: 50,
                             webcam_gaze_enabled: false,
                           }),
                           screenshots_enabled: event.target.checked,
@@ -1136,6 +1136,39 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       const sessionResponse = await api.listStudyParticipantSessions(study.id);
       setJobs(response.items);
       setSessions(sessionResponse.items);
+      const uploadedArtifacts = (
+        await Promise.all(
+          sessionResponse.items
+            .filter((session) => session.source === "participant-session")
+            .map(async (session) => {
+              try {
+                return parseCollectorArtifact(
+                  await api.getParticipantSessionReplay(study.id, session.id),
+                );
+              } catch (error) {
+                if (error instanceof ApiClientError && error.code === "REPLAY_NOT_FOUND")
+                  return null;
+                throw error;
+              }
+            }),
+        )
+      ).filter((artifact): artifact is CollectorArtifact => artifact !== null);
+      if (uploadedArtifacts.length) {
+        setCollectorArtifacts((current) => {
+          const uploadedIds = new Set(uploadedArtifacts.map((artifact) => artifact.sessionId));
+          return [
+            ...uploadedArtifacts,
+            ...current.filter((artifact) => !uploadedIds.has(artifact.sessionId)),
+          ];
+        });
+        setCollectorArtifact((current) => {
+          const replacement = current
+            ? uploadedArtifacts.find((artifact) => artifact.sessionId === current.sessionId)
+            : null;
+          return replacement ?? current ?? uploadedArtifacts[0];
+        });
+        void storeArtifacts(study.id, uploadedArtifacts).catch(() => undefined);
+      }
       const latest = response.items[0];
       const completed = response.items.filter((job) => job.status === "succeeded");
       const loaded = await Promise.all(

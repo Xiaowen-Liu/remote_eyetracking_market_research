@@ -1,4 +1,10 @@
-import { addEvent, addSnapshot, exportArtifact, newSession } from "./core/session-artifact.js";
+import {
+  addEvent,
+  addSnapshot,
+  exportArtifact,
+  newSession,
+  replayContextPayload,
+} from "./core/session-artifact.js";
 import {
   apiUrl,
   calibrationPayload,
@@ -154,6 +160,7 @@ async function startTask(session) {
   await chrome.tabs.update(tab.id, { active: true });
   const firstTask = session.completedTasks === 0;
   const startedAt = new Date().toISOString();
+  const sampleIntervalMs = session.protocol.collection_policy?.sample_interval_ms ?? 50;
   let next = {
     ...session,
     ...(firstTask ? { startedAt, events: [], snapshots: [], gazeSamples: [] } : {}),
@@ -173,9 +180,14 @@ async function startTask(session) {
     await navigateAndMessage(tab.id, taskUrl, {
       type: "COLLECTOR_START_TASK",
       taskTitle: task.title,
+      sampleIntervalMs,
     });
   else {
-    await chrome.tabs.sendMessage(tab.id, { type: "COLLECTOR_START_TASK", taskTitle: task.title });
+    await chrome.tabs.sendMessage(tab.id, {
+      type: "COLLECTOR_START_TASK",
+      taskTitle: task.title,
+      sampleIntervalMs,
+    });
     if (next.captureSnapshots) {
       try {
         const context = await chrome.tabs
@@ -237,6 +249,10 @@ async function finishTask(session) {
 async function submitStudy(session) {
   if (session.taskRun || session.completedTasks !== session.protocol.tasks.length)
     throw new Error("Complete every task before submitting");
+  await participantRequest(session, `/participant-sessions/${session.sessionId}/replay-context`, {
+    method: "PUT",
+    body: JSON.stringify(replayContextPayload(session)),
+  });
   const submitted = await participantRequest(
     session,
     `/participant-sessions/${session.sessionId}/submit`,

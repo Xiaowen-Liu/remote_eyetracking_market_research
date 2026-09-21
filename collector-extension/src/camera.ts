@@ -6,6 +6,7 @@ let video: HTMLVideoElement | null = null;
 let landmarker: FaceLandmarker | null = null;
 let stream: MediaStream | null = null;
 let frame: number | null = null;
+let videoFrame: number | null = null;
 let lastLightCheckAt = 0;
 const lightCanvas = document.createElement("canvas");
 lightCanvas.width = 64;
@@ -129,14 +130,21 @@ function detect() {
   };
   if (embedded) window.parent.postMessage(message, "*");
   else void chrome.runtime.sendMessage({ type: "OFFSCREEN_CAMERA_FEATURE", ...message });
-  frame = requestAnimationFrame(detect);
+  scheduleDetection();
+}
+
+function scheduleDetection() {
+  if (!video) return;
+  if ("requestVideoFrameCallback" in video)
+    videoFrame = video.requestVideoFrameCallback(() => detect());
+  else frame = requestAnimationFrame(detect);
 }
 
 async function start() {
   if (stream && landmarker) return { ok: true };
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+      video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } },
       audio: false,
     });
     stream.getVideoTracks()[0]?.addEventListener(
@@ -192,7 +200,10 @@ async function start() {
 
 function stop() {
   if (frame) cancelAnimationFrame(frame);
+  if (videoFrame && video && "cancelVideoFrameCallback" in video)
+    video.cancelVideoFrameCallback(videoFrame);
   frame = null;
+  videoFrame = null;
   landmarker?.close();
   landmarker = null;
   stream?.getTracks().forEach((track) => track.stop());

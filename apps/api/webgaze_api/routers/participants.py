@@ -22,6 +22,7 @@ from ..models import (
     QualityGrade,
     SessionEvent,
     SessionLifecycle,
+    SessionReplayContext,
     StudyLifecycle,
     Task,
     TaskOutcome,
@@ -37,6 +38,8 @@ from ..schemas import (
     GazeBatchResponse,
     ParticipantSessionCreate,
     ParticipantSessionResponse,
+    ReplayContextCreate,
+    ReplayContextResponse,
     SessionSubmitResponse,
     TaskRunComplete,
     TaskRunCreate,
@@ -153,6 +156,12 @@ def sequence_state(db: Session, session_id: uuid.UUID) -> tuple[int, list[int]]:
     highest = max(sequences, default=-1)
     present = set(sequences)
     return highest, [sequence for sequence in range(highest + 1) if sequence not in present]
+
+
+def same_instant(left: datetime, right: datetime) -> bool:
+    normalized_left = left if left.tzinfo else left.replace(tzinfo=timezone.utc)
+    normalized_right = right if right.tzinfo else right.replace(tzinfo=timezone.utc)
+    return normalized_left.astimezone(timezone.utc) == normalized_right.astimezone(timezone.utc)
 
 
 @router.post(
@@ -423,8 +432,7 @@ def submit_participant_session(
     db: Session = DbSession,
 ) -> SessionSubmitResponse:
     existing = db.scalar(
-        select(AnalysisJob)
-        .where(
+        select(AnalysisJob).where(
             AnalysisJob.session_id == participant_session.id,
             AnalysisJob.algorithm_version == ALGORITHM_VERSION,
             AnalysisJob.attempt == 1,
@@ -482,6 +490,62 @@ def submit_participant_session(
         lifecycle=participant_session.lifecycle,
         analysis_job=analysis_job_payload(job),
         replayed=False,
+    )
+
+
+@router.put(
+    "/participant-sessions/{session_id}/replay-context",
+    response_model=ReplayContextResponse,
+    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    operation_id="upsertParticipantReplayContext",
+)
+def upsert_replay_context(
+    payload: ReplayContextCreate,
+    participant_session: CurrentParticipantSession,
+    db: Session = DbSession,
+) -> ReplayContextResponse:
+    if participant_session.lifecycle not in {
+        SessionLifecycle.READY,
+        SessionLifecycle.RUNNING,
+        SessionLifecycle.SUBMITTED,
+    }:
+        raise ApiError(409, "INVALID_SESSION_STATE", "Replay context cannot be saved now")
+    context = db.get(SessionReplayContext, participant_session.id)
+    events = [event.model_dump(mode="json") for event in payload.events]
+    snapshots = [snapshot.model_dump(mode="json") for snapshot in payload.snapshots]
+    if participant_session.lifecycle == SessionLifecycle.SUBMITTED:
+        if (
+            context
+            and context.schema_version == payload.schemaVersion
+            and same_instant(context.started_at, payload.startedAt)
+            and same_instant(context.ended_at, payload.endedAt)
+            and context.capture_snapshots == payload.captureSnapshots
+            and context.events == events
+            and context.snapshots == snapshots
+        ):
+            return ReplayContextResponse(
+                sessionId=participant_session.id,
+                eventCount=len(context.events),
+                snapshotCount=len(context.snapshots),
+                updatedAt=context.updated_at,
+            )
+        raise ApiError(409, "REPLAY_ALREADY_FINAL", "Submitted replay context cannot be changed")
+    if context is None:
+        context = SessionReplayContext(session_id=participant_session.id)
+        db.add(context)
+    context.schema_version = payload.schemaVersion
+    context.started_at = payload.startedAt
+    context.ended_at = payload.endedAt
+    context.capture_snapshots = payload.captureSnapshots
+    context.events = events
+    context.snapshots = snapshots
+    db.commit()
+    db.refresh(context)
+    return ReplayContextResponse(
+        sessionId=participant_session.id,
+        eventCount=len(context.events),
+        snapshotCount=len(context.snapshots),
+        updatedAt=context.updated_at,
     )
 
 

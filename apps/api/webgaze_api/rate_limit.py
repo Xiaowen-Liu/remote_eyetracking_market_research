@@ -142,7 +142,9 @@ def install_rate_limits(app: FastAPI, settings: Settings) -> None:
             limit = settings.login_rate_limit_per_minute
             bucket = "researcher-login"
             identity = _client_key(request, settings)
-        elif request.method == "POST" and path.startswith("/api/v1/participant-sessions"):
+        elif request.method in {"POST", "PUT"} and path.startswith(
+            "/api/v1/participant-sessions"
+        ):
             limit = settings.participant_rate_limit_per_minute
             bucket = "participant-write"
             identity = _participant_key(request, settings)

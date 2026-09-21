@@ -65,7 +65,7 @@ The researcher dashboard also has a CI-enforced [web performance budget](docs/pe
 - Experimental webcam mode: on-device face/iris landmarks → nine-point and guided boundary calibration → center accuracy measurement → estimated coordinate batches after consent
 - Clean-room MV3 participant extension: consent-aware published-study session, explicit on-device camera calibration, arbitrary-page event timeline, idempotent coordinate ingestion, optional visible-tab snapshots, and local artifact review
 - Snapshot-linked gaze replay with URL/time/viewport context and bounded heatmap aggregation
-- Persistent local analysis workspace with ZIP import, raw-session and analysis-bundle export, session health, AOI drill-down, DOM proposals, and replay video
+- Automatic consent-aware replay ingestion for submitted extension sessions, plus a local ZIP-import fallback, session health, AOI drill-down, DOM proposals, and replay video
 
 ### Analysis boundary
 
