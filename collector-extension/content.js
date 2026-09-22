@@ -155,11 +155,15 @@ setTimeout(() => captureReadyState("page-settled"), 1200);
 // Page-load events can happen before the participant explicitly begins a task.
 // Capture one authoritative DOM state after the collector enters `running`, so
 // the replay always has candidates for the actual task page.
-chrome.runtime.onMessage.addListener((message) => {
-  if (message?.type === "COLLECTOR_START_TASK") {
-    void send("task-dom-ready", screenState("task-start"));
-  }
-});
+try {
+  chrome.runtime?.onMessage?.addListener?.((message) => {
+    if (message?.type === "COLLECTOR_START_TASK") {
+      void send("task-dom-ready", screenState("task-start"));
+    }
+  });
+} catch (error) {
+  if (invalidated(error)) showContextRecovery();
+}
 
 const participantMatch = location.pathname.match(/^\/(?:api\/v1\/)?participate\/([^/]+)$/);
 if (participantMatch) {
