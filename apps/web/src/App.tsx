@@ -32,6 +32,7 @@ import {
   domProposalStates,
   gazeSamplesForSnapshot,
   parseCollectorArtifact,
+  snapshotIndexAtReplayTime,
   type CollectorArtifact,
   type CollectorGazeSample,
   type CollectorSnapshot,
@@ -578,6 +579,7 @@ function StudyBuilder() {
     if (accessProject) {
       return (
         <ProjectAccessPage
+          key={accessProject.id}
           project={accessProject}
           researcher={researcher}
           onBack={() => setAccessProject(null)}
@@ -605,7 +607,7 @@ function StudyBuilder() {
   }
 
   if (resultsOpen && study) {
-    return <ResultsDashboard study={study} onBack={() => setResultsOpen(false)} />;
+    return <ResultsDashboard key={study.id} study={study} onBack={() => setResultsOpen(false)} />;
   }
 
   return (
@@ -1024,19 +1026,24 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const [busy, setBusy] = useState(true);
   const [collectorArtifact, setCollectorArtifact] = useState<CollectorArtifact | null>(null);
   const [collectorArtifacts, setCollectorArtifacts] = useState<CollectorArtifact[]>([]);
-  const [selectedSnapshot, setSelectedSnapshot] = useState(0);
   const [workspaceView, setWorkspaceView] = useState<"analysis" | "sessions">("analysis");
   const [analysisView, setAnalysisView] = useState<"replay" | "metrics" | "dom">("replay");
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [replaySpeed, setReplaySpeed] = useState(1);
   const [replayTimeMs, setReplayTimeMs] = useState(0);
-  const [replayAnnouncement, setReplayAnnouncement] = useState("Replay paused at 0 seconds.");
   const [heatMode, setHeatMode] = useState<"selected" | "buildup" | "whole">("buildup");
   const [orderMode, setOrderMode] = useState<"off" | "scanpath" | "aoi">("off");
   const [drawingAoi, setDrawingAoi] = useState(false);
   const [aoiDraft, setAoiDraft] = useState<Omit<ReplayAoi, "id" | "label" | "source"> | null>(null);
   const [aoiLabel, setAoiLabel] = useState("New AOI");
-  const [replayAois, setReplayAois] = useState<ReplayAoi[]>([]);
+  const [replayAois, setReplayAois] = useState<ReplayAoi[]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(`webgaze.aois.${study.id}`) ?? "[]");
+      return Array.isArray(stored) ? stored : [];
+    } catch {
+      return [];
+    }
+  });
   const [selectedAoiId, setSelectedAoiId] = useState<string | null>(null);
   const [aoiDetailView, setAoiDetailView] = useState<"summary" | "sessions" | "visits" | "samples">(
     "summary",
@@ -1054,32 +1061,19 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const [scrollScope, setScrollScope] = useState("auto");
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
   const [sessionPreferences, setSessionPreferences] = useState<Record<string, SessionPreference>>(
-    {},
+    () => {
+      try {
+        return JSON.parse(localStorage.getItem(`webgaze.sessions.${study.id}`) ?? "{}");
+      } catch {
+        return {};
+      }
+    },
   );
   const [showHiddenSessions, setShowHiddenSessions] = useState(false);
   const aoiDragStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     void loadJobs();
-  }, [study.id]);
-
-  useEffect(() => {
-    try {
-      setSessionPreferences(
-        JSON.parse(localStorage.getItem(`webgaze.sessions.${study.id}`) ?? "{}"),
-      );
-    } catch {
-      setSessionPreferences({});
-    }
-  }, [study.id]);
-
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(`webgaze.aois.${study.id}`) ?? "[]");
-      setReplayAois(Array.isArray(stored) ? stored : []);
-    } catch {
-      setReplayAois([]);
-    }
   }, [study.id]);
 
   useEffect(() => {
@@ -1121,16 +1115,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   }, [replayPlaying, replaySpeed, collectorArtifact]);
 
   useEffect(() => {
-    if (!collectorArtifact?.snapshots.length) return;
-    const absoluteTime = Date.parse(collectorArtifact.startedAt) + replayTimeMs;
-    let nextIndex = 0;
-    collectorArtifact.snapshots.forEach((snapshot, index) => {
-      if (Date.parse(snapshot.at) <= absoluteTime) nextIndex = index;
-    });
-    setSelectedSnapshot(nextIndex);
-  }, [collectorArtifact, replayTimeMs]);
-
-  useEffect(() => {
     if (workspaceView !== "analysis" || analysisView !== "replay" || !collectorArtifact) return;
     const duration = Math.max(
       0,
@@ -1155,20 +1139,10 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
             ? 0
             : duration;
       setReplayTimeMs(next);
-      setReplayAnnouncement(`Replay paused at ${formatReplayTime(next)}.`);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [analysisView, collectorArtifact, replayTimeMs, workspaceView]);
-
-  useEffect(() => {
-    if (!collectorArtifact) return;
-    setReplayAnnouncement(
-      `${replayPlaying ? "Replay playing from" : "Replay paused at"} ${formatReplayTime(replayTimeMs)}.`,
-    );
-    // Announce state transitions, not each 50 ms playback tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectorArtifact, replayPlaying]);
 
   async function loadJobs() {
     setBusy(true);
@@ -1313,7 +1287,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       const parsed = imported.at(-1)!;
       setCollectorArtifacts(next);
       setCollectorArtifact(parsed);
-      setSelectedSnapshot(0);
       setReplayTimeMs(0);
       setReplayPlaying(false);
       restoreHeatPreferences(parsed);
@@ -1335,7 +1308,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         [...current, syntheticCollectorReplay].map((artifact) => [artifact.sessionId, artifact]),
       ).values(),
     ]);
-    setSelectedSnapshot(0);
     setReplayTimeMs(0);
     setReplayPlaying(false);
     restoreHeatPreferences(syntheticCollectorReplay);
@@ -1363,13 +1335,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       setCollectorArtifact(next);
       setCollectorArtifacts((current) =>
         current.map((artifact) => (artifact.sessionId === next.sessionId ? next : artifact)),
-      );
-      setSelectedSnapshot(
-        next.snapshots.findIndex(
-          (snapshot) =>
-            snapshot.reason === "researcher-inserted" &&
-            Date.parse(snapshot.at) === Date.parse(next.startedAt) + replayTimeMs,
-        ),
       );
       await storeArtifacts(study.id, [next]);
       setNotice({
@@ -1813,6 +1778,12 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
           Date.parse(collectorArtifact.startedAt),
       )
     : 0;
+  const selectedSnapshot = collectorArtifact
+    ? snapshotIndexAtReplayTime(collectorArtifact, replayTimeMs)
+    : 0;
+  const replayAnnouncement = collectorArtifact
+    ? `${replayPlaying ? "Replay playing from" : "Replay paused at"} ${formatReplayTime(replayTimeMs)}.`
+    : "Replay paused at 0 seconds.";
   const heatBoundaries = [
     0,
     ...heatCuts.filter((cut) => cut > 0 && cut < replayDurationMs),
@@ -3168,7 +3139,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                           if (artifact) {
                             setCollectorArtifact(artifact);
                             setReplayTimeMs(0);
-                            setSelectedSnapshot(0);
                             restoreHeatPreferences(artifact);
                           }
                         }}
@@ -4026,7 +3996,37 @@ function ProjectAccessPage({
   }
 
   useEffect(() => {
-    void load();
+    let active = true;
+    void api
+      .getProjectAccess(project.id)
+      .then(async (currentAccess) => {
+        if (!active) return;
+        setAccess(currentAccess);
+        if (!currentAccess.can_manage_members) return;
+        const [memberList, invitationList, auditList] = await Promise.all([
+          api.listProjectMembers(project.id),
+          api.listProjectInvitations(project.id),
+          api.listProjectAuditEvents(project.id),
+        ]);
+        if (!active) return;
+        setMembers(memberList.items);
+        setInvitations(invitationList.items);
+        setEvents(auditList.items);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(
+          loadError instanceof ApiClientError
+            ? loadError.message
+            : "Project access could not be loaded.",
+        );
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [project.id]);
 
   async function addMember(event: FormEvent<HTMLFormElement>) {

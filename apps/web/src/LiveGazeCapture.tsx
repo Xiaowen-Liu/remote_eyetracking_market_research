@@ -70,6 +70,7 @@ export function LiveGazeCapture({
   const [attempt, setAttempt] = useState(1);
   const [quality, setQuality] = useState<number | null>(null);
   const [heat, setHeat] = useState<GazeFeature[]>([]);
+  const [calibrated, setCalibrated] = useState(false);
 
   useEffect(
     () => () => {
@@ -141,6 +142,7 @@ export function LiveGazeCapture({
   }
   function retry() {
     modelRef.current = null;
+    setCalibrated(false);
     setSamples([]);
     setPointIndex(0);
     setQuality(null);
@@ -173,6 +175,7 @@ export function LiveGazeCapture({
       return;
     }
     modelRef.current = model;
+    setCalibrated(true);
     setMessage(`Calibration accepted locally (${(nextQuality * 100).toFixed(1)}% RMS).`);
     onCalibrated(nextQuality);
   }
@@ -191,7 +194,7 @@ export function LiveGazeCapture({
           Allow camera and calibrate
         </button>
       )}
-      {started && !modelRef.current && (
+      {started && !calibrated && (
         <div className="participant-calibration-board">
           <button
             type="button"
@@ -215,7 +218,7 @@ export function LiveGazeCapture({
           )}
         </div>
       )}
-      {modelRef.current && (
+      {calibrated && (
         <div className="participant-live-preview">
           <span>
             {collecting ? "Collecting coordinate samples" : "Calibration ready"} ·{" "}

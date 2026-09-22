@@ -114,7 +114,9 @@ export function ExperimentalEyeTracking() {
     const video = videoRef.current;
     const landmarker = landmarkerRef.current;
     if (!video || !landmarker) return;
-    const result = landmarker.detectForVideo(video, performance.now());
+    // Video time is stable for a frame and is the timestamp expected by MediaPipe.
+    // It also keeps this animation callback independent from wall-clock render timing.
+    const result = landmarker.detectForVideo(video, video.currentTime * 1_000);
     const feature = result.faceLandmarks[0] ? featureFromLandmarks(result.faceLandmarks[0]) : null;
     featureRef.current = feature;
     setFaceDetected(Boolean(feature));
