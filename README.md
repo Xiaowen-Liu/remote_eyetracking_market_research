@@ -2,9 +2,26 @@
 
 An independent, clean-room full-stack UX-research platform for designing versioned studies, running consent-aware participant flows, ingesting gaze-like telemetry, and producing reproducible task-level results.
 
+In plain language: this is a full-stack research app plus a Chrome extension for
+building UX studies, guiding participants through consent and calibration, and
+reviewing replayable gaze sessions. It is built with React/TypeScript,
+FastAPI, PostgreSQL, and CI/CD deployment to Vercel and Railway.
+
 **Live:** [web app](https://webgaze-research.vercel.app) · [API docs](https://remoteeyetrackingmarketresearch-production.up.railway.app/api/docs) · [health check](https://remoteeyetrackingmarketresearch-production.up.railway.app/healthz)
 
 > This is a public portfolio project. The standalone web participant experience uses clearly disclosed synthetic samples. The separate experimental extension can create calibration-dependent coordinate estimates on-device for a consented study; it never uploads camera frames. No employer code, data, assets, or internal systems were used to implement this repository.
+
+## Recruiter quick start
+
+- **Live app:** [webgaze-research.vercel.app](https://webgaze-research.vercel.app)
+- **API contract:** [interactive FastAPI docs](https://remoteeyetrackingmarketresearch-production.up.railway.app/api/docs)
+- **Five-minute walkthrough:** [demo runbook](docs/demo-runbook.md)
+- **Architecture:** [system boundaries and reliability seams](docs/architecture.md)
+
+The fastest way to understand the project is to open the live app, inspect the
+researcher study builder, then follow the participant link into the results
+dashboard. The public route is intentionally synthetic; the extension is the
+separate consented, on-device experimental collector.
 
 ## Why this exists
 
