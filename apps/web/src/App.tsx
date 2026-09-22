@@ -343,7 +343,6 @@ export function App() {
 }
 
 function StudyBuilder() {
-  const bootstrapStarted = useRef(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [study, setStudy] = useState<StudyDraftResponse | null>(null);
@@ -376,8 +375,6 @@ function StudyBuilder() {
   );
 
   useEffect(() => {
-    if (bootstrapStarted.current) return;
-    bootstrapStarted.current = true;
     let active = true;
     void bootstrapStudyWorkspace()
       .then((workspace) => {
