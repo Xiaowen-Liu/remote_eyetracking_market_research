@@ -162,7 +162,10 @@ export function gazeSamplesForSnapshot(
 }
 
 /** Return the recorded screen that was current at a replay offset. */
-export function snapshotIndexAtReplayTime(artifact: CollectorArtifact, replayTimeMs: number): number {
+export function snapshotIndexAtReplayTime(
+  artifact: CollectorArtifact,
+  replayTimeMs: number,
+): number {
   if (!artifact.snapshots.length) return 0;
   const absoluteTime = Date.parse(artifact.startedAt) + replayTimeMs;
   let snapshotIndex = 0;
