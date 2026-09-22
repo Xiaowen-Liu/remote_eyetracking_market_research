@@ -356,6 +356,9 @@ function StudyBuilder() {
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [projectCreationOpen, setProjectCreationOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false);
+  const [resultsWorkspaceView, setResultsWorkspaceView] = useState<"analysis" | "sessions">(
+    "analysis",
+  );
   const [accessProject, setAccessProject] = useState<Project | null>(null);
   const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
@@ -412,6 +415,7 @@ function StudyBuilder() {
       setProjectAccess(null);
       setDashboardOpen(false);
       setResultsOpen(false);
+      setResultsWorkspaceView("analysis");
       setStudy(null);
       setDraft(
         isNewProject ? { ...emptyDraft, title: "Untitled study", description: "" } : emptyDraft,
@@ -628,7 +632,14 @@ function StudyBuilder() {
   }
 
   if (resultsOpen && study) {
-    return <ResultsDashboard key={study.id} study={study} onBack={() => setResultsOpen(false)} />;
+    return (
+      <ResultsDashboard
+        key={study.id}
+        study={study}
+        onBack={() => setResultsOpen(false)}
+        initialWorkspaceView={resultsWorkspaceView}
+      />
+    );
   }
 
   return (
@@ -666,6 +677,31 @@ function StudyBuilder() {
       </header>
 
       <main>
+        {study && (
+          <nav className="workspace-tabs study-workspace-tabs" aria-label="Study workspace">
+            <button type="button" className="active" aria-current="page">
+              Build
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setResultsWorkspaceView("sessions");
+                setResultsOpen(true);
+              }}
+            >
+              Fieldwork
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setResultsWorkspaceView("analysis");
+                setResultsOpen(true);
+              }}
+            >
+              Results
+            </button>
+          </nav>
+        )}
         <nav className="breadcrumbs" aria-label="Breadcrumb">
           <button
             type="button"
@@ -1037,7 +1073,15 @@ function StudyBuilder() {
   );
 }
 
-function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack: () => void }) {
+function ResultsDashboard({
+  study,
+  onBack,
+  initialWorkspaceView = "analysis",
+}: {
+  study: StudyDraftResponse;
+  onBack: () => void;
+  initialWorkspaceView?: "analysis" | "sessions";
+}) {
   const [jobs, setJobs] = useState<AnalysisJob[]>([]);
   const [sessions, setSessions] = useState<ParticipantSessionSummary[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -1047,7 +1091,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const [busy, setBusy] = useState(true);
   const [collectorArtifact, setCollectorArtifact] = useState<CollectorArtifact | null>(null);
   const [collectorArtifacts, setCollectorArtifacts] = useState<CollectorArtifact[]>([]);
-  const [workspaceView, setWorkspaceView] = useState<"analysis" | "sessions">("analysis");
+  const [workspaceView, setWorkspaceView] = useState<"analysis" | "sessions">(initialWorkspaceView);
   const [analysisView, setAnalysisView] = useState<"replay" | "metrics" | "dom">("replay");
   const [heatMode, setHeatMode] = useState<"selected" | "buildup" | "whole">("buildup");
   const [orderMode, setOrderMode] = useState<"off" | "scanpath" | "aoi">("off");
@@ -1131,6 +1175,11 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         selectedJobIdRef.current && workspace.resultsByJob[selectedJobIdRef.current]
           ? selectedJobIdRef.current
           : (latest?.id ?? null);
+      const selectedSessionId = workspace.jobs.find((job) => job.id === selected)?.session_id;
+      const selectedArtifact = selectedSessionId
+        ? workspace.uploadedArtifacts.find((artifact) => artifact.sessionId === selectedSessionId)
+        : null;
+      if (selectedSessionId) setCollectorArtifact(selectedArtifact ?? null);
       selectedJobIdRef.current = selected;
       setSelectedJobId(selected);
       setResult(selected ? (workspace.resultsByJob[selected] ?? null) : null);
@@ -1210,9 +1259,18 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   }
 
   function selectJob(jobId: string) {
+    const job = jobs.find((candidate) => candidate.id === jobId);
     selectedJobIdRef.current = jobId;
     setSelectedJobId(jobId);
     setResult(resultsByJob[jobId] ?? null);
+    if (job) {
+      const artifact = collectorArtifacts.find((item) => item.sessionId === job.session_id) ?? null;
+      setCollectorArtifact(artifact);
+      if (artifact) {
+        setReplayTimeMs(0);
+        restoreHeatPreferences(artifact);
+      }
+    }
   }
 
   function restoreHeatPreferences(artifact: CollectorArtifact) {
@@ -1704,6 +1762,16 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
 
   const latest = jobs[0];
   const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? latest;
+  const selectedJobArtifact = selectedJob
+    ? (collectorArtifacts.find((artifact) => artifact.sessionId === selectedJob.session_id) ?? null)
+    : null;
+  const domProposalEmptyReason = selectedJob
+    ? selectedJobArtifact
+      ? undefined
+      : selectedJob.status === "queued" || selectedJob.status === "running"
+        ? "This session is still being processed and has no replay context available in Results yet. Finish the participant flow, then refresh Fieldwork."
+        : "This session has no uploaded replay context. DOM candidates are available only when the collector finishes and uploads its replay context."
+    : undefined;
   const taskMetrics =
     (result?.task_metrics.tasks as Array<Record<string, unknown>> | undefined) ?? [];
   const completedResults = Object.values(resultsByJob);
@@ -1905,23 +1973,23 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
           </div>
         </details>
       </header>
-      <nav className="workspace-tabs" aria-label="Dashboard sections">
+      <nav className="workspace-tabs" aria-label="Study workspace">
         <button type="button" onClick={onBack}>
-          Setup
+          Build
         </button>
         <button
           type="button"
           className={workspaceView === "analysis" ? "active" : ""}
           onClick={() => setWorkspaceView("analysis")}
         >
-          Analysis
+          Results
         </button>
         <button
           type="button"
           className={workspaceView === "sessions" ? "active" : ""}
           onClick={() => setWorkspaceView("sessions")}
         >
-          Sessions
+          Fieldwork
         </button>
       </nav>
       <main>
@@ -3431,6 +3499,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                 artifact={collectorArtifact}
                 aois={replayAois}
                 onAdd={addProposals}
+                emptyReason={domProposalEmptyReason}
               />
             )}
           </>

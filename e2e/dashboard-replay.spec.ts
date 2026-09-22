@@ -105,7 +105,13 @@ test("imports a real extension artifact and renders the minimal replay canvas", 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Extension E2E study" })).toBeVisible();
   await page.getByRole("button", { name: "View results" }).click();
-  await expect(page.getByRole("button", { name: "Analysis" })).toHaveClass(/active/);
+  await expect(page.getByRole("button", { name: "Results" })).toHaveClass(/active/);
+  await page.getByRole("button", { name: "Build" }).click();
+  await expect(page.getByRole("button", { name: "Build" })).toHaveClass(/active/);
+  await page.getByRole("button", { name: "Fieldwork" }).click();
+  await expect(page.getByRole("button", { name: "Fieldwork" })).toHaveClass(/active/);
+  await page.getByRole("button", { name: "Results" }).click();
+  await expect(page.getByRole("button", { name: "Results" })).toHaveClass(/active/);
 
   const startedAt = Date.parse(createdAt);
   const artifact = {

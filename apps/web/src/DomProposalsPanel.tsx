@@ -8,10 +8,12 @@ export function DomProposalsPanel({
   artifact,
   aois,
   onAdd,
+  emptyReason,
 }: {
   artifact: CollectorArtifact | null;
   aois: ReplayAoi[];
   onAdd: (additions: ReplayAoi[]) => void;
+  emptyReason?: string;
 }) {
   const [stateIndex, setStateIndex] = useState(0);
   const [proposalIndex, setProposalIndex] = useState(0);
@@ -48,8 +50,9 @@ export function DomProposalsPanel({
         <h2>DOM proposals</h2>
         <p>
           {artifact
-            ? "This replay session does not contain live DOM proposal AOIs. Replay screenshots are not used to reconstruct missing DOM proposals."
-            : "Select or import a replay session to review live DOM proposal AOIs."}
+            ? "This replay context has no recorded DOM candidates. Screenshots are not used to reconstruct missing DOM proposals; reload the current collector build before recording a new session."
+            : (emptyReason ??
+              "Select a replay-ready session or import an extension artifact to review recorded DOM candidates.")}
         </p>
       </section>
     );
