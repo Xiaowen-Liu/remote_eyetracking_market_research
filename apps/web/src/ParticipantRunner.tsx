@@ -113,7 +113,14 @@ export function ParticipantRunner({ token }: { token: string }) {
         const newSession = { id: created.id, accessToken: created.access_token };
         setSession(newSession);
         setPhase("consent");
-        persist("consent", newSession, { nextSequence: 0, completedTasks: 0, activeRun: null });
+        const initialStoredSession: StoredSession = {
+          ...newSession,
+          phase: "consent",
+          nextSequence: 0,
+          completedTasks: 0,
+          activeRun: null,
+        };
+        window.sessionStorage.setItem(storageKey(token), JSON.stringify(initialStoredSession));
       } catch (error) {
         if (!cancelled) {
           showError(error);

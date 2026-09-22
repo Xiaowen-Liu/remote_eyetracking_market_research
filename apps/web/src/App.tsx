@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -32,10 +33,10 @@ import {
   domProposalStates,
   gazeSamplesForSnapshot,
   parseCollectorArtifact,
+  snapshotIndexAtReplayTime,
   type CollectorArtifact,
   type CollectorGazeSample,
   type CollectorSnapshot,
-  type DomProposal,
 } from "./collectorArtifact";
 import { syntheticCollectorReplay } from "./demoCollectorArtifact";
 import { aggregateAoiMetrics, calculateAoiMetrics } from "./aoiMetrics";
@@ -48,7 +49,13 @@ import {
   type DocumentExtent,
   type ReplayCoordinateMode,
 } from "./replayCoordinates";
-import { isEditableReplayTarget, replayKeyboardAction } from "./replayAccessibility";
+import { useReplayPlayback } from "./useReplayPlayback";
+import { AoiManagementPanel } from "./AoiManagementPanel";
+import { AoiPerformanceTable, SpectrumMeter } from "./AoiPerformanceTable";
+import { DomProposalsPanel } from "./DomProposalsPanel";
+import { proposalWasAdopted, urlPath } from "./aoiProposalMatching";
+import { useAoiDrillDown } from "./useAoiDrillDown";
+import { useStudyAnalysisPreferences, type ReplayAoi } from "./useStudyAnalysisPreferences";
 import { windowReplaySamples } from "./replayWindow";
 import { virtualRowRange } from "./virtualRows";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
@@ -90,49 +97,59 @@ const emptyDraft: StudyDraft = {
   ],
 };
 
-type Notice = { kind: "success" | "error"; text: string } | null;
-type ReplayAoi = {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  source: "manual" | "dom";
-  sessionIds?: string[];
-  allSessions?: boolean;
-  canonicalKey?: string;
-  sourcePath?: string;
-};
-type SessionPreference = { name?: string; hidden?: boolean };
+function toDraft(value: StudyDraftResponse): StudyDraft {
+  return {
+    title: value.title,
+    description: value.description,
+    consent_version: value.consent_version,
+    consent_text: value.consent_text,
+    target_origins: value.target_origins,
+    calibration_policy: value.calibration_policy,
+    collection_policy: value.collection_policy,
+    retention_days: value.retention_days,
+    tasks: value.tasks,
+  };
+}
 
-function urlPath(value?: string) {
-  if (!value) return null;
-  try {
-    return new URL(value).pathname;
-  } catch {
-    return null;
+async function bootstrapStudyWorkspace() {
+  const researcher = hasResearcherToken() ? await api.getCurrentResearcher() : null;
+  const projectList = await api.listProjects();
+  const project = projectList.items[0] ?? (await api.createProject("Checkout UX research"));
+  const projects = projectList.items.length ? projectList.items : [project];
+  const [studies, access] = await Promise.all([
+    api.listStudies(project.id),
+    api.getProjectAccess(project.id),
+  ]);
+  const summary = studies.items[0];
+  if (!summary) {
+    return {
+      researcher,
+      projects,
+      project,
+      access,
+      study: null,
+      draft: emptyDraft,
+      editing: true,
+      participantUrl: null,
+    };
   }
+  const study = await api.getDraft(summary.id);
+  const participantUrl = study.current_published_version
+    ? (await api.getParticipantLink(study.id)).participant_url
+    : null;
+  return {
+    researcher,
+    projects,
+    project,
+    access,
+    study,
+    draft: toDraft(study),
+    editing: study.current_published_version === null,
+    participantUrl,
+  };
 }
 
-function sameProposalGeometry(
-  left: Pick<ReplayAoi, "x" | "y" | "width" | "height">,
-  right: Pick<DomProposal, "x" | "y" | "width" | "height">,
-) {
-  return (
-    Math.abs(left.x - right.x) < 0.04 &&
-    Math.abs(left.y - right.y) < 0.04 &&
-    Math.abs(left.width - right.width) < 0.04 &&
-    Math.abs(left.height - right.height) < 0.04
-  );
-}
-
-function proposalWasAdopted(aoi: ReplayAoi, proposal: DomProposal) {
-  return (
-    aoi.label.localeCompare(proposal.label, undefined, { sensitivity: "accent" }) === 0 &&
-    sameProposalGeometry(aoi, proposal)
-  );
-}
+type Notice = { kind: "success" | "error"; text: string } | null;
 
 type TaskAggregate = {
   position: number;
@@ -142,6 +159,46 @@ type TaskAggregate = {
   meanConfidence: number | null;
 };
 
+type AnalysisWorkspace = {
+  jobs: AnalysisJob[];
+  sessions: ParticipantSessionSummary[];
+  uploadedArtifacts: CollectorArtifact[];
+  resultsByJob: Record<string, AnalysisResult>;
+};
+
+async function fetchAnalysisWorkspace(studyId: string): Promise<AnalysisWorkspace> {
+  const [jobResponse, sessionResponse] = await Promise.all([
+    api.listStudyAnalysisJobs(studyId),
+    api.listStudyParticipantSessions(studyId),
+  ]);
+  const uploadedArtifacts = (
+    await Promise.all(
+      sessionResponse.items
+        .filter((session) => session.source === "participant-session")
+        .map(async (session) => {
+          try {
+            return parseCollectorArtifact(
+              await api.getParticipantSessionReplay(studyId, session.id),
+            );
+          } catch (error) {
+            if (error instanceof ApiClientError && error.code === "REPLAY_NOT_FOUND") return null;
+            throw error;
+          }
+        }),
+    )
+  ).filter((artifact): artifact is CollectorArtifact => artifact !== null);
+  const completedJobs = jobResponse.items.filter((job) => job.status === "succeeded");
+  const loadedResults = await Promise.all(
+    completedJobs.map(async (job) => [job.id, await api.getAnalysisResult(job.id)] as const),
+  );
+  return {
+    jobs: jobResponse.items,
+    sessions: sessionResponse.items,
+    uploadedArtifacts,
+    resultsByJob: Object.fromEntries(loadedResults),
+  };
+}
+
 function numberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -149,45 +206,6 @@ function numberValue(value: unknown): number | null {
 function formatReplayTime(milliseconds: number) {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-const metricDescriptions = {
-  exposure: "Share of applicable sessions with dwell above zero.",
-  dwell: "Average total dwell among sessions that noticed this AOI.",
-  proportion: "Average per-session share of dwell across applicable AOIs.",
-  ttff: "Median delay before this AOI was first noticed.",
-  meaningfulLatency: "Median delay before the first visit lasting at least 500 ms.",
-  meaningfulDuration: "Average duration of the first meaningful visit.",
-  revisit: "Share of applicable sessions containing a meaningful revisit.",
-};
-
-function MetricHeading({ label, description }: { label: string; description: string }) {
-  return (
-    <span>
-      {label}{" "}
-      <button
-        type="button"
-        className="metric-info"
-        aria-label={`${label}: ${description}`}
-        data-tip={description}
-      >
-        i
-      </button>
-    </span>
-  );
-}
-
-function SpectrumMeter({ value }: { value: number }) {
-  const percent = Math.round(Math.max(0, Math.min(1, value)) * 100);
-  const tone = percent >= 72 ? "high" : percent >= 38 ? "medium" : percent > 0 ? "low" : "zero";
-  return (
-    <span className={`spectrum-meter ${tone}`}>
-      <b>{percent}%</b>
-      <span>
-        <i style={{ width: `${percent}%` }} />
-      </span>
-    </span>
-  );
 }
 
 function aggregateTaskMetrics(results: AnalysisResult[]): TaskAggregate[] {
@@ -325,7 +343,6 @@ export function App() {
 }
 
 function StudyBuilder() {
-  const bootstrapStarted = useRef(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [study, setStudy] = useState<StudyDraftResponse | null>(null);
@@ -343,38 +360,49 @@ function StudyBuilder() {
   const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [researcher, setResearcher] = useState<Researcher | null>(null);
+  const applyBootstrapWorkspace = useCallback(
+    (workspace: Awaited<ReturnType<typeof bootstrapStudyWorkspace>>) => {
+      setResearcher(workspace.researcher);
+      setProjects(workspace.projects);
+      setProject(workspace.project);
+      setProjectAccess(workspace.access);
+      setStudy(workspace.study);
+      setDraft(workspace.draft);
+      setEditing(workspace.editing);
+      setParticipantUrl(workspace.participantUrl);
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (bootstrapStarted.current) return;
-    bootstrapStarted.current = true;
-    void bootstrap();
-  }, []);
-
-  async function bootstrap() {
-    try {
-      if (hasResearcherToken()) {
-        setResearcher(await api.getCurrentResearcher());
-      }
-      const projectList = await api.listProjects();
-      const current = projectList.items[0] ?? (await api.createProject("Checkout UX research"));
-      const available = projectList.items.length ? projectList.items : [current];
-      setProjects(available);
-      await selectProject(current);
-    } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        ["RESEARCHER_AUTH_REQUIRED", "INVALID_RESEARCHER_SESSION"].includes(error.code)
-      ) {
-        saveResearcherToken(null);
-        setResearcher(null);
-        setAuthRequired(true);
-      } else {
-        showError(error);
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
+    let active = true;
+    void bootstrapStudyWorkspace()
+      .then((workspace) => {
+        if (!active) return;
+        applyBootstrapWorkspace(workspace);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (
+          error instanceof ApiClientError &&
+          ["RESEARCHER_AUTH_REQUIRED", "INVALID_RESEARCHER_SESSION"].includes(error.code)
+        ) {
+          saveResearcherToken(null);
+          setResearcher(null);
+          setAuthRequired(true);
+        } else {
+          const text =
+            error instanceof ApiClientError ? error.message : "Something went wrong. Try again.";
+          setNotice({ kind: "error", text });
+        }
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [applyBootstrapWorkspace]);
 
   async function selectProject(nextProject: Project, isNewProject = false) {
     setBusy(true);
@@ -426,20 +454,6 @@ function StudyBuilder() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function toDraft(value: StudyDraftResponse): StudyDraft {
-    return {
-      title: value.title,
-      description: value.description,
-      consent_version: value.consent_version,
-      consent_text: value.consent_text,
-      target_origins: value.target_origins,
-      calibration_policy: value.calibration_policy,
-      collection_policy: value.collection_policy,
-      retention_days: value.retention_days,
-      tasks: value.tasks,
-    };
   }
 
   function showError(error: unknown) {
@@ -568,7 +582,15 @@ function StudyBuilder() {
           setResearcher(sessionResearcher);
           setAuthRequired(false);
           setBusy(true);
-          await bootstrap();
+          try {
+            applyBootstrapWorkspace(await bootstrapStudyWorkspace());
+          } catch (error) {
+            const text =
+              error instanceof ApiClientError ? error.message : "Something went wrong. Try again.";
+            setNotice({ kind: "error", text });
+          } finally {
+            setBusy(false);
+          }
         }}
       />
     );
@@ -578,6 +600,7 @@ function StudyBuilder() {
     if (accessProject) {
       return (
         <ProjectAccessPage
+          key={accessProject.id}
           project={accessProject}
           researcher={researcher}
           onBack={() => setAccessProject(null)}
@@ -605,7 +628,7 @@ function StudyBuilder() {
   }
 
   if (resultsOpen && study) {
-    return <ResultsDashboard study={study} onBack={() => setResultsOpen(false)} />;
+    return <ResultsDashboard key={study.id} study={study} onBack={() => setResultsOpen(false)} />;
   }
 
   return (
@@ -1024,27 +1047,13 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const [busy, setBusy] = useState(true);
   const [collectorArtifact, setCollectorArtifact] = useState<CollectorArtifact | null>(null);
   const [collectorArtifacts, setCollectorArtifacts] = useState<CollectorArtifact[]>([]);
-  const [selectedSnapshot, setSelectedSnapshot] = useState(0);
   const [workspaceView, setWorkspaceView] = useState<"analysis" | "sessions">("analysis");
   const [analysisView, setAnalysisView] = useState<"replay" | "metrics" | "dom">("replay");
-  const [replayPlaying, setReplayPlaying] = useState(false);
-  const [replaySpeed, setReplaySpeed] = useState(1);
-  const [replayTimeMs, setReplayTimeMs] = useState(0);
-  const [replayAnnouncement, setReplayAnnouncement] = useState("Replay paused at 0 seconds.");
   const [heatMode, setHeatMode] = useState<"selected" | "buildup" | "whole">("buildup");
   const [orderMode, setOrderMode] = useState<"off" | "scanpath" | "aoi">("off");
   const [drawingAoi, setDrawingAoi] = useState(false);
   const [aoiDraft, setAoiDraft] = useState<Omit<ReplayAoi, "id" | "label" | "source"> | null>(null);
   const [aoiLabel, setAoiLabel] = useState("New AOI");
-  const [replayAois, setReplayAois] = useState<ReplayAoi[]>([]);
-  const [selectedAoiId, setSelectedAoiId] = useState<string | null>(null);
-  const [aoiDetailView, setAoiDetailView] = useState<"summary" | "sessions" | "visits" | "samples">(
-    "summary",
-  );
-  const [aoiSessionId, setAoiSessionId] = useState<string | null>(null);
-  const [selectedVisitIndex, setSelectedVisitIndex] = useState<number | null>(null);
-  const [proposalStateIndex, setProposalStateIndex] = useState(0);
-  const [selectedProposalIndex, setSelectedProposalIndex] = useState(0);
   const [heatCuts, setHeatCuts] = useState<number[]>([]);
   const [selectedHeatSegment, setSelectedHeatSegment] = useState(0);
   const [heatNames, setHeatNames] = useState<Record<number, string>>({});
@@ -1053,34 +1062,23 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const [coordinateMode, setCoordinateMode] = useState<ReplayCoordinateMode>("viewport");
   const [scrollScope, setScrollScope] = useState("auto");
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
-  const [sessionPreferences, setSessionPreferences] = useState<Record<string, SessionPreference>>(
-    {},
-  );
   const [showHiddenSessions, setShowHiddenSessions] = useState(false);
   const aoiDragStart = useRef<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    void loadJobs();
-  }, [study.id]);
-
-  useEffect(() => {
-    try {
-      setSessionPreferences(
-        JSON.parse(localStorage.getItem(`webgaze.sessions.${study.id}`) ?? "{}"),
-      );
-    } catch {
-      setSessionPreferences({});
-    }
-  }, [study.id]);
-
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(`webgaze.aois.${study.id}`) ?? "[]");
-      setReplayAois(Array.isArray(stored) ? stored : []);
-    } catch {
-      setReplayAois([]);
-    }
-  }, [study.id]);
+  const selectedJobIdRef = useRef<string | null>(null);
+  const { replayAois, persistAois, sessionPreferences, saveSessionPreference } =
+    useStudyAnalysisPreferences(study.id);
+  const {
+    durationMs: replayDurationMs,
+    playing: replayPlaying,
+    setPlaying: setReplayPlaying,
+    speed: replaySpeed,
+    setSpeed: setReplaySpeed,
+    timeMs: replayTimeMs,
+    setTimeMs: setReplayTimeMs,
+  } = useReplayPlayback(
+    collectorArtifact,
+    workspaceView === "analysis" && analysisView === "replay",
+  );
 
   useEffect(() => {
     let active = true;
@@ -1089,7 +1087,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         if (!active || !stored.length) return;
         setCollectorArtifacts(stored);
         setCollectorArtifact((current) => current ?? stored[0]);
-        if (!collectorArtifact) restoreHeatPreferences(stored[0]);
+        restoreHeatPreferences(stored[0]);
       })
       .catch(() => {
         if (active)
@@ -1103,128 +1101,46 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     };
   }, [study.id]);
 
-  useEffect(() => {
-    if (!replayPlaying || !collectorArtifact) return;
-    const started = Date.now();
-    const initial = replayTimeMs;
-    const duration = Math.max(
-      0,
-      Date.parse(collectorArtifact.endedAt ?? collectorArtifact.startedAt) -
-        Date.parse(collectorArtifact.startedAt),
-    );
-    const timer = window.setInterval(() => {
-      const next = Math.min(duration, initial + (Date.now() - started) * replaySpeed);
-      setReplayTimeMs(next);
-      if (next >= duration) setReplayPlaying(false);
-    }, 50);
-    return () => window.clearInterval(timer);
-  }, [replayPlaying, replaySpeed, collectorArtifact]);
-
-  useEffect(() => {
-    if (!collectorArtifact?.snapshots.length) return;
-    const absoluteTime = Date.parse(collectorArtifact.startedAt) + replayTimeMs;
-    let nextIndex = 0;
-    collectorArtifact.snapshots.forEach((snapshot, index) => {
-      if (Date.parse(snapshot.at) <= absoluteTime) nextIndex = index;
-    });
-    setSelectedSnapshot(nextIndex);
-  }, [collectorArtifact, replayTimeMs]);
-
-  useEffect(() => {
-    if (workspaceView !== "analysis" || analysisView !== "replay" || !collectorArtifact) return;
-    const duration = Math.max(
-      0,
-      Date.parse(collectorArtifact.endedAt ?? collectorArtifact.startedAt) -
-        Date.parse(collectorArtifact.startedAt),
-    );
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (isEditableReplayTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey)
-        return;
-      const action = replayKeyboardAction(event.key);
-      if (!action) return;
-      event.preventDefault();
-      if (action.type === "toggle") {
-        setReplayPlaying((current) => !current);
-        return;
-      }
-      setReplayPlaying(false);
-      const next =
-        action.type === "seek"
-          ? Math.min(duration, Math.max(0, replayTimeMs + action.deltaMs))
-          : action.position === "start"
-            ? 0
-            : duration;
-      setReplayTimeMs(next);
-      setReplayAnnouncement(`Replay paused at ${formatReplayTime(next)}.`);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [analysisView, collectorArtifact, replayTimeMs, workspaceView]);
-
-  useEffect(() => {
-    if (!collectorArtifact) return;
-    setReplayAnnouncement(
-      `${replayPlaying ? "Replay playing from" : "Replay paused at"} ${formatReplayTime(replayTimeMs)}.`,
-    );
-    // Announce state transitions, not each 50 ms playback tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectorArtifact, replayPlaying]);
-
-  async function loadJobs() {
-    setBusy(true);
-    try {
-      const response = await api.listStudyAnalysisJobs(study.id);
-      const sessionResponse = await api.listStudyParticipantSessions(study.id);
-      setJobs(response.items);
-      setSessions(sessionResponse.items);
-      const uploadedArtifacts = (
-        await Promise.all(
-          sessionResponse.items
-            .filter((session) => session.source === "participant-session")
-            .map(async (session) => {
-              try {
-                return parseCollectorArtifact(
-                  await api.getParticipantSessionReplay(study.id, session.id),
-                );
-              } catch (error) {
-                if (error instanceof ApiClientError && error.code === "REPLAY_NOT_FOUND")
-                  return null;
-                throw error;
-              }
-            }),
-        )
-      ).filter((artifact): artifact is CollectorArtifact => artifact !== null);
-      if (uploadedArtifacts.length) {
+  const applyAnalysisWorkspace = useCallback(
+    (workspace: AnalysisWorkspace) => {
+      setJobs(workspace.jobs);
+      setSessions(workspace.sessions);
+      if (workspace.uploadedArtifacts.length) {
         setCollectorArtifacts((current) => {
-          const uploadedIds = new Set(uploadedArtifacts.map((artifact) => artifact.sessionId));
+          const uploadedIds = new Set(
+            workspace.uploadedArtifacts.map((artifact) => artifact.sessionId),
+          );
           return [
-            ...uploadedArtifacts,
+            ...workspace.uploadedArtifacts,
             ...current.filter((artifact) => !uploadedIds.has(artifact.sessionId)),
           ];
         });
         setCollectorArtifact((current) => {
           const replacement = current
-            ? uploadedArtifacts.find((artifact) => artifact.sessionId === current.sessionId)
+            ? workspace.uploadedArtifacts.find(
+                (artifact) => artifact.sessionId === current.sessionId,
+              )
             : null;
-          return replacement ?? current ?? uploadedArtifacts[0];
+          return replacement ?? current ?? workspace.uploadedArtifacts[0];
         });
-        void storeArtifacts(study.id, uploadedArtifacts).catch(() => undefined);
+        void storeArtifacts(study.id, workspace.uploadedArtifacts).catch(() => undefined);
       }
-      const latest = response.items[0];
-      const completed = response.items.filter((job) => job.status === "succeeded");
-      const loaded = await Promise.all(
-        completed.map(async (job) => [job.id, await api.getAnalysisResult(job.id)] as const),
-      );
-      const nextResults = Object.fromEntries(loaded);
-      setResultsByJob(nextResults);
+      setResultsByJob(workspace.resultsByJob);
+      const latest = workspace.jobs[0];
       const selected =
-        selectedJobId && nextResults[selectedJobId] ? selectedJobId : (latest?.id ?? null);
+        selectedJobIdRef.current && workspace.resultsByJob[selectedJobIdRef.current]
+          ? selectedJobIdRef.current
+          : (latest?.id ?? null);
+      selectedJobIdRef.current = selected;
       setSelectedJobId(selected);
-      if (selected && nextResults[selected]) {
-        setResult(nextResults[selected]);
-      } else {
-        setResult(null);
-      }
+      setResult(selected ? (workspace.resultsByJob[selected] ?? null) : null);
+    },
+    [study.id],
+  );
+
+  const loadJobs = useCallback(async () => {
+    try {
+      applyAnalysisWorkspace(await fetchAnalysisWorkspace(study.id));
     } catch (error) {
       const text =
         error instanceof ApiClientError ? error.message : "Could not load analysis jobs.";
@@ -1232,7 +1148,27 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     } finally {
       setBusy(false);
     }
-  }
+  }, [applyAnalysisWorkspace, study.id]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchAnalysisWorkspace(study.id)
+      .then((workspace) => {
+        if (active) applyAnalysisWorkspace(workspace);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const text =
+          error instanceof ApiClientError ? error.message : "Could not load analysis jobs.";
+        setNotice({ kind: "error", text });
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [applyAnalysisWorkspace, study.id]);
 
   async function runLatestJob(job: AnalysisJob) {
     setBusy(true);
@@ -1240,6 +1176,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     try {
       const nextResult = await api.runAnalysisJob(job.id);
       setResult(nextResult);
+      selectedJobIdRef.current = job.id;
       setSelectedJobId(job.id);
       setResultsByJob((current) => ({ ...current, [job.id]: nextResult }));
       setJobs((current) =>
@@ -1273,6 +1210,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   }
 
   function selectJob(jobId: string) {
+    selectedJobIdRef.current = jobId;
     setSelectedJobId(jobId);
     setResult(resultsByJob[jobId] ?? null);
   }
@@ -1313,7 +1251,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       const parsed = imported.at(-1)!;
       setCollectorArtifacts(next);
       setCollectorArtifact(parsed);
-      setSelectedSnapshot(0);
       setReplayTimeMs(0);
       setReplayPlaying(false);
       restoreHeatPreferences(parsed);
@@ -1335,7 +1272,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         [...current, syntheticCollectorReplay].map((artifact) => [artifact.sessionId, artifact]),
       ).values(),
     ]);
-    setSelectedSnapshot(0);
     setReplayTimeMs(0);
     setReplayPlaying(false);
     restoreHeatPreferences(syntheticCollectorReplay);
@@ -1363,13 +1299,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       setCollectorArtifact(next);
       setCollectorArtifacts((current) =>
         current.map((artifact) => (artifact.sessionId === next.sessionId ? next : artifact)),
-      );
-      setSelectedSnapshot(
-        next.snapshots.findIndex(
-          (snapshot) =>
-            snapshot.reason === "researcher-inserted" &&
-            Date.parse(snapshot.at) === Date.parse(next.startedAt) + replayTimeMs,
-        ),
       );
       await storeArtifacts(study.id, [next]);
       setNotice({
@@ -1429,8 +1358,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
         source: "manual" as const,
       },
     ];
-    setReplayAois(next);
-    localStorage.setItem(`webgaze.aois.${study.id}`, JSON.stringify(next));
+    persistAois(next);
     setAoiDraft(null);
     setAoiLabel("New AOI");
     setDrawingAoi(false);
@@ -1440,28 +1368,15 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     });
   }
 
-  function persistAois(next: ReplayAoi[]) {
-    setReplayAois(next);
-    localStorage.setItem(`webgaze.aois.${study.id}`, JSON.stringify(next));
-  }
-
-  function addProposal(label: string, proposal: DomProposal) {
-    if (replayAois.some((aoi) => proposalWasAdopted(aoi, proposal))) return;
-    persistAois([
-      ...replayAois,
-      {
-        ...proposal,
-        id: crypto.randomUUID(),
-        label,
-        source: "dom",
-        sessionIds: collectorArtifact ? [collectorArtifact.sessionId] : [],
-        canonicalKey: proposal.canonicalKey,
-        sourcePath: urlPath(proposalState?.url) ?? undefined,
-      },
-    ]);
+  function addProposals(additions: ReplayAoi[]) {
+    const fresh = additions.filter(
+      (addition) => !replayAois.some((aoi) => proposalWasAdopted(aoi, addition)),
+    );
+    if (!fresh.length) return;
+    persistAois([...replayAois, ...fresh]);
     setNotice({
       kind: "success",
-      text: `${label} was added to this study and is now available in AOI Metrics.`,
+      text: `${fresh.length} DOM proposal${fresh.length === 1 ? " was" : "s were"} added to this study.`,
     });
   }
 
@@ -1475,22 +1390,13 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       );
   }
 
-  function saveSessionPreference(sessionId: string, preference: SessionPreference) {
-    const next = {
-      ...sessionPreferences,
-      [sessionId]: { ...sessionPreferences[sessionId], ...preference },
-    };
-    setSessionPreferences(next);
-    localStorage.setItem(`webgaze.sessions.${study.id}`, JSON.stringify(next));
-  }
-
   function updateAoi(id: string, updates: Partial<ReplayAoi>) {
     persistAois(replayAois.map((aoi) => (aoi.id === id ? { ...aoi, ...updates } : aoi)));
   }
 
   function removeAoi(id: string) {
     persistAois(replayAois.filter((aoi) => aoi.id !== id));
-    if (selectedAoiId === id) setSelectedAoiId(null);
+    clearAoi(id);
     setNotice({ kind: "success", text: "AOI removed. Raw session data was not changed." });
   }
 
@@ -1806,13 +1712,12 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   );
   const aggregateSessionCount = completedResults.length;
   const aggregateMetrics = aggregateTaskMetrics(aggregateEligibleResults);
-  const replayDurationMs = collectorArtifact
-    ? Math.max(
-        0,
-        Date.parse(collectorArtifact.endedAt ?? collectorArtifact.startedAt) -
-          Date.parse(collectorArtifact.startedAt),
-      )
+  const selectedSnapshot = collectorArtifact
+    ? snapshotIndexAtReplayTime(collectorArtifact, replayTimeMs)
     : 0;
+  const replayAnnouncement = collectorArtifact
+    ? `${replayPlaying ? "Replay playing from" : "Replay paused at"} ${formatReplayTime(replayTimeMs)}.`
+    : "Replay paused at 0 seconds.";
   const heatBoundaries = [
     0,
     ...heatCuts.filter((cut) => cut > 0 && cut < replayDurationMs),
@@ -1894,7 +1799,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     )
     .sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt))
     .map(({ aoi }) => aoi);
-  const selectedAoiMetric = aoiMetrics.find((metric) => metric.aoi.id === selectedAoiId) ?? null;
   const visibleCollectorArtifacts = collectorArtifacts.filter(
     (artifact) => !sessionPreferences[artifact.sessionId]?.hidden,
   );
@@ -1935,43 +1839,20 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
       return Boolean(configured.sessionIds?.includes(sessionId));
     },
   );
-  const selectedAggregateAoi =
-    aggregateAoiResults.find((metric) => metric.aoi.id === selectedAoiId) ?? null;
-  const activeAoiSessionId = aoiSessionId ?? collectorArtifact?.sessionId ?? null;
-  const drilldownSessionMetric =
-    selectedAggregateAoi?.sessionMetrics.find(
-      (metric) => metric.sessionId === activeAoiSessionId,
-    ) ?? null;
-  const drilldownVisit =
-    selectedVisitIndex == null
-      ? null
-      : (drilldownSessionMetric?.visits[selectedVisitIndex] ?? null);
-  const drilldownSamples = drilldownVisit?.samples ?? drilldownSessionMetric?.samples ?? [];
-  const proposalStates = collectorArtifact ? domProposalStates(collectorArtifact) : [];
-  const proposalState = proposalStates[proposalStateIndex] ?? null;
-  const selectedProposal = proposalState?.proposals[selectedProposalIndex] ?? null;
-  const newProposals =
-    proposalState?.proposals
-      .filter((proposal) => !replayAois.some((aoi) => proposalWasAdopted(aoi, proposal)))
-      .map((proposal) => ({
-        ...proposal,
-        sessionIds: collectorArtifact ? [collectorArtifact.sessionId] : [],
-        sourcePath: urlPath(proposalState?.url) ?? undefined,
-      })) ?? [];
-  const proposalSnapshotIndex =
-    collectorArtifact && proposalState
-      ? collectorArtifact.snapshots.reduce(
-          (best, snapshot, index) =>
-            Math.abs(Date.parse(snapshot.at) - Date.parse(proposalState.at)) <
-            Math.abs(
-              Date.parse(collectorArtifact.snapshots[best]?.at ?? collectorArtifact.startedAt) -
-                Date.parse(proposalState.at),
-            )
-              ? index
-              : best,
-          0,
-        )
-      : 0;
+  const {
+    selectedMetric: selectedAggregateAoi,
+    detailView: aoiDetailView,
+    setDetailView: setAoiDetailView,
+    activeSessionId: activeAoiSessionId,
+    setSessionId: setAoiSessionId,
+    visitIndex: selectedVisitIndex,
+    setVisitIndex: setSelectedVisitIndex,
+    sessionMetric: drilldownSessionMetric,
+    visit: drilldownVisit,
+    samples: drilldownSamples,
+    selectAoi,
+    clearAoi,
+  } = useAoiDrillDown(aggregateAoiResults, collectorArtifact?.sessionId ?? null);
   const visibleSessionCount = sessions.filter(
     (session) => !sessionPreferences[session.id]?.hidden,
   ).length;
@@ -2389,78 +2270,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
               </button>
             </nav>
             {analysisView === "metrics" && replayAois.length > 0 && (
-              <details className="aoi-management">
-                <summary>Areas of Interest · {replayAois.length}</summary>
-                <p>
-                  Rename or fine-tune saved regions. Coordinate changes immediately recompute
-                  historical metrics.
-                </p>
-                <div className="aoi-management-list">
-                  {replayAois.map((aoi, index) => (
-                    <article key={aoi.id}>
-                      <div className="aoi-management-title">
-                        <strong>AOI {index + 1}</strong>
-                        <button
-                          className="text-button danger"
-                          type="button"
-                          onClick={() => removeAoi(aoi.id)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <label>
-                        Label
-                        <input
-                          value={aoi.label}
-                          onChange={(event) => updateAoi(aoi.id, { label: event.target.value })}
-                        />
-                      </label>
-                      <span>
-                        Source:{" "}
-                        {aoi.source === "dom" ? "added from DOM proposal" : "manual AOI rectangle"}
-                      </span>
-                      {aoi.source === "dom" && (
-                        <div className="aoi-applicability">
-                          <button
-                            className={`secondary-button ${aoi.allSessions ? "active-tool" : ""}`}
-                            type="button"
-                            onClick={() => updateAoi(aoi.id, { allSessions: !aoi.allSessions })}
-                          >
-                            {aoi.allSessions
-                              ? "Enabled for all sessions"
-                              : "Enable for all sessions"}
-                          </button>
-                          <small>
-                            {aoi.allSessions
-                              ? "This AOI is forced applicable across the whole study."
-                              : "Use this only when you are sure the page and layout are the same across sessions."}
-                          </small>
-                        </div>
-                      )}
-                      <details>
-                        <summary>Advanced coordinates</summary>
-                        <div className="coordinate-grid">
-                          {(["x", "y", "width", "height"] as const).map((field) => (
-                            <label key={field}>
-                              {field}
-                              <input
-                                type="number"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={aoi[field]}
-                                onChange={(event) =>
-                                  updateAoi(aoi.id, { [field]: Number(event.target.value) || 0 })
-                                }
-                              />
-                            </label>
-                          ))}
-                        </div>
-                      </details>
-                    </article>
-                  ))}
-                </div>
-              </details>
+              <AoiManagementPanel aois={replayAois} onRemove={removeAoi} onUpdate={updateAoi} />
             )}
             {analysisView === "metrics" && (!collectorArtifact || replayAois.length === 0) && (
               <section className="empty-results dashboard-empty">
@@ -2474,116 +2284,16 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
             )}
             {analysisView === "metrics" && collectorArtifact && replayAois.length > 0 && (
               <section className="aoi-metrics-panel">
-                <div className="aoi-metrics-heading">
-                  <div>
-                    <p className="eyebrow">AOI metrics</p>
-                    <h2>AOI Performance Table</h2>
-                    <p>Metrics deserve their own surface. They are not side notes to replay.</p>
-                    <p>
-                      These metrics are recomputed from saved raw gaze samples using the current
-                      study AOIs, so newly added AOIs can appear for older sessions too.
-                    </p>
-                    <p>Scope: aggregated across all sessions stored in this analysis workspace.</p>
-                  </div>
-                  <span className="context-chip">
-                    {visibleCollectorArtifacts.length} visible session
-                    {visibleCollectorArtifacts.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <div className="session-table-wrap">
-                  <table className="session-table aoi-table">
-                    <thead>
-                      <tr>
-                        <th>Area of interest</th>
-                        <th>
-                          <MetricHeading
-                            label="Exposure %"
-                            description={metricDescriptions.exposure}
-                          />
-                        </th>
-                        <th>
-                          <MetricHeading label="Avg dwell" description={metricDescriptions.dwell} />
-                        </th>
-                        <th>
-                          <MetricHeading
-                            label="Avg proportion dwell"
-                            description={metricDescriptions.proportion}
-                          />
-                        </th>
-                        <th>
-                          <MetricHeading
-                            label="Median TTFF"
-                            description={metricDescriptions.ttff}
-                          />
-                        </th>
-                        <th>
-                          <MetricHeading
-                            label="Meaningful latency"
-                            description={metricDescriptions.meaningfulLatency}
-                          />
-                        </th>
-                        <th>
-                          <MetricHeading
-                            label="Meaningful duration"
-                            description={metricDescriptions.meaningfulDuration}
-                          />
-                        </th>
-                        <th>
-                          <MetricHeading
-                            label="Revisit rate"
-                            description={metricDescriptions.revisit}
-                          />
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {aggregateAoiResults.map((metric) => (
-                        <tr key={metric.aoi.id}>
-                          <td>
-                            <button
-                              className="aoi-name-button"
-                              type="button"
-                              onClick={() => {
-                                setSelectedAoiId(metric.aoi.id);
-                                setAoiDetailView("summary");
-                                setAoiSessionId(collectorArtifact?.sessionId ?? null);
-                                setSelectedVisitIndex(null);
-                              }}
-                            >
-                              › {metric.aoi.label}
-                            </button>
-                          </td>
-                          <td>
-                            <SpectrumMeter value={metric.exposureRate} />
-                          </td>
-                          <td>{formatReplayTime(metric.averageDwellMs)}</td>
-                          <td>{Math.round(metric.averageDwellProportion * 100)}%</td>
-                          <td>
-                            {metric.medianTtffMs == null
-                              ? "—"
-                              : formatReplayTime(metric.medianTtffMs)}
-                          </td>
-                          <td>
-                            {metric.medianFirstMeaningfulLatencyMs == null
-                              ? "—"
-                              : formatReplayTime(metric.medianFirstMeaningfulLatencyMs)}
-                          </td>
-                          <td>
-                            {metric.averageFirstMeaningfulDurationMs == null
-                              ? "—"
-                              : formatReplayTime(metric.averageFirstMeaningfulDurationMs)}
-                          </td>
-                          <td>{Math.round(metric.revisitRate * 100)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {selectedAoiMetric && selectedAggregateAoi && (
+                <AoiPerformanceTable
+                  metrics={aggregateAoiResults}
+                  visibleSessionCount={visibleCollectorArtifacts.length}
+                  onSelect={selectAoi}
+                />
+                {selectedAggregateAoi && (
                   <section className="aoi-drilldown">
                     <div>
                       <p className="eyebrow">AOI drill-down</p>
-                      <h3>{selectedAoiMetric.aoi.label}</h3>
+                      <h3>{selectedAggregateAoi.aoi.label}</h3>
                       <p>
                         Move from aggregated metrics into per-session visits and underlying sample
                         records.
@@ -2913,13 +2623,13 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                       <>
                         <p className="drilldown-copy">
                           {drilldownVisit
-                            ? `Showing raw samples inside ${selectedAoiMetric.aoi.label} for the selected visit.`
-                            : `Showing all raw samples that fall inside ${selectedAoiMetric.aoi.label} for the selected session.`}{" "}
+                            ? `Showing raw samples inside ${selectedAggregateAoi.aoi.label} for the selected visit.`
+                            : `Showing all raw samples that fall inside ${selectedAggregateAoi.aoi.label} for the selected session.`}{" "}
                           {drilldownSamples.length} rows.
                         </p>
                         {drilldownSamples.length > 0 ? (
                           <VirtualSampleTable
-                            key={`${selectedAoiMetric.aoi.id}-${activeAoiSessionId}-${selectedVisitIndex}`}
+                            key={`${selectedAggregateAoi.aoi.id}-${activeAoiSessionId}-${selectedVisitIndex}`}
                             samples={drilldownSamples.slice(0, 250)}
                             documentExtent={documentExtent}
                             activeSnapshot={activeSnapshot}
@@ -3168,7 +2878,6 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                           if (artifact) {
                             setCollectorArtifact(artifact);
                             setReplayTimeMs(0);
-                            setSelectedSnapshot(0);
                             restoreHeatPreferences(artifact);
                           }
                         }}
@@ -3717,163 +3426,12 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
                 )}
               </section>
             )}
-            {analysisView === "dom" && proposalStates.length === 0 && (
-              <section className="empty-results dashboard-empty">
-                <p className="eyebrow">Automatic AOI review</p>
-                <h2>DOM proposals</h2>
-                <p>
-                  {collectorArtifact
-                    ? "This replay session does not contain live DOM proposal AOIs. Replay screenshots are not used to reconstruct missing DOM proposals."
-                    : "Select or import a replay session to review live DOM proposal AOIs."}
-                </p>
-              </section>
-            )}
-            {analysisView === "dom" && proposalState && collectorArtifact && (
-              <section className="dom-proposals-panel">
-                <div className="dom-proposals-header">
-                  <div>
-                    <p className="eyebrow">Automatic AOI review</p>
-                    <h2>DOM Proposals</h2>
-                    <p>Review regions captured from the live DOM at recording time.</p>
-                  </div>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    disabled={!newProposals.length}
-                    onClick={() => {
-                      const additions = newProposals.map((proposal) => ({
-                        ...proposal,
-                        id: crypto.randomUUID(),
-                        source: "dom" as const,
-                      }));
-                      persistAois([...replayAois, ...additions]);
-                      setNotice({
-                        kind: "success",
-                        text: `${additions.length} DOM proposals were added to this study.`,
-                      });
-                    }}
-                  >
-                    {newProposals.length ? `Add ${newProposals.length} New` : "All Added"}
-                  </button>
-                </div>
-                <div className="proposal-toolbar">
-                  <label>
-                    Screen state
-                    <select
-                      value={proposalStateIndex}
-                      onChange={(event) => {
-                        setProposalStateIndex(Number(event.target.value));
-                        setSelectedProposalIndex(0);
-                      }}
-                    >
-                      {proposalStates.map((state, index) => (
-                        <option value={index} key={`${state.at}-${index}`}>
-                          {new Date(state.at).toLocaleTimeString()} · {state.trigger} ·{" "}
-                          {state.proposals.length}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <span className="context-chip">{proposalState.proposals.length} on screen</span>
-                  <span className="context-chip">{newProposals.length} new</span>
-                  <span className="context-chip">
-                    {proposalState.proposals.length - newProposals.length} added
-                  </span>
-                </div>
-                <div className="proposal-grid">
-                  <section>
-                    <div className="snapshot-title">
-                      <h3>Screen Preview</h3>
-                      <span>
-                        {new Date(proposalState.at).toLocaleTimeString()} · {proposalState.trigger}
-                      </span>
-                    </div>
-                    {collectorArtifact.snapshots[proposalSnapshotIndex] ? (
-                      <div className="proposal-preview">
-                        <img
-                          src={collectorArtifact.snapshots[proposalSnapshotIndex].dataUrl}
-                          alt="Recorded page state"
-                        />
-                        {proposalState.proposals.map((proposal, index) => (
-                          <button
-                            type="button"
-                            key={`${proposal.label}-${index}`}
-                            className={selectedProposalIndex === index ? "selected" : ""}
-                            aria-label={`Select ${proposal.label}`}
-                            onClick={() => setSelectedProposalIndex(index)}
-                            style={{
-                              left: `${Math.max(0, proposal.x) * 100}%`,
-                              top: `${Math.max(0, proposal.y) * 100}%`,
-                              width: `${Math.min(1, proposal.width) * 100}%`,
-                              height: `${Math.min(1, proposal.height) * 100}%`,
-                            }}
-                          >
-                            {selectedProposalIndex === index ? "Selected" : index + 1}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p>
-                        This screen state has DOM proposals, but no matching screenshot preview was
-                        saved.
-                      </p>
-                    )}
-                  </section>
-                  <aside>
-                    <div className="proposal-inspector">
-                      <p className="eyebrow">Selected candidate</p>
-                      <h3>{selectedProposal?.label ?? "No proposal selected"}</h3>
-                      {selectedProposal && (
-                        <>
-                          <span>
-                            {selectedProposal.tag}
-                            {selectedProposal.role ? ` · ${selectedProposal.role}` : ""}
-                          </span>
-                          <p>
-                            {Math.round(selectedProposal.width * 100)}% ×{" "}
-                            {Math.round(selectedProposal.height * 100)}% of viewport
-                          </p>
-                          <button
-                            className="primary-button"
-                            type="button"
-                            disabled={replayAois.some((aoi) =>
-                              proposalWasAdopted(aoi, selectedProposal),
-                            )}
-                            onClick={() => addProposal(selectedProposal.label, selectedProposal)}
-                          >
-                            {replayAois.some((aoi) => proposalWasAdopted(aoi, selectedProposal))
-                              ? "Added"
-                              : "Add to Study"}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    <ol className="proposal-list">
-                      {proposalState.proposals.map((proposal, index) => {
-                        const added = replayAois.some((aoi) => proposalWasAdopted(aoi, proposal));
-                        return (
-                          <li
-                            className={selectedProposalIndex === index ? "selected" : ""}
-                            key={`${proposal.label}-${index}`}
-                          >
-                            <button type="button" onClick={() => setSelectedProposalIndex(index)}>
-                              <b>{index + 1}</b>
-                              <span>
-                                <strong>{proposal.label}</strong>
-                                <small>
-                                  {proposal.tag} ·{" "}
-                                  {Math.round(proposal.width * proposal.height * 100)}% viewport
-                                </small>
-                              </span>
-                              <em>{added ? "Added" : "Review"}</em>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ol>
-                  </aside>
-                </div>
-              </section>
+            {analysisView === "dom" && (
+              <DomProposalsPanel
+                artifact={collectorArtifact}
+                aois={replayAois}
+                onAdd={addProposals}
+              />
             )}
           </>
         )}
@@ -4026,7 +3584,37 @@ function ProjectAccessPage({
   }
 
   useEffect(() => {
-    void load();
+    let active = true;
+    void api
+      .getProjectAccess(project.id)
+      .then(async (currentAccess) => {
+        if (!active) return;
+        setAccess(currentAccess);
+        if (!currentAccess.can_manage_members) return;
+        const [memberList, invitationList, auditList] = await Promise.all([
+          api.listProjectMembers(project.id),
+          api.listProjectInvitations(project.id),
+          api.listProjectAuditEvents(project.id),
+        ]);
+        if (!active) return;
+        setMembers(memberList.items);
+        setInvitations(invitationList.items);
+        setEvents(auditList.items);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(
+          loadError instanceof ApiClientError
+            ? loadError.message
+            : "Project access could not be loaded.",
+        );
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [project.id]);
 
   async function addMember(event: FormEvent<HTMLFormElement>) {

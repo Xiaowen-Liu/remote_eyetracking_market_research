@@ -5,6 +5,7 @@ import {
   domProposalStates,
   gazeSamplesForSnapshot,
   parseCollectorArtifact,
+  snapshotIndexAtReplayTime,
 } from "./collectorArtifact";
 
 describe("parseCollectorArtifact", () => {
@@ -64,6 +65,18 @@ describe("parseCollectorArtifact", () => {
   it("drops out-of-bounds coordinates before replay", () => {
     const parsed = parseCollectorArtifact({ ...artifact, gazeSamples: [{ x: 1.4, y: 0.2 }] });
     expect(parsed.gazeSamples).toEqual([]);
+  });
+
+  it("derives the active screen from replay time instead of storing duplicate selection state", () => {
+    const parsed = parseCollectorArtifact({
+      ...artifact,
+      snapshots: [
+        { at: "2026-09-11T00:00:05.000Z", dataUrl: "data:image/jpeg;base64,first" },
+        { at: "2026-09-11T00:00:15.000Z", dataUrl: "data:image/jpeg;base64,second" },
+      ],
+    });
+    expect(snapshotIndexAtReplayTime(parsed, 4_999)).toBe(0);
+    expect(snapshotIndexAtReplayTime(parsed, 15_000)).toBe(1);
   });
 });
 
