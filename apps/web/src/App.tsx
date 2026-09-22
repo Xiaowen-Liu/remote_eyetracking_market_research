@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -96,6 +97,58 @@ const emptyDraft: StudyDraft = {
   ],
 };
 
+function toDraft(value: StudyDraftResponse): StudyDraft {
+  return {
+    title: value.title,
+    description: value.description,
+    consent_version: value.consent_version,
+    consent_text: value.consent_text,
+    target_origins: value.target_origins,
+    calibration_policy: value.calibration_policy,
+    collection_policy: value.collection_policy,
+    retention_days: value.retention_days,
+    tasks: value.tasks,
+  };
+}
+
+async function bootstrapStudyWorkspace() {
+  const researcher = hasResearcherToken() ? await api.getCurrentResearcher() : null;
+  const projectList = await api.listProjects();
+  const project = projectList.items[0] ?? (await api.createProject("Checkout UX research"));
+  const projects = projectList.items.length ? projectList.items : [project];
+  const [studies, access] = await Promise.all([
+    api.listStudies(project.id),
+    api.getProjectAccess(project.id),
+  ]);
+  const summary = studies.items[0];
+  if (!summary) {
+    return {
+      researcher,
+      projects,
+      project,
+      access,
+      study: null,
+      draft: emptyDraft,
+      editing: true,
+      participantUrl: null,
+    };
+  }
+  const study = await api.getDraft(summary.id);
+  const participantUrl = study.current_published_version
+    ? (await api.getParticipantLink(study.id)).participant_url
+    : null;
+  return {
+    researcher,
+    projects,
+    project,
+    access,
+    study,
+    draft: toDraft(study),
+    editing: study.current_published_version === null,
+    participantUrl,
+  };
+}
+
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 type TaskAggregate = {
@@ -105,6 +158,46 @@ type TaskAggregate = {
   sampleCount: number;
   meanConfidence: number | null;
 };
+
+type AnalysisWorkspace = {
+  jobs: AnalysisJob[];
+  sessions: ParticipantSessionSummary[];
+  uploadedArtifacts: CollectorArtifact[];
+  resultsByJob: Record<string, AnalysisResult>;
+};
+
+async function fetchAnalysisWorkspace(studyId: string): Promise<AnalysisWorkspace> {
+  const [jobResponse, sessionResponse] = await Promise.all([
+    api.listStudyAnalysisJobs(studyId),
+    api.listStudyParticipantSessions(studyId),
+  ]);
+  const uploadedArtifacts = (
+    await Promise.all(
+      sessionResponse.items
+        .filter((session) => session.source === "participant-session")
+        .map(async (session) => {
+          try {
+            return parseCollectorArtifact(
+              await api.getParticipantSessionReplay(studyId, session.id),
+            );
+          } catch (error) {
+            if (error instanceof ApiClientError && error.code === "REPLAY_NOT_FOUND") return null;
+            throw error;
+          }
+        }),
+    )
+  ).filter((artifact): artifact is CollectorArtifact => artifact !== null);
+  const completedJobs = jobResponse.items.filter((job) => job.status === "succeeded");
+  const loadedResults = await Promise.all(
+    completedJobs.map(async (job) => [job.id, await api.getAnalysisResult(job.id)] as const),
+  );
+  return {
+    jobs: jobResponse.items,
+    sessions: sessionResponse.items,
+    uploadedArtifacts,
+    resultsByJob: Object.fromEntries(loadedResults),
+  };
+}
 
 function numberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -268,38 +361,51 @@ function StudyBuilder() {
   const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [researcher, setResearcher] = useState<Researcher | null>(null);
+  const applyBootstrapWorkspace = useCallback(
+    (workspace: Awaited<ReturnType<typeof bootstrapStudyWorkspace>>) => {
+      setResearcher(workspace.researcher);
+      setProjects(workspace.projects);
+      setProject(workspace.project);
+      setProjectAccess(workspace.access);
+      setStudy(workspace.study);
+      setDraft(workspace.draft);
+      setEditing(workspace.editing);
+      setParticipantUrl(workspace.participantUrl);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (bootstrapStarted.current) return;
     bootstrapStarted.current = true;
-    void bootstrap();
-  }, []);
-
-  async function bootstrap() {
-    try {
-      if (hasResearcherToken()) {
-        setResearcher(await api.getCurrentResearcher());
-      }
-      const projectList = await api.listProjects();
-      const current = projectList.items[0] ?? (await api.createProject("Checkout UX research"));
-      const available = projectList.items.length ? projectList.items : [current];
-      setProjects(available);
-      await selectProject(current);
-    } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        ["RESEARCHER_AUTH_REQUIRED", "INVALID_RESEARCHER_SESSION"].includes(error.code)
-      ) {
-        saveResearcherToken(null);
-        setResearcher(null);
-        setAuthRequired(true);
-      } else {
-        showError(error);
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
+    let active = true;
+    void bootstrapStudyWorkspace()
+      .then((workspace) => {
+        if (!active) return;
+        applyBootstrapWorkspace(workspace);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (
+          error instanceof ApiClientError &&
+          ["RESEARCHER_AUTH_REQUIRED", "INVALID_RESEARCHER_SESSION"].includes(error.code)
+        ) {
+          saveResearcherToken(null);
+          setResearcher(null);
+          setAuthRequired(true);
+        } else {
+          const text =
+            error instanceof ApiClientError ? error.message : "Something went wrong. Try again.";
+          setNotice({ kind: "error", text });
+        }
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [applyBootstrapWorkspace]);
 
   async function selectProject(nextProject: Project, isNewProject = false) {
     setBusy(true);
@@ -351,20 +457,6 @@ function StudyBuilder() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function toDraft(value: StudyDraftResponse): StudyDraft {
-    return {
-      title: value.title,
-      description: value.description,
-      consent_version: value.consent_version,
-      consent_text: value.consent_text,
-      target_origins: value.target_origins,
-      calibration_policy: value.calibration_policy,
-      collection_policy: value.collection_policy,
-      retention_days: value.retention_days,
-      tasks: value.tasks,
-    };
   }
 
   function showError(error: unknown) {
@@ -493,7 +585,15 @@ function StudyBuilder() {
           setResearcher(sessionResearcher);
           setAuthRequired(false);
           setBusy(true);
-          await bootstrap();
+          try {
+            applyBootstrapWorkspace(await bootstrapStudyWorkspace());
+          } catch (error) {
+            const text =
+              error instanceof ApiClientError ? error.message : "Something went wrong. Try again.";
+            setNotice({ kind: "error", text });
+          } finally {
+            setBusy(false);
+          }
         }}
       />
     );
@@ -967,6 +1067,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   const [viewSettingsOpen, setViewSettingsOpen] = useState(false);
   const [showHiddenSessions, setShowHiddenSessions] = useState(false);
   const aoiDragStart = useRef<{ x: number; y: number } | null>(null);
+  const selectedJobIdRef = useRef<string | null>(null);
   const { replayAois, persistAois, sessionPreferences, saveSessionPreference } =
     useStudyAnalysisPreferences(study.id);
   const {
@@ -983,17 +1084,13 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   );
 
   useEffect(() => {
-    void loadJobs();
-  }, [study.id]);
-
-  useEffect(() => {
     let active = true;
     void listStoredArtifacts(study.id)
       .then((stored) => {
         if (!active || !stored.length) return;
         setCollectorArtifacts(stored);
         setCollectorArtifact((current) => current ?? stored[0]);
-        if (!collectorArtifact) restoreHeatPreferences(stored[0]);
+        restoreHeatPreferences(stored[0]);
       })
       .catch(() => {
         if (active)
@@ -1007,61 +1104,46 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     };
   }, [study.id]);
 
-  async function loadJobs() {
-    setBusy(true);
-    try {
-      const response = await api.listStudyAnalysisJobs(study.id);
-      const sessionResponse = await api.listStudyParticipantSessions(study.id);
-      setJobs(response.items);
-      setSessions(sessionResponse.items);
-      const uploadedArtifacts = (
-        await Promise.all(
-          sessionResponse.items
-            .filter((session) => session.source === "participant-session")
-            .map(async (session) => {
-              try {
-                return parseCollectorArtifact(
-                  await api.getParticipantSessionReplay(study.id, session.id),
-                );
-              } catch (error) {
-                if (error instanceof ApiClientError && error.code === "REPLAY_NOT_FOUND")
-                  return null;
-                throw error;
-              }
-            }),
-        )
-      ).filter((artifact): artifact is CollectorArtifact => artifact !== null);
-      if (uploadedArtifacts.length) {
+  const applyAnalysisWorkspace = useCallback(
+    (workspace: AnalysisWorkspace) => {
+      setJobs(workspace.jobs);
+      setSessions(workspace.sessions);
+      if (workspace.uploadedArtifacts.length) {
         setCollectorArtifacts((current) => {
-          const uploadedIds = new Set(uploadedArtifacts.map((artifact) => artifact.sessionId));
+          const uploadedIds = new Set(
+            workspace.uploadedArtifacts.map((artifact) => artifact.sessionId),
+          );
           return [
-            ...uploadedArtifacts,
+            ...workspace.uploadedArtifacts,
             ...current.filter((artifact) => !uploadedIds.has(artifact.sessionId)),
           ];
         });
         setCollectorArtifact((current) => {
           const replacement = current
-            ? uploadedArtifacts.find((artifact) => artifact.sessionId === current.sessionId)
+            ? workspace.uploadedArtifacts.find(
+                (artifact) => artifact.sessionId === current.sessionId,
+              )
             : null;
-          return replacement ?? current ?? uploadedArtifacts[0];
+          return replacement ?? current ?? workspace.uploadedArtifacts[0];
         });
-        void storeArtifacts(study.id, uploadedArtifacts).catch(() => undefined);
+        void storeArtifacts(study.id, workspace.uploadedArtifacts).catch(() => undefined);
       }
-      const latest = response.items[0];
-      const completed = response.items.filter((job) => job.status === "succeeded");
-      const loaded = await Promise.all(
-        completed.map(async (job) => [job.id, await api.getAnalysisResult(job.id)] as const),
-      );
-      const nextResults = Object.fromEntries(loaded);
-      setResultsByJob(nextResults);
+      setResultsByJob(workspace.resultsByJob);
+      const latest = workspace.jobs[0];
       const selected =
-        selectedJobId && nextResults[selectedJobId] ? selectedJobId : (latest?.id ?? null);
+        selectedJobIdRef.current && workspace.resultsByJob[selectedJobIdRef.current]
+          ? selectedJobIdRef.current
+          : (latest?.id ?? null);
+      selectedJobIdRef.current = selected;
       setSelectedJobId(selected);
-      if (selected && nextResults[selected]) {
-        setResult(nextResults[selected]);
-      } else {
-        setResult(null);
-      }
+      setResult(selected ? (workspace.resultsByJob[selected] ?? null) : null);
+    },
+    [study.id],
+  );
+
+  const loadJobs = useCallback(async () => {
+    try {
+      applyAnalysisWorkspace(await fetchAnalysisWorkspace(study.id));
     } catch (error) {
       const text =
         error instanceof ApiClientError ? error.message : "Could not load analysis jobs.";
@@ -1069,7 +1151,27 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     } finally {
       setBusy(false);
     }
-  }
+  }, [applyAnalysisWorkspace, study.id]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchAnalysisWorkspace(study.id)
+      .then((workspace) => {
+        if (active) applyAnalysisWorkspace(workspace);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const text =
+          error instanceof ApiClientError ? error.message : "Could not load analysis jobs.";
+        setNotice({ kind: "error", text });
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [applyAnalysisWorkspace, study.id]);
 
   async function runLatestJob(job: AnalysisJob) {
     setBusy(true);
@@ -1077,6 +1179,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
     try {
       const nextResult = await api.runAnalysisJob(job.id);
       setResult(nextResult);
+      selectedJobIdRef.current = job.id;
       setSelectedJobId(job.id);
       setResultsByJob((current) => ({ ...current, [job.id]: nextResult }));
       setJobs((current) =>
@@ -1110,6 +1213,7 @@ function ResultsDashboard({ study, onBack }: { study: StudyDraftResponse; onBack
   }
 
   function selectJob(jobId: string) {
+    selectedJobIdRef.current = jobId;
     setSelectedJobId(jobId);
     setResult(resultsByJob[jobId] ?? null);
   }
